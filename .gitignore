@@ -1,0 +1,15 @@
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Editor
+.vs/
+.idea/
+*.user
+*.suo
+
+# Secrets (when implementation starts)
+.env
+appsettings.*.local.json
+*.pfx

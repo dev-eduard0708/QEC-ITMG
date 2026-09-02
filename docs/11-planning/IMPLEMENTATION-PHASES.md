@@ -1,0 +1,372 @@
+# Implementation phases
+
+Related: [MASTER-ROADMAP.md](MASTER-ROADMAP.md) · [MVP-DEFINITION.md](MVP-DEFINITION.md) · [DEFINITION-OF-DONE.md](DEFINITION-OF-DONE.md)
+
+Phases are ordered by **dependency**, not by sidebar menus. Each package is a later Cursor implementation task.
+
+**Phase count: 21 (Phase 0 through Phase 20).**
+
+Global out-of-scope for every phase: custom remote protocol, microservices, Kafka, skipping authz/history.
+
+---
+
+## Phase 0 — Architecture, repository foundation, engineering standards
+
+**Objective:** Empty repo becomes a buildable modular-monolith skeleton with CI hooks and no business features.
+
+**Prerequisites:** Documentation accepted (this set).
+
+**Scope:** Solution layout per [../01-architecture/SOLUTION-STRUCTURE.md](../01-architecture/SOLUTION-STRUCTURE.md); EditorConfig; analyzers; frontend Vite shell; health endpoint; `.gitignore`; directory.Build.props; architecture test project empty rules.
+
+**Out of scope:** Tickets, SSO completion (stub ok), MeshCentral.
+
+### Packages
+
+| ID | Work |
+|----|------|
+| P0-01 | Repository and solution foundation (first coding package) |
+| P0-02 | Host, DI module interface, health checks, Serilog |
+| P0-03 | Frontend Vite/React/Tailwind/shadcn shell, routing stub |
+| P0-04 | EF conventions, SQL connection, migrate empty |
+| P0-05 | CI pipeline (build/test) |
+| P0-06 | Architecture tests skeleton |
+| P0-07 | Docker compose optional SQL for dev |
+| P0-08 | Docs pointer in README status still architecture+foundation |
+
+**Backend:** Host, BuildingBlocks empty types (`IClock`).
+**Frontend:** App shell, design tokens.
+**Database:** Empty or `plt` placeholder.
+**Security:** HTTPS dev certs; no anonymous business API.
+**Audit:** N/A yet.
+**Tests:** Solution builds; one architecture test (Host references modules correctly).
+**Dependencies:** None.
+**Acceptance / exit:** `dotnet build` + `npm run build` succeed; no feature claims in README.
+
+---
+
+## Phase 1 — Identity, organization, users, roles, permissions, audit foundation
+
+**Objective:** Real users, RBAC, org lookups, immutable security + business audit for identity changes.
+
+**Prerequisites:** P0.
+
+**Out of scope:** Tickets, SSO polish can complete here (OIDC BFF).
+
+### Packages
+
+| ID | Work |
+|----|------|
+| P1-01 | User, Role, Permission entities |
+| P1-02 | OIDC BFF cookie auth |
+| P1-03 | Permission policies |
+| P1-04 | Departments, locations |
+| P1-05 | Admin UI users/roles |
+| P1-06 | BusinessAuditRecord + SecurityAuditEvent |
+| P1-07 | Break-glass local admin |
+| P1-08 | Authz tests |
+| P1-09 | `/me` endpoint and SPA session |
+| P1-10 | Seed Employee + Platform Administrator |
+
+**Security:** MFA story documented; Entra CA; step-up placeholder claim.
+**Audit:** Role assignment history required.
+**Acceptance:** Cannot call admin API as Employee; history row on role change.
+
+---
+
+## Phase 2 — Shared platform foundations
+
+**Objective:** Numbering, attachments, comments/timeline, workflow, notifications, lookups.
+
+**Prerequisites:** P1.
+
+**Out of scope:** Ticket types.
+
+### Packages
+
+| ID | Work |
+|----|------|
+| P2-01 | NumberSequence concurrency |
+| P2-02 | Attachment metadata + disk storage |
+| P2-03 | Malware scan state machine |
+| P2-04 | Comments visibility |
+| P2-05 | Workflow engine (data-driven states) |
+| P2-06 | Notification entity + in-app |
+| P2-07 | Email channel Hangfire |
+| P2-08 | Lookup admin |
+| P2-09 | Tests numbering races |
+| P2-10 | SPA shared components (table, timeline) |
+
+---
+
+## Phase 3 — Asset management / CMDB foundation
+
+**Objective:** CI + Asset as source of truth.
+
+**Prerequisites:** P2.
+
+**Out of scope:** Discovery integrations, full relationship graph UX (simple list + typed links ok).
+
+### Packages
+
+| ID | Work |
+|----|------|
+| P3-01 | CiType, ConfigurationItem |
+| P3-02 | Relationships |
+| P3-03 | Asset + assignment + custody |
+| P3-04 | BusinessService stub |
+| P3-05 | APIs + authz classification |
+| P3-06 | IT UI list/detail |
+| P3-07 | Employee My Equipment |
+| P3-08 | History on assignment |
+| P3-09 | Tests |
+| P3-10 | Seed types (laptop, server, application) |
+
+---
+
+## Phase 4 — Service desk / support tickets / service requests
+
+**Objective:** Daily ITSM for SR and incidents (incident = ticket type).
+
+**Prerequisites:** P3 (link CI). P2 SLA needs Hangfire.
+
+**Out of scope:** Full problem, major-incident war room, email-in.
+
+### Packages
+
+| ID | Work |
+|----|------|
+| P4-01 | Ticket domain |
+| P4-02 | Ticket API |
+| P4-03 | Assignment / queues |
+| P4-04 | SLA engine |
+| P4-05 | Ticket UI employee + IT |
+| P4-06 | Attachments on ticket |
+| P4-07 | Timeline |
+| P4-08 | Notifications assign/SLA |
+| P4-09 | Tests including IDOR |
+| P4-10 | E2E employee request |
+| P4-11 | KB published read + simple manage |
+| P4-12 | Operational dashboard widgets |
+
+---
+
+## Phase 5 — Incident and problem management
+
+**Objective:** Incident specialization (major flag, security classification) and Problem aggregate.
+
+**Prerequisites:** P4.
+
+**MVP note:** Security classification + major flag should not wait if P4 shipped without them — include in P4 if possible; P5 completes problem.
+
+### Packages
+
+| ID | Work |
+|----|------|
+| P5-01 | Incident fields, security permission |
+| P5-02 | Promote from event (stub until P8) |
+| P5-03 | Problem domain/API/UI |
+| P5-04 | Link incidents |
+| P5-05 | Recurring metrics |
+| P5-06 | Tests security IDOR |
+| P5-07 | Known error flag |
+
+**Out of scope:** Full PIR methodology UI.
+
+---
+
+## Phase 6 — Change management
+
+**Objective:** Standard/normal/emergency with SoD approvals and CI links.
+
+**Prerequisites:** P3, P2 workflow. P4 for optional ticket link.
+
+### Packages
+
+| ID | Work |
+|----|------|
+| P6-01 | Change domain |
+| P6-02 | API + CI links |
+| P6-03 | Approval SoD |
+| P6-04 | Implementation/validation/PIR states |
+| P6-05 | UI |
+| P6-06 | Notifications approval |
+| P6-07 | Tests SoD |
+| P6-08 | Standard change catalog (optional) |
+| P6-09 | Emergency retrospective path |
+| P6-10 | History |
+
+---
+
+## Phase 7 — Remote support integration
+
+**Objective:** ITMG-owned attended sessions; adapter to MeshCentral; no engine bypass.
+
+**Prerequisites:** P1, P3, P4 (ticket). P6 recommended before unattended.
+
+### Packages
+
+| ID | Work |
+|----|------|
+| P7-00 | Engine spike / lab MeshCentral |
+| P7-01 | RemoteSessionRequest domain |
+| P7-02 | Consent API/UI |
+| P7-03 | `IRemoteSupportEngine` + MeshCentral adapter |
+| P7-04 | Active/history/audit log UI |
+| P7-05 | Webhook/poll end session |
+| P7-06 | Unattended flag **off** in prod MVP |
+| P7-07 | Security tests (no start without authz) |
+| P7-08 | Degraded mode |
+| P7-09 | Notifications |
+| P7-10 | E2E with mock engine |
+
+**Out of scope:** Custom protocol; Guacamole (later adapter).
+
+---
+
+## Phase 8 — Events, monitoring, IT operations
+
+**Prerequisites:** P3. P4 for promote-to-incident.
+
+### Packages
+
+P8-01 Event ingest/dedup; P8-02 Acknowledge/promote; P8-03 Backup/restore test records; P8-04 Certificates expiry notify; P8-05 Patch metadata; P8-06 Jobs metadata; P8-07 Retention; P8-08 UI; P8-09 Permissions; P8-10 Tests.
+
+**Out of scope:** SIEM replacement, raw syslog.
+
+---
+
+## Phase 9 — Access management / JML
+
+**Prerequisites:** P1, P3 (apps as CI), P2 workflow. P4 optional work orders.
+
+### Packages
+
+P9-01 AccessCase; P9-02 Joiner; P9-03 Mover; P9-04 Leaver checklist; P9-05 Access request; P9-06 Reviews; P9-07 Privileged/service accounts; P9-08 SoD rules; P9-09 Evidence promote hook (manual); P9-10 Tests.
+
+**Out of scope:** Full AD automation (interface only / checklist).
+
+---
+
+## Phase 10 — Policy and document management
+
+**Prerequisites:** P2 files, P1 users.
+
+### Packages
+
+P10-01 ManagedDocument versions; P10-02 Policy UX; P10-03 Approvals; P10-04 Acknowledgements; P10-05 Review notifications; P10-06 Diagram type; P10-07 Tests.
+
+---
+
+## Phase 11 — Governance and control library
+
+**Prerequisites:** P3 for registers-as-views; P10 optional policy links.
+
+### Packages
+
+P11-01 Org chart; P11-02 Register views; P11-03 InternalControl CRUD; P11-04 Owners/frequency; P11-05 TestProcedure; P11-06 UI; P11-07 Permissions; P11-08 Tests.
+
+**Out of scope:** Framework content packs (P12).
+
+---
+
+## Phase 12 — Compliance framework mapping
+
+**Prerequisites:** P11.
+
+### Packages
+
+P12-01 Framework version requirement import model; P12-02 Mapping UI; P12-03 Coverage APIs (honest); P12-04 Assessment; P12-05 Calendar; P12-06 Seed **structure** not full COBIT text (licensing!); P12-07 Tests; P12-08 No vanity %.
+
+Content packs: load licensed/public text as **data files**, not code.
+
+---
+
+## Phase 13 — Evidence library
+
+**Prerequisites:** P11, P2 files.
+
+### Packages
+
+P13-01 Evidence entity; P13-02 Links; P13-03 Validity job; P13-04 Accept workflow; P13-05 Export permission (may wait P14); P13-06 UI; P13-07 Tests classification; P13-08 Promote from change/restore if those exist.
+
+---
+
+## Phase 14 — Audit management
+
+**Prerequisites:** P13.
+
+### Packages
+
+P14-01 Engagement; P14-02 Questions; P14-03 Findings; P14-04 CAPA; P14-05 Evidence requests; P14-06 Export pack + audit log; P14-07 Auditor role; P14-08 Tests.
+
+---
+
+## Phase 15 — Security management
+
+**Prerequisites:** P3, P4 (security tickets), P11 optional risk-control link.
+
+### Packages
+
+P15-01 Vulnerability; P15-02 Remediation link change/ticket; P15-03 Risk register; P15-04 Exceptions; P15-05 Pentest record; P15-06 Awareness completions; P15-07 Dashboard; P15-08 Tests.
+
+Scanner ingest: stub adapter.
+
+---
+
+## Phase 16 — Business continuity
+
+**Prerequisites:** P3 BusinessService RTO/RPO.
+
+### Packages
+
+P16-01 BIA; P16-02 Plans; P16-03 Procedures; P16-04 DR tests + evidence; P16-05 SPOF flag; P16-06 Reports; P16-07 Tests.
+
+---
+
+## Phase 17 — Vendor / third-party
+
+**Prerequisites:** P3 vendor FK may already exist; this fills Vendor aggregate.
+
+### Packages
+
+P17-01 Vendor/contract; P17-02 Assessments; P17-03 Expiry notify; P17-04 Vendor access link; P17-05 UI; P17-06 Tests.
+
+---
+
+## Phase 18 — Advanced reporting / executive dashboards
+
+**Prerequisites:** Data from prior phases. MVP used P4-12 widgets.
+
+### Packages
+
+P18-01 Report API package; P18-02 Snapshots Hangfire; P18-03 Exec dashboard; P18-04 Compliance honest tiles; P18-05 Export CSV audited; P18-06 Permissions per report; P18-07 Tests.
+
+---
+
+## Phase 19 — Integrations / automation
+
+**Prerequisites:** Adapters behind interfaces already. This wires real systems.
+
+### Packages
+
+P19-01 Directory sync/JML; P19-02 Mail/M365; P19-03 Veeam/events; P19-04 vCenter/Hyper-V enrich; P19-05 Vuln scanner; P19-06 SIEM outbound; P19-07 Webhook hardening; P19-08 Tests/secrets.
+
+**Out of scope:** Building those vendors’ products.
+
+---
+
+## Phase 20 — AI assistance
+
+**Prerequisites:** Stable APIs + RBAC. Local/on-prem model optional.
+
+### Packages
+
+P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 KB suggest; P20-04 Summaries; P20-05 NL query restricted to permitted reports; P20-06 Redaction; P20-07 Prompt-injection tests; P20-08 Never unattended remote via model.
+
+**Out of scope:** Autopilot changes to production.
+
+---
+
+## Suggested first coding task after docs review
+
+**P0-01 Repository and solution foundation** — create `src` layout, Host, BuildingBlocks, test projects, frontend shell, gitignore, build. Do not implement service desk in that task.
