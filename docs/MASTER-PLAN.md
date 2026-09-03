@@ -147,9 +147,9 @@ Authz + history + tests + docs for every package. [11-planning/DEFINITION-OF-DON
 
 **Phase 0 is complete** (including P0-08 closeout). Optional P0-07 Docker Compose for SQL remains deferred while local SQL Express works.
 
-**Next:** Phase 4 / package **P4-09 — Tests including IDOR.**
+**Next:** Phase 5 / package **P5-01 — Incident specialization.**
 
-Service desk ticket UI, attachments, comments/timeline, and notifications (P4-05..P4-08) are complete.
+Phase 4 (Service desk) is COMPLETE (P4-01..P4-12).
 
 ---
 

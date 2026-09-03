@@ -154,10 +154,10 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 | P4-06 | Attachments on ticket | Done |
 | P4-07 | Timeline | Done |
 | P4-08 | Notifications assign/SLA | Done |
-| P4-09 | Tests including IDOR |
-| P4-10 | E2E employee request |
-| P4-11 | KB published read + simple manage |
-| P4-12 | Operational dashboard widgets |
+| P4-09 | Tests including IDOR | Done |
+| P4-10 | E2E employee request | Done |
+| P4-11 | KB published read + simple manage | Done |
+| P4-12 | Operational dashboard widgets | Done |
 
 ---
 
@@ -380,4 +380,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete.** Packages **P4-01..P4-08** (ticket domain through UI, attachments, comments/timeline, notifications) are done. Next: **P4-09 Tests including IDOR.**
+**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete. Phase 4 (Service desk) is COMPLETE (P4-01..P4-12).** Next: **P5-01 Incident specialization.**
