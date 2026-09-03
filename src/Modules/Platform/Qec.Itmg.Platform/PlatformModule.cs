@@ -42,7 +42,8 @@ public sealed class PlatformModule : IModule
             .Get<SmtpEmailOptions>()
             ?? new SmtpEmailOptions();
         services.AddSingleton(Options.Create(smtpOptions));
-        services.AddSingleton<IEmailSender, NullEmailSender>();
+        services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        services.AddSingleton<IEmailQueue, InlineEmailQueue>();
 
         // Integration adapters — all disabled by default; production connections require QEC authorization.
         IntegrationOptions integrationOptions = configuration

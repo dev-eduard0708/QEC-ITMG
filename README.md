@@ -28,7 +28,7 @@ QEC ITMG is the internal enterprise platform for IT service management, operatio
 | Business domain (tickets, assets, GRC, …) | **Not started** |
 | Production deployment | **Not started** |
 
-**Next step:** Phase 2 — Shared platform foundations (package **P2-01 NumberSequence concurrency**). See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) and [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md).
+**Next step:** Phase 2 — Shared platform foundations (package **P2-08 Lookup admin**). See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) and [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md).
 
 P0-07 (optional Docker Compose for SQL) is **deferred**: local SQL Express development already works.
 

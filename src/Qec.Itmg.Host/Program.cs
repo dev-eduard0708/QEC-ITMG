@@ -1,7 +1,14 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Hangfire;
+using Hangfire.SqlServer;
+using Qec.Itmg.BuildingBlocks.Email;
+using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.Host;
+using Qec.Itmg.Host.Email;
+using Qec.Itmg.Host.Notifications;
 using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Identity.Admin;
@@ -12,7 +19,6 @@ using Qec.Itmg.Identity.Seed;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Platform.Persistence;
-using Qec.Itmg.Host.Notifications;
 using Serilog;
 using System.Security.Claims;
 
@@ -41,6 +47,33 @@ try
     builder.Services.AddIdentityAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddIdentitySeed(builder.Configuration);
     builder.Services.AddScoped<ISharedDbTransaction, SharedSqlTransaction>();
+
+    bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
+    string? hangfireConnection = builder.Configuration.GetConnectionString(QecEfConventions.ConnectionStringName);
+    if (enableHangfire && !string.IsNullOrWhiteSpace(hangfireConnection))
+    {
+        builder.Services.AddHangfire(configuration => configuration
+            .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+            .UseSimpleAssemblyNameTypeSerializer()
+            .UseRecommendedSerializerSettings()
+            .UseSqlServerStorage(
+                hangfireConnection,
+                new SqlServerStorageOptions
+                {
+                    SchemaName = "hangfire",
+                    PrepareSchemaIfNecessary = true,
+                    CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
+                    SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
+                    QueuePollInterval = TimeSpan.Zero,
+                    UseRecommendedIsolationLevel = true,
+                    DisableGlobalLocks = true,
+                }));
+
+        builder.Services.AddHangfireServer();
+        builder.Services.AddTransient<NotificationEmailJob>();
+        builder.Services.RemoveAll<IEmailQueue>();
+        builder.Services.AddSingleton<IEmailQueue, HangfireEmailQueue>();
+    }
 
     builder.Services
         .AddHealthChecks()
