@@ -7,7 +7,8 @@ namespace Qec.Itmg.ServiceDesk.Services;
 
 public sealed class SlaEvaluationService(ServiceDeskDbContext db, IClock clock)
 {
-    public async Task<int> MarkBreachesAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SlaBreachEvent>> MarkBreachesAsync(
+        CancellationToken cancellationToken = default)
     {
         DateTimeOffset utcNow = clock.UtcNow;
         List<Ticket> candidates = await db.Tickets
@@ -26,24 +27,32 @@ public sealed class SlaEvaluationService(ServiceDeskDbContext db, IClock clock)
             .Take(200)
             .ToListAsync(cancellationToken);
 
-        int marked = 0;
+        List<SlaBreachEvent> events = [];
         foreach (Ticket ticket in candidates)
         {
             bool beforeResponse = ticket.ResponseBreached;
             bool beforeResolution = ticket.ResolutionBreached;
             ticket.MarkResponseBreached(utcNow);
             ticket.MarkResolutionBreached(utcNow);
-            if (ticket.ResponseBreached != beforeResponse || ticket.ResolutionBreached != beforeResolution)
+            bool responseNew = ticket.ResponseBreached && !beforeResponse;
+            bool resolutionNew = ticket.ResolutionBreached && !beforeResolution;
+            if (responseNew || resolutionNew)
             {
-                marked++;
+                events.Add(new SlaBreachEvent(
+                    ticket.Id,
+                    ticket.TicketNumber,
+                    ticket.AssignedUserId,
+                    ticket.RequesterUserId,
+                    responseNew,
+                    resolutionNew));
             }
         }
 
-        if (marked > 0)
+        if (events.Count > 0)
         {
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        return marked;
+        return events;
     }
 }

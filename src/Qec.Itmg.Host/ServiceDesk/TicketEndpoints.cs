@@ -6,6 +6,7 @@ using Qec.Itmg.Identity.Authorization;
 using Qec.Itmg.Identity.CurrentUser;
 using Qec.Itmg.ServiceDesk.Domain;
 using Qec.Itmg.ServiceDesk.Services;
+using TicketEntity = Qec.Itmg.ServiceDesk.Domain.Ticket;
 
 namespace Qec.Itmg.Host.ServiceDesk;
 
@@ -61,6 +62,7 @@ public static class TicketEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             TicketService service,
+            TicketNotificationService notifications,
             CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Description))
@@ -95,7 +97,7 @@ public static class TicketEndpoints
 
             try
             {
-                Ticket created = await service.CreateAsync(
+                TicketEntity created = await service.CreateAsync(
                     type,
                     request.Title,
                     request.Description,
@@ -105,9 +107,13 @@ public static class TicketEndpoints
                     request.Category,
                     request.QueueId,
                     cancellationToken);
-                return Results.Created(
-                    $"/api/v1/tickets/{created.Id}",
-                    await service.GetAsync(created.Id, cancellationToken));
+                TicketDto? dto = await service.GetAsync(created.Id, cancellationToken);
+                if (dto is not null)
+                {
+                    await notifications.NotifyTicketCreatedAsync(dto, cancellationToken);
+                }
+
+                return Results.Created($"/api/v1/tickets/{created.Id}", dto);
             }
             catch (InvalidOperationException ex)
             {
@@ -163,7 +169,10 @@ public static class TicketEndpoints
         manageGroup.MapPost("/{id:guid}/status", async (
             Guid id,
             ChangeTicketStatusRequest request,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
             TicketService service,
+            TicketNotificationService notifications,
             CancellationToken cancellationToken) =>
         {
             if (string.IsNullOrWhiteSpace(request.Status)
@@ -172,10 +181,28 @@ public static class TicketEndpoints
                 return ValidationProblem("A valid status is required.");
             }
 
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, cancellationToken);
+            if (session is null)
+            {
+                return SessionUnavailable();
+            }
+
+            TicketDto? before = await service.GetAsync(id, cancellationToken);
+            if (before is null)
+            {
+                return Results.NotFound();
+            }
+
             try
             {
-                await service.ChangeStatusAsync(id, status, request.RowVersion, cancellationToken);
-                return Results.Ok(await service.GetAsync(id, cancellationToken));
+                await service.ChangeStatusAsync(id, status, session.Id, request.RowVersion, cancellationToken);
+                TicketDto? after = await service.GetAsync(id, cancellationToken);
+                if (after is not null)
+                {
+                    await notifications.NotifyStatusChangedAsync(after, before.Status, cancellationToken);
+                }
+
+                return Results.Ok(after);
             }
             catch (InvalidOperationException ex)
             {
@@ -189,12 +216,19 @@ public static class TicketEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             TicketService service,
+            TicketNotificationService notifications,
             CancellationToken cancellationToken) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, cancellationToken);
             if (session is null)
             {
                 return SessionUnavailable();
+            }
+
+            TicketDto? before = await service.GetAsync(id, cancellationToken);
+            if (before is null)
+            {
+                return Results.NotFound();
             }
 
             try
@@ -206,7 +240,17 @@ public static class TicketEndpoints
                     request.AssignedUserId,
                     request.Notes,
                     cancellationToken);
-                return Results.Ok(await service.GetAsync(id, cancellationToken));
+                TicketDto? after = await service.GetAsync(id, cancellationToken);
+                if (after is not null)
+                {
+                    await notifications.NotifyAssignedAsync(after, before.AssignedUserId, cancellationToken);
+                    if (!string.Equals(before.Status, after.Status, StringComparison.Ordinal))
+                    {
+                        await notifications.NotifyStatusChangedAsync(after, before.Status, cancellationToken);
+                    }
+                }
+
+                return Results.Ok(after);
             }
             catch (InvalidOperationException ex)
             {
@@ -224,6 +268,7 @@ public static class TicketEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             TicketService service,
+            TicketNotificationService notifications,
             CancellationToken cancellationToken) =>
         {
             CurrentUserDto? session = await ResolveSessionAsync(principal, currentUser, cancellationToken);
@@ -253,7 +298,7 @@ public static class TicketEndpoints
 
             try
             {
-                Ticket created = await service.CreateAsync(
+                TicketEntity created = await service.CreateAsync(
                     type,
                     request.Title,
                     request.Description,
@@ -262,9 +307,13 @@ public static class TicketEndpoints
                     request.ConfigurationItemId,
                     request.Category,
                     cancellationToken: cancellationToken);
-                return Results.Created(
-                    $"/api/v1/me/tickets/{created.Id}",
-                    await service.GetForRequesterAsync(created.Id, session.Id, cancellationToken));
+                TicketDto? dto = await service.GetForRequesterAsync(created.Id, session.Id, cancellationToken);
+                if (dto is not null)
+                {
+                    await notifications.NotifyTicketCreatedAsync(dto, cancellationToken);
+                }
+
+                return Results.Created($"/api/v1/me/tickets/{created.Id}", dto);
             }
             catch (ArgumentException ex)
             {
