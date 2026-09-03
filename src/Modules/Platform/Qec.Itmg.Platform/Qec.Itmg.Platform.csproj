@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Qec.Itmg.Platform</RootNamespace>
+    <AssemblyName>Qec.Itmg.Platform</AssemblyName>
+    <Description>Platform module stub. Numbering, attachments, workflow, and audit history are later packages.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Qec.Itmg.BuildingBlocks\Qec.Itmg.BuildingBlocks.csproj" />
+  </ItemGroup>
+</Project>

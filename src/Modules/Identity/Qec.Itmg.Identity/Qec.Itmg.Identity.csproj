@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Qec.Itmg.Identity</RootNamespace>
+    <AssemblyName>Qec.Itmg.Identity</AssemblyName>
+    <Description>Identity module stub. Users, roles, and authentication are later packages.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Qec.Itmg.BuildingBlocks\Qec.Itmg.BuildingBlocks.csproj" />
+  </ItemGroup>
+</Project>

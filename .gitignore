@@ -8,8 +8,45 @@ Desktop.ini
 .idea/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
 
-# Secrets (when implementation starts)
+# .NET
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+artifacts/
+TestResults/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+
+# Coverage
+coverage/
+coverage.xml
+*.coverage
+*.coveragexml
+*.opencover.xml
+
+# Node / frontend (P0-03+)
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Secrets / local configuration
 .env
-appsettings.*.local.json
+.env.*
+!.env.example
 *.pfx
+*.p12
+*.key
+id_rsa
+id_rsa.pub
+appsettings.*.local.json
+
+# Logs
+*.log
+logs/

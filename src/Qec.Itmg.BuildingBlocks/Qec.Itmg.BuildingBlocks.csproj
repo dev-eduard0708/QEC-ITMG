@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Qec.Itmg.BuildingBlocks</RootNamespace>
+    <AssemblyName>Qec.Itmg.BuildingBlocks</AssemblyName>
+    <Description>Shared technical kernel for QEC ITMG. No business-module policy.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

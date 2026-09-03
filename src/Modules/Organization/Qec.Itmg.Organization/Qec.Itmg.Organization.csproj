@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Qec.Itmg.Organization</RootNamespace>
+    <AssemblyName>Qec.Itmg.Organization</AssemblyName>
+    <Description>Organization module stub. Departments and locations are later packages.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Qec.Itmg.BuildingBlocks\Qec.Itmg.BuildingBlocks.csproj" />
+  </ItemGroup>
+</Project>

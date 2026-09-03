@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>Qec.Itmg.Host</RootNamespace>
+    <AssemblyName>Qec.Itmg.Host</AssemblyName>
+    <Description>ASP.NET Core composition host. Business APIs, auth, health, and logging are later packages.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Qec.Itmg.BuildingBlocks\Qec.Itmg.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\Qec.Itmg.Contracts\Qec.Itmg.Contracts.csproj" />
+    <ProjectReference Include="..\Modules\Identity\Qec.Itmg.Identity\Qec.Itmg.Identity.csproj" />
+    <ProjectReference Include="..\Modules\Organization\Qec.Itmg.Organization\Qec.Itmg.Organization.csproj" />
+    <ProjectReference Include="..\Modules\Platform\Qec.Itmg.Platform\Qec.Itmg.Platform.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Qec.Itmg.Contracts</RootNamespace>
+    <AssemblyName>Qec.Itmg.Contracts</AssemblyName>
+    <Description>Published module contracts and integration events. Intentionally empty in P0-01.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>
