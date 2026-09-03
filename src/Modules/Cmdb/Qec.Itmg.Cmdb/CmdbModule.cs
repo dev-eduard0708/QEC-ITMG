@@ -24,5 +24,6 @@ public sealed class CmdbModule : IModule
         services.AddScoped<ConfigurationItemService>();
         services.AddScoped<CiRelationshipService>();
         services.AddScoped<AssetService>();
+        services.AddScoped<BusinessServiceService>();
     }
 }

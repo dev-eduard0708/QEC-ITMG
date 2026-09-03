@@ -28,7 +28,7 @@ QEC ITMG is the internal enterprise platform for IT service management, operatio
 | Business domain (tickets, assets, GRC, …) | **Not started** |
 | Production deployment | **Not started** |
 
-**Next step:** Phase 3 — Asset management / CMDB foundation (package **P3-01**). See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) and [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md).
+**Next step:** Phase 3 — Asset / CMDB APIs + authz (package **P3-05**). See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) and [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md).
 
 P0-07 (optional Docker Compose for SQL) is **deferred**: local SQL Express development already works.
 

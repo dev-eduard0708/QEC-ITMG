@@ -18,6 +18,11 @@ public sealed class CmdbDbContext(DbContextOptions<CmdbDbContext> options) : DbC
 
     public DbSet<AssetAssignment> AssetAssignments => Set<AssetAssignment>();
 
+    public DbSet<BusinessService> BusinessServices => Set<BusinessService>();
+
+    public DbSet<BusinessServiceConfigurationItem> BusinessServiceConfigurationItems =>
+        Set<BusinessServiceConfigurationItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
