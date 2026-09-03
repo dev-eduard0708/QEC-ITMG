@@ -7,8 +7,10 @@ using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Contracts.Integrations;
 using Qec.Itmg.Contracts.Modules;
+using Qec.Itmg.Platform.Attachments;
 using Qec.Itmg.Platform.Audit;
 using Qec.Itmg.Platform.Integrations;
+using Qec.Itmg.Platform.NumberSequence;
 using Qec.Itmg.Platform.Persistence;
 
 namespace Qec.Itmg.Platform;
@@ -21,6 +23,16 @@ public sealed class PlatformModule : IModule
     public void Register(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<IClock, SystemClock>();
+
+        AttachmentStorageOptions attachmentOptions = configuration
+            .GetSection(AttachmentStorageOptions.SectionName)
+            .Get<AttachmentStorageOptions>()
+            ?? new AttachmentStorageOptions();
+        services.AddSingleton(Options.Create(attachmentOptions));
+        services.AddSingleton<IFileStorage, LocalDiskFileStorage>();
+        services.AddScoped<IAttachmentStorageService, AttachmentStorageService>();
+        services.AddSingleton<IMalwareScanner, DisabledMalwareScanner>();
+        services.AddScoped<IAttachmentMalwareScanService, AttachmentMalwareScanService>();
 
         SmtpEmailOptions smtpOptions = configuration
             .GetSection(SmtpEmailOptions.SectionName)
@@ -52,5 +64,7 @@ public sealed class PlatformModule : IModule
 
         services.AddScoped<IBusinessAuditWriter, EfBusinessAuditWriter>();
         services.AddScoped<ISecurityAuditLogger, EfSecurityAuditLogger>();
+
+        services.AddScoped<INumberSequenceService, NumberSequenceService>();
     }
 }

@@ -12,6 +12,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<SecurityAuditEvent> SecurityAuditEvents => Set<SecurityAuditEvent>();
 
+    public DbSet<Qec.Itmg.Platform.Domain.NumberSequence> NumberSequences =>
+        Set<Qec.Itmg.Platform.Domain.NumberSequence>();
+
+    public DbSet<AttachmentMetadata> Attachments => Set<AttachmentMetadata>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
