@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Qec.Itmg.Identity.Authorization;
 
 namespace Qec.Itmg.Identity.Authentication;
 
@@ -100,6 +102,9 @@ public static class IdentityAuthenticationExtensions
             });
         }
 
+        services.AddSingleton<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
+        services.AddScoped<IUserPermissionEvaluator, SqlUserPermissionEvaluator>();
+        services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddAuthorization();
         return services;
     }
@@ -118,7 +123,7 @@ public static class IdentityAuthenticationExtensions
             string? returnUrl = httpContext.Request.Query["returnUrl"].FirstOrDefault();
             AuthenticationProperties properties = new()
             {
-                RedirectUri = string.IsNullOrWhiteSpace(returnUrl) ? "/" : returnUrl,
+                RedirectUri = LocalReturnUrl.Sanitize(returnUrl),
             };
 
             return Results.Challenge(properties, [OidcScheme]);
