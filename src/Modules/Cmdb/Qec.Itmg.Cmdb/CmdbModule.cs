@@ -22,5 +22,6 @@ public sealed class CmdbModule : IModule
             connectionString,
             CmdbDbContext.SchemaName);
         services.AddScoped<ConfigurationItemService>();
+        services.AddScoped<CiRelationshipService>();
     }
 }

@@ -12,6 +12,8 @@ public sealed class CmdbDbContext(DbContextOptions<CmdbDbContext> options) : DbC
 
     public DbSet<ConfigurationItem> ConfigurationItems => Set<ConfigurationItem>();
 
+    public DbSet<CiRelationship> CiRelationships => Set<CiRelationship>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
