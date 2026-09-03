@@ -23,5 +23,6 @@ public sealed class CmdbModule : IModule
             CmdbDbContext.SchemaName);
         services.AddScoped<ConfigurationItemService>();
         services.AddScoped<CiRelationshipService>();
+        services.AddScoped<AssetService>();
     }
 }

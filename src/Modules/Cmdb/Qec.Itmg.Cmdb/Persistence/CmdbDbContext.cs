@@ -14,6 +14,10 @@ public sealed class CmdbDbContext(DbContextOptions<CmdbDbContext> options) : DbC
 
     public DbSet<CiRelationship> CiRelationships => Set<CiRelationship>();
 
+    public DbSet<Asset> Assets => Set<Asset>();
+
+    public DbSet<AssetAssignment> AssetAssignments => Set<AssetAssignment>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
