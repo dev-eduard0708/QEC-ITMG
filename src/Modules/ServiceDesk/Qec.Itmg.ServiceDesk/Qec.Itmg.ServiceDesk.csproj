@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Qec.Itmg.ServiceDesk</RootNamespace>
+    <AssemblyName>Qec.Itmg.ServiceDesk</AssemblyName>
+    <Description>Service desk tickets, queues, and SLA foundation.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Qec.Itmg.BuildingBlocks\Qec.Itmg.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\..\Qec.Itmg.Contracts\Qec.Itmg.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+  </ItemGroup>
+</Project>

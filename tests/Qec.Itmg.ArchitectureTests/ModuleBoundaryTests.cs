@@ -6,6 +6,7 @@ using Qec.Itmg.Contracts.Modules;
 using Qec.Itmg.Identity;
 using Qec.Itmg.Organization;
 using Qec.Itmg.Platform;
+using Qec.Itmg.ServiceDesk;
 using Xunit;
 
 namespace Qec.Itmg.ArchitectureTests;
@@ -22,6 +23,7 @@ public sealed class ModuleBoundaryTests
     private static readonly Assembly Organization = typeof(OrganizationModule).Assembly;
     private static readonly Assembly Platform = typeof(PlatformModule).Assembly;
     private static readonly Assembly Cmdb = typeof(CmdbModule).Assembly;
+    private static readonly Assembly ServiceDesk = typeof(ServiceDeskModule).Assembly;
 
     private static readonly string[] FeatureModules =
     [
@@ -29,6 +31,7 @@ public sealed class ModuleBoundaryTests
         "Qec.Itmg.Organization",
         "Qec.Itmg.Platform",
         "Qec.Itmg.Cmdb",
+        "Qec.Itmg.ServiceDesk",
     ];
 
     [Fact]
@@ -44,27 +47,33 @@ public sealed class ModuleBoundaryTests
     }
 
     [Fact]
-    public void Identity_MustNotDependOn_OrganizationOrPlatformOrCmdb()
+    public void Identity_MustNotDependOn_OtherFeatureModules()
     {
-        AssertNoDependencyOn(Identity, ["Qec.Itmg.Organization", "Qec.Itmg.Platform", "Qec.Itmg.Cmdb"]);
+        AssertNoDependencyOn(Identity, ["Qec.Itmg.Organization", "Qec.Itmg.Platform", "Qec.Itmg.Cmdb", "Qec.Itmg.ServiceDesk"]);
     }
 
     [Fact]
-    public void Organization_MustNotDependOn_IdentityOrPlatformOrCmdb()
+    public void Organization_MustNotDependOn_OtherFeatureModules()
     {
-        AssertNoDependencyOn(Organization, ["Qec.Itmg.Identity", "Qec.Itmg.Platform", "Qec.Itmg.Cmdb"]);
+        AssertNoDependencyOn(Organization, ["Qec.Itmg.Identity", "Qec.Itmg.Platform", "Qec.Itmg.Cmdb", "Qec.Itmg.ServiceDesk"]);
     }
 
     [Fact]
-    public void Platform_MustNotDependOn_IdentityOrOrganizationOrCmdb()
+    public void Platform_MustNotDependOn_OtherFeatureModules()
     {
-        AssertNoDependencyOn(Platform, ["Qec.Itmg.Identity", "Qec.Itmg.Organization", "Qec.Itmg.Cmdb"]);
+        AssertNoDependencyOn(Platform, ["Qec.Itmg.Identity", "Qec.Itmg.Organization", "Qec.Itmg.Cmdb", "Qec.Itmg.ServiceDesk"]);
     }
 
     [Fact]
-    public void Cmdb_MustNotDependOn_IdentityOrOrganizationOrPlatform()
+    public void Cmdb_MustNotDependOn_OtherFeatureModules()
     {
-        AssertNoDependencyOn(Cmdb, ["Qec.Itmg.Identity", "Qec.Itmg.Organization", "Qec.Itmg.Platform"]);
+        AssertNoDependencyOn(Cmdb, ["Qec.Itmg.Identity", "Qec.Itmg.Organization", "Qec.Itmg.Platform", "Qec.Itmg.ServiceDesk"]);
+    }
+
+    [Fact]
+    public void ServiceDesk_MustNotDependOn_OtherFeatureModules()
+    {
+        AssertNoDependencyOn(ServiceDesk, ["Qec.Itmg.Identity", "Qec.Itmg.Organization", "Qec.Itmg.Platform", "Qec.Itmg.Cmdb"]);
     }
 
     [Fact]
@@ -74,6 +83,7 @@ public sealed class ModuleBoundaryTests
         AssertNoDependencyOn(Organization, ["Qec.Itmg.Host"]);
         AssertNoDependencyOn(Platform, ["Qec.Itmg.Host"]);
         AssertNoDependencyOn(Cmdb, ["Qec.Itmg.Host"]);
+        AssertNoDependencyOn(ServiceDesk, ["Qec.Itmg.Host"]);
     }
 
     [Fact]
@@ -93,6 +103,10 @@ public sealed class ModuleBoundaryTests
 
         Assert.Contains(
             Types.InAssembly(Host).That().HaveDependencyOn("Qec.Itmg.Cmdb").GetTypes(),
+            static _ => true);
+
+        Assert.Contains(
+            Types.InAssembly(Host).That().HaveDependencyOn("Qec.Itmg.ServiceDesk").GetTypes(),
             static _ => true);
     }
 

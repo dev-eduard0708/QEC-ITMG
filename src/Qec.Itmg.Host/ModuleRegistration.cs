@@ -6,6 +6,7 @@ using Qec.Itmg.Identity;
 using Qec.Itmg.Cmdb;
 using Qec.Itmg.Organization;
 using Qec.Itmg.Platform;
+using Qec.Itmg.ServiceDesk;
 
 namespace Qec.Itmg.Host;
 
@@ -22,6 +23,7 @@ internal static class ModuleRegistration
             new OrganizationModule(),
             new PlatformModule(),
             new CmdbModule(),
+            new ServiceDeskModule(),
         ];
 
         foreach (IModule module in modules)
