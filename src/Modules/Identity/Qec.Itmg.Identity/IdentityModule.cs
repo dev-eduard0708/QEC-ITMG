@@ -2,7 +2,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Qec.Itmg.BuildingBlocks.Persistence;
+using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Contracts.Modules;
+using Qec.Itmg.Identity.Audit;
 using Qec.Itmg.Identity.Persistence;
 
 namespace Qec.Itmg.Identity;
@@ -25,5 +27,8 @@ public sealed class IdentityModule : IModule
             options.UseSqlServer(
                 connectionString,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", IdentityDbContext.SchemaName)));
+
+        services.AddHttpContextAccessor();
+        services.AddScoped<IAuditRequestContext, IdentityAuditRequestContext>();
     }
 }

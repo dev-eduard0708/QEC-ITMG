@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Qec.Itmg.Identity.Audit;
 
 namespace Qec.Itmg.Identity.Authorization;
 
-public sealed class PermissionAuthorizationHandler(IUserPermissionEvaluator permissionEvaluator)
+public sealed class PermissionAuthorizationHandler(
+    IUserPermissionEvaluator permissionEvaluator,
+    IHttpContextAccessor httpContextAccessor)
     : AuthorizationHandler<PermissionRequirement>
 {
     protected override async Task HandleRequirementAsync(
@@ -21,6 +25,11 @@ public sealed class PermissionAuthorizationHandler(IUserPermissionEvaluator perm
         if (allowed)
         {
             context.Succeed(requirement);
+            return;
         }
+
+        await SecurityAuditHooks.LogPermissionDeniedAsync(
+            httpContextAccessor.HttpContext,
+            requirement.PermissionKey);
     }
 }

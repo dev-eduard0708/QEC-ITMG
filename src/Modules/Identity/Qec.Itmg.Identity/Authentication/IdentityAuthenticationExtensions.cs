@@ -12,6 +12,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Qec.Itmg.Identity.Admin;
+using Qec.Itmg.Identity.Audit;
 using Qec.Itmg.Identity.Authorization;
 
 namespace Qec.Itmg.Identity.Authentication;
@@ -52,7 +53,7 @@ public static class IdentityAuthenticationExtensions
                 : CookieSecurePolicy.Always;
             options.SlidingExpiration = true;
             options.ExpireTimeSpan = oidcOptions.SessionLifetime;
-            options.Events.OnSigningIn = context =>
+            options.Events.OnSigningIn = async context =>
             {
                 // Ensure cookie principal never carries IdP role claims for authorization.
                 if (context.Principal is not null
@@ -61,7 +62,7 @@ public static class IdentityAuthenticationExtensions
                     context.Principal = OidcPrincipalMapper.MapAuthenticatedPrincipal(context.Principal);
                 }
 
-                return Task.CompletedTask;
+                await SecurityAuditHooks.LogLoginSuccessAsync(context.HttpContext);
             };
             options.Events.OnRedirectToLogin = context =>
             {
@@ -121,6 +122,20 @@ public static class IdentityAuthenticationExtensions
                         context.Principal = OidcPrincipalMapper.MapAuthenticatedPrincipal(context.Principal);
                         return Task.CompletedTask;
                     },
+                    OnAuthenticationFailed = async context =>
+                    {
+                        await SecurityAuditHooks.LogLoginFailureAsync(
+                            context.HttpContext,
+                            context.Exception?.Message);
+                    },
+                    OnRemoteFailure = async context =>
+                    {
+                        await SecurityAuditHooks.LogLoginFailureAsync(
+                            context.HttpContext,
+                            context.Failure?.Message);
+                        context.Response.Redirect("/?authError=remote");
+                        context.HandleResponse();
+                    },
                 };
             });
         }
@@ -157,6 +172,8 @@ public static class IdentityAuthenticationExtensions
             HttpContext httpContext,
             IOptions<OidcAuthenticationOptions> options) =>
         {
+            await SecurityAuditHooks.LogLogoutAsync(httpContext);
+
             if (options.Value.Enabled)
             {
                 AuthenticationProperties properties = new()

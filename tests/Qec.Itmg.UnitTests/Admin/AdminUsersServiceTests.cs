@@ -1,9 +1,15 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Contracts.Audit;
+using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Identity.Admin;
+using Qec.Itmg.Identity.Audit;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
+using Qec.Itmg.Organization.Persistence;
+using Qec.Itmg.Platform.Audit;
+using Qec.Itmg.Platform.Persistence;
 using Xunit;
 
 namespace Qec.Itmg.UnitTests.Admin;
@@ -15,12 +21,12 @@ public sealed class AdminUsersServiceTests
     [Fact]
     public async Task List_SearchesByUpnAndDisplayName()
     {
-        await using IdentityDbContext db = CreateDb();
-        AdminUsersService service = CreateService(db);
+        await using AdminTestHost host = AdminTestHost.Create();
+        AdminUsersService service = host.CreateUsersService();
 
-        db.Users.Add(User.Create("alice@qehc.edu.sa", "Alice Admin", UserType.Employee, Now));
-        db.Users.Add(User.Create("bob@qehc.edu.sa", "Bob Agent", UserType.Employee, Now));
-        await db.SaveChangesAsync();
+        host.Identity.Users.Add(User.Create("alice@qehc.edu.sa", "Alice Admin", UserType.Employee, Now));
+        host.Identity.Users.Add(User.Create("bob@qehc.edu.sa", "Bob Agent", UserType.Employee, Now));
+        await host.Identity.SaveChangesAsync();
 
         IReadOnlyList<AdminUserDto> byUpn = await service.ListAsync("alice@", CancellationToken.None);
         IReadOnlyList<AdminUserDto> byName = await service.ListAsync("Agent", CancellationToken.None);
@@ -34,8 +40,8 @@ public sealed class AdminUsersServiceTests
     [Fact]
     public async Task Create_PreProvisionsUser()
     {
-        await using IdentityDbContext db = CreateDb();
-        AdminUsersService service = CreateService(db);
+        await using AdminTestHost host = AdminTestHost.Create();
+        AdminUsersService service = host.CreateUsersService();
 
         IResult result = await service.CreateAsync(
             new CreateAdminUserRequest(
@@ -47,7 +53,7 @@ public sealed class AdminUsersServiceTests
             CancellationToken.None);
 
         Assert.Equal(StatusCodes.Status201Created, GetStatusCode(result));
-        AdminUserDto? dto = await db.Users.AsNoTracking()
+        AdminUserDto? dto = await host.Identity.Users.AsNoTracking()
             .Where(user => user.Upn == "new@qehc.edu.sa")
             .Select(user => new AdminUserDto(
                 user.Id,
@@ -70,11 +76,11 @@ public sealed class AdminUsersServiceTests
     [Fact]
     public async Task Update_AppliesProfileAndStatus_WithConcurrency()
     {
-        await using IdentityDbContext db = CreateDb();
-        AdminUsersService service = CreateService(db);
+        await using AdminTestHost host = AdminTestHost.Create();
+        AdminUsersService service = host.CreateUsersService();
         User user = User.Create("edit@qehc.edu.sa", "Edit Me", UserType.Employee, Now, directoryObjectId: "oid-edit");
-        db.Users.Add(user);
-        await db.SaveChangesAsync();
+        host.Identity.Users.Add(user);
+        await host.Identity.SaveChangesAsync();
 
         string rowVersion = Convert.ToBase64String(user.RowVersion);
         IResult ok = await service.UpdateAsync(
@@ -83,7 +89,7 @@ public sealed class AdminUsersServiceTests
             CancellationToken.None);
 
         Assert.Equal(StatusCodes.Status200OK, GetStatusCode(ok));
-        await db.Entry(user).ReloadAsync();
+        await host.Identity.Entry(user).ReloadAsync();
         Assert.Equal("Edited", user.DisplayName);
         Assert.Equal(UserType.Service, user.UserType);
         Assert.Equal(UserStatus.Disabled, user.Status);
@@ -105,14 +111,14 @@ public sealed class AdminUsersServiceTests
     [Fact]
     public async Task ReplaceRoles_Validates_AndPreventsDuplicates()
     {
-        await using IdentityDbContext db = CreateDb();
-        AdminUsersService service = CreateService(db);
+        await using AdminTestHost host = AdminTestHost.Create();
+        AdminUsersService service = host.CreateUsersService();
         User user = User.Create("roles@qehc.edu.sa", "Roles User", UserType.Employee, Now);
         Role roleA = Role.Create("Role A", Now);
         Role roleB = Role.Create("Role B", Now);
-        db.Users.Add(user);
-        db.Roles.AddRange(roleA, roleB);
-        await db.SaveChangesAsync();
+        host.Identity.Users.Add(user);
+        host.Identity.Roles.AddRange(roleA, roleB);
+        await host.Identity.SaveChangesAsync();
 
         IResult assigned = await service.ReplaceRolesAsync(
             user.Id,
@@ -120,7 +126,7 @@ public sealed class AdminUsersServiceTests
             CancellationToken.None);
 
         Assert.Equal(StatusCodes.Status200OK, GetStatusCode(assigned));
-        Assert.Equal(2, await db.UserRoles.CountAsync(userRole => userRole.UserId == user.Id));
+        Assert.Equal(2, await host.Identity.UserRoles.CountAsync(userRole => userRole.UserId == user.Id));
 
         IResult invalid = await service.ReplaceRolesAsync(
             user.Id,
@@ -128,17 +134,6 @@ public sealed class AdminUsersServiceTests
             CancellationToken.None);
 
         Assert.Equal(StatusCodes.Status400BadRequest, GetStatusCode(invalid));
-    }
-
-    private static AdminUsersService CreateService(IdentityDbContext db) =>
-        new(db, new FixedClock(Now));
-
-    private static IdentityDbContext CreateDb()
-    {
-        DbContextOptions<IdentityDbContext> options = new DbContextOptionsBuilder<IdentityDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
-            .Options;
-        return new IdentityDbContext(options);
     }
 
     private static int GetStatusCode(IResult result)
@@ -151,7 +146,66 @@ public sealed class AdminUsersServiceTests
         throw new InvalidOperationException($"Result type {result.GetType().Name} does not expose a status code.");
     }
 
-    private sealed class FixedClock(DateTimeOffset utcNow) : IClock
+    internal sealed class AdminTestHost : IAsyncDisposable
+    {
+        private AdminTestHost(
+            IdentityDbContext identity,
+            OrganizationDbContext organization,
+            PlatformDbContext platform,
+            FixedClock clock,
+            IBusinessAuditWriter businessAudit,
+            ISecurityAuditLogger securityAudit,
+            ISharedDbTransaction shared)
+        {
+            Identity = identity;
+            Organization = organization;
+            Platform = platform;
+            Clock = clock;
+            BusinessAudit = businessAudit;
+            SecurityAudit = securityAudit;
+            Shared = shared;
+        }
+
+        public IdentityDbContext Identity { get; }
+        public OrganizationDbContext Organization { get; }
+        public PlatformDbContext Platform { get; }
+        public FixedClock Clock { get; }
+        public IBusinessAuditWriter BusinessAudit { get; }
+        public ISecurityAuditLogger SecurityAudit { get; }
+        public ISharedDbTransaction Shared { get; }
+
+        public static AdminTestHost Create()
+        {
+            string name = Guid.NewGuid().ToString("N");
+            IdentityDbContext identity = new(new DbContextOptionsBuilder<IdentityDbContext>()
+                .UseInMemoryDatabase($"users-id-{name}")
+                .Options);
+            OrganizationDbContext organization = new(new DbContextOptionsBuilder<OrganizationDbContext>()
+                .UseInMemoryDatabase($"users-org-{name}")
+                .Options);
+            PlatformDbContext platform = new(new DbContextOptionsBuilder<PlatformDbContext>()
+                .UseInMemoryDatabase($"users-plt-{name}")
+                .Options);
+            FixedClock clock = new(Now);
+            NullAuditRequestContext context = NullAuditRequestContext.Instance;
+            IBusinessAuditWriter businessAudit = new EfBusinessAuditWriter(platform, clock, context);
+            ISecurityAuditLogger securityAudit = new EfSecurityAuditLogger(platform, clock, context);
+            ISharedDbTransaction shared = new SharedSqlTransaction(identity, organization, platform);
+            return new AdminTestHost(identity, organization, platform, clock, businessAudit, securityAudit, shared);
+        }
+
+        public AdminUsersService CreateUsersService() =>
+            new(Identity, Clock, BusinessAudit, SecurityAudit, Shared);
+
+        public async ValueTask DisposeAsync()
+        {
+            await Identity.DisposeAsync();
+            await Organization.DisposeAsync();
+            await Platform.DisposeAsync();
+        }
+    }
+
+    internal sealed class FixedClock(DateTimeOffset utcNow) : IClock
     {
         public DateTimeOffset UtcNow { get; } = utcNow;
     }

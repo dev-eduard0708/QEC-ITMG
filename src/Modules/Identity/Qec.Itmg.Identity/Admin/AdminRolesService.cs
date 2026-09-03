@@ -1,12 +1,18 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
 
 namespace Qec.Itmg.Identity.Admin;
 
-public sealed class AdminRolesService(IdentityDbContext db, IClock clock)
+public sealed class AdminRolesService(
+    IdentityDbContext db,
+    IClock clock,
+    IBusinessAuditWriter businessAudit,
+    ISecurityAuditLogger securityAudit,
+    ISharedDbTransaction sharedDbTransaction)
 {
     public async Task<IReadOnlyList<AdminRoleDto>> ListAsync(CancellationToken cancellationToken)
     {
@@ -44,8 +50,12 @@ public sealed class AdminRolesService(IdentityDbContext db, IClock clock)
         }
 
         Role role = Role.Create(name, clock.UtcNow, description: request.Description, isSystem: false);
-        db.Roles.Add(role);
-        await db.SaveChangesAsync(cancellationToken);
+
+        await sharedDbTransaction.ExecuteAsync(async ct =>
+        {
+            db.Roles.Add(role);
+            await businessAudit.AppendAsync(AdminAuditComposer.RoleCreated(role), ct);
+        }, cancellationToken);
 
         return Results.Created(
             $"/api/v1/admin/roles/{role.Id}",
@@ -98,6 +108,8 @@ public sealed class AdminRolesService(IdentityDbContext db, IClock clock)
             }
         }
 
+        AdminAuditComposer.RoleAuditState before = AdminAuditComposer.CaptureRole(role);
+
         try
         {
             role.Update(name, request.Description, clock.UtcNow);
@@ -107,9 +119,17 @@ public sealed class AdminRolesService(IdentityDbContext db, IClock clock)
             return AdminApiResults.Conflict("admin.roles.systemImmutable", exception.Message);
         }
 
+        List<BusinessAuditEntry> changes = AdminAuditComposer.RoleChanges(before, role).ToList();
+
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await sharedDbTransaction.ExecuteAsync(async ct =>
+            {
+                if (changes.Count > 0)
+                {
+                    await businessAudit.AppendManyAsync(changes, ct);
+                }
+            }, cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -155,14 +175,60 @@ public sealed class AdminRolesService(IdentityDbContext db, IClock clock)
             .Where(rolePermission => rolePermission.RoleId == id)
             .ToListAsync(cancellationToken);
 
-        db.RolePermissions.RemoveRange(current);
+        HashSet<Guid> currentIds = current.Select(link => link.PermissionId).ToHashSet();
+        HashSet<Guid> nextIds = distinctPermissionIds.ToHashSet();
+        Guid[] added = nextIds.Except(currentIds).ToArray();
+        Guid[] removed = currentIds.Except(nextIds).ToArray();
 
-        foreach (Guid permissionId in distinctPermissionIds)
+        Dictionary<Guid, string> permissionKeys = await db.Permissions.AsNoTracking()
+            .Where(permission => currentIds.Contains(permission.Id) || nextIds.Contains(permission.Id))
+            .ToDictionaryAsync(permission => permission.Id, permission => permission.Key, cancellationToken);
+
+        await sharedDbTransaction.ExecuteAsync(async ct =>
         {
-            db.RolePermissions.Add(RolePermission.Create(id, permissionId));
-        }
+            db.RolePermissions.RemoveRange(current);
 
-        await db.SaveChangesAsync(cancellationToken);
+            foreach (Guid permissionId in distinctPermissionIds)
+            {
+                db.RolePermissions.Add(RolePermission.Create(id, permissionId));
+            }
+
+            foreach (Guid permissionId in added)
+            {
+                string key = permissionKeys[permissionId];
+                await businessAudit.AppendAsync(
+                    AdminAuditComposer.PermissionGranted(id, role.Name, permissionId, key),
+                    ct);
+                await securityAudit.AppendAsync(
+                    new SecurityAuditEntry
+                    {
+                        EventType = SecurityEventType.PermissionGranted,
+                        Outcome = SecurityEventOutcome.Success,
+                        TargetType = nameof(Role),
+                        TargetId = id.ToString("D"),
+                        Details = $"Permission:{key}",
+                    },
+                    ct);
+            }
+
+            foreach (Guid permissionId in removed)
+            {
+                string key = permissionKeys[permissionId];
+                await businessAudit.AppendAsync(
+                    AdminAuditComposer.PermissionRevoked(id, role.Name, permissionId, key),
+                    ct);
+                await securityAudit.AppendAsync(
+                    new SecurityAuditEntry
+                    {
+                        EventType = SecurityEventType.PermissionRevoked,
+                        Outcome = SecurityEventOutcome.Success,
+                        TargetType = nameof(Role),
+                        TargetId = id.ToString("D"),
+                        Details = $"Permission:{key}",
+                    },
+                    ct);
+            }
+        }, cancellationToken);
 
         Role refreshed = await db.Roles.AsNoTracking().SingleAsync(entity => entity.Id == id, cancellationToken);
         AdminRoleDto dto = (await MapRolesAsync([refreshed], includePermissions: true, cancellationToken))[0];

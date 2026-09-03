@@ -1,12 +1,18 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
 
 namespace Qec.Itmg.Identity.Admin;
 
-public sealed class AdminUsersService(IdentityDbContext db, IClock clock)
+public sealed class AdminUsersService(
+    IdentityDbContext db,
+    IClock clock,
+    IBusinessAuditWriter businessAudit,
+    ISecurityAuditLogger securityAudit,
+    ISharedDbTransaction sharedDbTransaction)
 {
     public async Task<IReadOnlyList<AdminUserDto>> ListAsync(string? search, CancellationToken cancellationToken)
     {
@@ -101,8 +107,11 @@ public sealed class AdminUsersService(IdentityDbContext db, IClock clock)
             directoryObjectId: request.DirectoryObjectId,
             timeZone: request.TimeZone);
 
-        db.Users.Add(user);
-        await db.SaveChangesAsync(cancellationToken);
+        await sharedDbTransaction.ExecuteAsync(async ct =>
+        {
+            db.Users.Add(user);
+            await businessAudit.AppendAsync(AdminAuditComposer.UserCreated(user), ct);
+        }, cancellationToken);
 
         return Results.Created($"/api/v1/admin/users/{user.Id}", MapUser(user, []));
     }
@@ -169,6 +178,8 @@ public sealed class AdminUsersService(IdentityDbContext db, IClock clock)
             }
         }
 
+        AdminAuditComposer.UserAuditState before = AdminAuditComposer.CaptureUser(user);
+
         user.UpdateProfile(
             request.DisplayName,
             userType,
@@ -177,9 +188,33 @@ public sealed class AdminUsersService(IdentityDbContext db, IClock clock)
             timeZone: request.TimeZone,
             directoryObjectId: request.DirectoryObjectId);
 
+        List<BusinessAuditEntry> changes = AdminAuditComposer.UserProfileChanges(before, user).ToList();
+
         try
         {
-            await db.SaveChangesAsync(cancellationToken);
+            await sharedDbTransaction.ExecuteAsync(async ct =>
+            {
+                if (changes.Count > 0)
+                {
+                    await businessAudit.AppendManyAsync(changes, ct);
+                }
+
+                if (before.Status != user.Status)
+                {
+                    await securityAudit.AppendAsync(
+                        new SecurityAuditEntry
+                        {
+                            EventType = user.Status == UserStatus.Disabled
+                                ? SecurityEventType.UserDisabled
+                                : SecurityEventType.UserEnabled,
+                            Outcome = SecurityEventOutcome.Success,
+                            TargetType = nameof(User),
+                            TargetId = user.Id.ToString("D"),
+                            Details = $"Status:{before.Status}->{user.Status}",
+                        },
+                        ct);
+                }
+            }, cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -225,15 +260,57 @@ public sealed class AdminUsersService(IdentityDbContext db, IClock clock)
             .Where(userRole => userRole.UserId == id)
             .ToListAsync(cancellationToken);
 
-        db.UserRoles.RemoveRange(current);
+        HashSet<Guid> currentIds = current.Select(link => link.RoleId).ToHashSet();
+        HashSet<Guid> nextIds = distinctRoleIds.ToHashSet();
+        Guid[] added = nextIds.Except(currentIds).ToArray();
+        Guid[] removed = currentIds.Except(nextIds).ToArray();
 
-        DateTimeOffset assignedAt = clock.UtcNow;
-        foreach (Guid roleId in distinctRoleIds)
+        Dictionary<Guid, string> roleNames = await db.Roles.AsNoTracking()
+            .Where(role => currentIds.Contains(role.Id) || nextIds.Contains(role.Id))
+            .ToDictionaryAsync(role => role.Id, role => role.Name, cancellationToken);
+
+        await sharedDbTransaction.ExecuteAsync(async ct =>
         {
-            db.UserRoles.Add(UserRole.Create(id, roleId, assignedAt));
-        }
+            db.UserRoles.RemoveRange(current);
 
-        await db.SaveChangesAsync(cancellationToken);
+            DateTimeOffset assignedAt = clock.UtcNow;
+            foreach (Guid roleId in distinctRoleIds)
+            {
+                db.UserRoles.Add(UserRole.Create(id, roleId, assignedAt));
+            }
+
+            foreach (Guid roleId in added)
+            {
+                string roleName = roleNames[roleId];
+                await businessAudit.AppendAsync(AdminAuditComposer.RoleAssigned(id, user.Upn, roleId, roleName), ct);
+                await securityAudit.AppendAsync(
+                    new SecurityAuditEntry
+                    {
+                        EventType = SecurityEventType.RoleAssigned,
+                        Outcome = SecurityEventOutcome.Success,
+                        TargetType = nameof(User),
+                        TargetId = id.ToString("D"),
+                        Details = $"Role:{roleName}",
+                    },
+                    ct);
+            }
+
+            foreach (Guid roleId in removed)
+            {
+                string roleName = roleNames[roleId];
+                await businessAudit.AppendAsync(AdminAuditComposer.RoleUnassigned(id, user.Upn, roleId, roleName), ct);
+                await securityAudit.AppendAsync(
+                    new SecurityAuditEntry
+                    {
+                        EventType = SecurityEventType.RoleUnassigned,
+                        Outcome = SecurityEventOutcome.Success,
+                        TargetType = nameof(User),
+                        TargetId = id.ToString("D"),
+                        Details = $"Role:{roleName}",
+                    },
+                    ct);
+            }
+        }, cancellationToken);
 
         List<AdminRoleSummaryDto> roles = await LoadRolesAsync(id, cancellationToken);
         User refreshed = await db.Users.AsNoTracking().SingleAsync(entity => entity.Id == id, cancellationToken);

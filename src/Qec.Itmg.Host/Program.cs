@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Qec.Itmg.Host;
+using Qec.Itmg.Host.Persistence;
+using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.Persistence;
@@ -33,6 +35,7 @@ try
 
     builder.AddQecModules();
     builder.Services.AddIdentityAuthentication(builder.Configuration, builder.Environment);
+    builder.Services.AddScoped<ISharedDbTransaction, SharedSqlTransaction>();
 
     builder.Services
         .AddHealthChecks()

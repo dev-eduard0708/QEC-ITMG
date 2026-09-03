@@ -3,13 +3,15 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Contracts.Modules;
+using Qec.Itmg.Platform.Audit;
 using Qec.Itmg.Platform.Persistence;
 
 namespace Qec.Itmg.Platform;
 
 /// <summary>
-/// Platform module composition. Additional shared platform services are added in Phase 2.
+/// Platform module composition: shared platform services and audit persistence.
 /// </summary>
 public sealed class PlatformModule : IModule
 {
@@ -28,5 +30,8 @@ public sealed class PlatformModule : IModule
             options.UseSqlServer(
                 connectionString,
                 sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", PlatformDbContext.SchemaName)));
+
+        services.AddScoped<IBusinessAuditWriter, EfBusinessAuditWriter>();
+        services.AddScoped<ISecurityAuditLogger, EfSecurityAuditLogger>();
     }
 }

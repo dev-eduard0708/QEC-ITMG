@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Qec.Itmg.Identity.Authentication;
@@ -130,7 +131,7 @@ public sealed class PermissionAuthorizationTests
         ClaimsPrincipal principal,
         string permissionKey)
     {
-        PermissionAuthorizationHandler handler = new(new SqlUserPermissionEvaluator(db));
+        PermissionAuthorizationHandler handler = new(new SqlUserPermissionEvaluator(db), new HttpContextAccessor());
         PermissionRequirement requirement = new(permissionKey);
         AuthorizationHandlerContext context = new([requirement], principal, resource: null);
         await handler.HandleAsync(context);
