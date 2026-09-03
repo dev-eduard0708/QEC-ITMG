@@ -6,6 +6,7 @@ import {
   Menu,
   Monitor,
   Moon,
+  Settings2,
   Shield,
   Sun,
   Users,
@@ -24,7 +25,8 @@ import { cn } from '@/lib/utils'
 const workspaces = [
   { to: '/', labelKey: 'nav.foundation', icon: LayoutDashboard, end: true },
   { to: '/employee', labelKey: 'nav.employee', icon: Users, end: false },
-  { to: '/it', labelKey: 'nav.it', icon: Building2, end: false },
+  { to: '/it', labelKey: 'nav.it', icon: Building2, end: true },
+  { to: '/it/admin', labelKey: 'nav.admin', icon: Settings2, end: false },
   { to: '/governance', labelKey: 'nav.governance', icon: Shield, end: false },
 ] as const
 
@@ -143,6 +145,7 @@ function PreferenceControls() {
 }
 
 function workspaceTitle(pathname: string, t: (key: string) => string) {
+  if (pathname.startsWith('/it/admin')) return t('nav.admin')
   if (pathname.startsWith('/employee')) return t('nav.employee')
   if (pathname.startsWith('/it')) return t('nav.it')
   if (pathname.startsWith('/governance')) return t('nav.governance')

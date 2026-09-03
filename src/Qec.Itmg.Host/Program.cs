@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Qec.Itmg.Host;
+using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Organization.Persistence;
@@ -57,15 +58,23 @@ try
     });
 
     app.MapIdentityAuthEndpoints();
+    app.MapIdentityAdminEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))
     {
         app.MapGet("/__test__/signin", async (HttpContext httpContext) =>
         {
+            string externalId = httpContext.Request.Query["externalId"].FirstOrDefault() ?? "oid-1";
+            string upn = httpContext.Request.Query["upn"].FirstOrDefault() ?? "test@qehc.edu.sa";
+            string name = httpContext.Request.Query["name"].FirstOrDefault() ?? "Test User";
+
             ClaimsPrincipal principal = new(new ClaimsIdentity(
                 [
-                    new Claim(OidcPrincipalMapper.ExternalIdClaimType, "oid-1"),
-                    new Claim(ClaimTypes.Name, "Test User"),
+                    new Claim(OidcPrincipalMapper.ExternalIdClaimType, externalId),
+                    new Claim(ClaimTypes.NameIdentifier, externalId),
+                    new Claim(OidcPrincipalMapper.UpnClaimType, upn),
+                    new Claim(ClaimTypes.Upn, upn),
+                    new Claim(ClaimTypes.Name, name),
                 ],
                 IdentityAuthenticationExtensions.CookieScheme));
 

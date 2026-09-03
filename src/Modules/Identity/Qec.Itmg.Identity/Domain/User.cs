@@ -82,6 +82,33 @@ public sealed class User
         UpdatedAtUtc = utcNow;
     }
 
+    public void UpdateProfile(
+        string displayName,
+        UserType userType,
+        UserStatus status,
+        DateTimeOffset utcNow,
+        string? timeZone = null,
+        string? directoryObjectId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        if (!Enum.IsDefined(userType))
+        {
+            throw new ArgumentOutOfRangeException(nameof(userType));
+        }
+
+        if (!Enum.IsDefined(status))
+        {
+            throw new ArgumentOutOfRangeException(nameof(status));
+        }
+
+        DisplayName = displayName.Trim();
+        UserType = userType;
+        TimeZone = NormalizeOptional(timeZone);
+        DirectoryObjectId = NormalizeOptional(directoryObjectId);
+        Status = status;
+        UpdatedAtUtc = utcNow;
+    }
+
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

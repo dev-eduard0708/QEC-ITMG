@@ -48,4 +48,28 @@ public sealed class Role
         Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         UpdatedAtUtc = utcNow;
     }
+
+    public void Rename(string name, DateTimeOffset utcNow)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (IsSystem)
+        {
+            throw new InvalidOperationException("System roles cannot be renamed.");
+        }
+
+        Name = name.Trim();
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void Update(string name, string? description, DateTimeOffset utcNow)
+    {
+        if (IsSystem)
+        {
+            UpdateDescription(description, utcNow);
+            return;
+        }
+
+        Rename(name, utcNow);
+        UpdateDescription(description, utcNow);
+    }
 }

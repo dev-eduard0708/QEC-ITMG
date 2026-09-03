@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Authorization;
 
 namespace Qec.Itmg.Identity.Authentication;
@@ -62,6 +63,28 @@ public static class IdentityAuthenticationExtensions
 
                 return Task.CompletedTask;
             };
+            options.Events.OnRedirectToLogin = context =>
+            {
+                if (context.Request.Path.StartsWithSegments("/api"))
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    return Task.CompletedTask;
+                }
+
+                context.Response.Redirect(context.RedirectUri);
+                return Task.CompletedTask;
+            };
+            options.Events.OnRedirectToAccessDenied = context =>
+            {
+                if (context.Request.Path.StartsWithSegments("/api"))
+                {
+                    context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                    return Task.CompletedTask;
+                }
+
+                context.Response.Redirect(context.RedirectUri);
+                return Task.CompletedTask;
+            };
         });
 
         if (oidcOptions.Enabled)
@@ -106,6 +129,7 @@ public static class IdentityAuthenticationExtensions
         services.AddScoped<IUserPermissionEvaluator, SqlUserPermissionEvaluator>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddAuthorization();
+        services.AddIdentityAdminServices();
         return services;
     }
 
