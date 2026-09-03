@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Qec.Itmg.BuildingBlocks.Persistence;
@@ -21,9 +20,8 @@ public sealed class OrganizationModule : IModule
                 $"Connection string '{QecEfConventions.ConnectionStringName}' is not configured.");
         }
 
-        services.AddDbContext<OrganizationDbContext>(options =>
-            options.UseSqlServer(
-                connectionString,
-                sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", OrganizationDbContext.SchemaName)));
+        services.AddQecSqlServerDbContext<OrganizationDbContext>(
+            connectionString,
+            OrganizationDbContext.SchemaName);
     }
 }

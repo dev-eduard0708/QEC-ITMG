@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Qec.Itmg.BuildingBlocks.Persistence;
@@ -23,10 +22,9 @@ public sealed class IdentityModule : IModule
                 $"Connection string '{QecEfConventions.ConnectionStringName}' is not configured.");
         }
 
-        services.AddDbContext<IdentityDbContext>(options =>
-            options.UseSqlServer(
-                connectionString,
-                sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", IdentityDbContext.SchemaName)));
+        services.AddQecSqlServerDbContext<IdentityDbContext>(
+            connectionString,
+            IdentityDbContext.SchemaName);
 
         services.AddHttpContextAccessor();
         services.AddScoped<IAuditRequestContext, IdentityAuditRequestContext>();
