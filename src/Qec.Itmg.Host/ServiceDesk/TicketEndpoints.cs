@@ -41,9 +41,26 @@ public static class TicketEndpoints
             return Results.Ok(result);
         });
 
-        // Queues before {id} route
+        // Static paths before {id} route
         readGroup.MapGet("/queues", async (TicketService service, CancellationToken cancellationToken) =>
             Results.Ok(await service.ListQueuesAsync(cancellationToken)));
+
+        readGroup.MapGet("/dashboard", async (
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            TicketService service,
+            CancellationToken cancellationToken) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, cancellationToken);
+            if (session is null)
+            {
+                return Results.Json(
+                    new { error = new { code = "session_unavailable", message = "No active ITMG user session." } },
+                    statusCode: StatusCodes.Status403Forbidden);
+            }
+
+            return Results.Ok(await service.GetDashboardAsync(session.Id, cancellationToken));
+        });
 
         readGroup.MapGet("/{id:guid}", async (
             Guid id,

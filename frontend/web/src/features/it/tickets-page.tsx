@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -31,11 +31,12 @@ function slaLabel(ticket: Ticket, t: (key: string) => string): string {
 export function TicketsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('all')
-  const [type, setType] = useState('all')
-  const [priority, setPriority] = useState('all')
+  const [status, setStatus] = useState(searchParams.get('status') || 'all')
+  const [type, setType] = useState(searchParams.get('type') || 'all')
+  const [priority, setPriority] = useState(searchParams.get('priority') || 'all')
 
   const filtersKey = `${search}|${status}|${type}|${priority}`
   const listQuery = useQuery({

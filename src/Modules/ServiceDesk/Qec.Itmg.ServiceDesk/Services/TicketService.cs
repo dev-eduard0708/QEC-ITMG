@@ -68,6 +68,17 @@ public sealed record TicketListResult(
     int Page,
     int PageSize);
 
+public sealed record TicketDashboardDto(
+    int OpenTickets,
+    int Unassigned,
+    int CriticalOpen,
+    int SlaBreached,
+    int MyAssigned,
+    int NewToday,
+    int ResolvedToday,
+    IReadOnlyDictionary<string, int> ByStatus,
+    IReadOnlyDictionary<string, int> ByPriority);
+
 public sealed class TicketService(
     ServiceDeskDbContext db,
     INumberSequenceService numbers,
@@ -77,6 +88,45 @@ public sealed class TicketService(
     public const string ServiceRequestSequenceKey = "tickets-service-request";
     public const string IncidentPrefix = "INC";
     public const string ServiceRequestPrefix = "SR";
+
+    private static readonly TicketStatus[] ActiveStatuses =
+    [
+        TicketStatus.New,
+        TicketStatus.Open,
+        TicketStatus.InProgress,
+        TicketStatus.PendingRequester,
+    ];
+
+    public async Task<TicketDashboardDto> GetDashboardAsync(
+        Guid currentUserId,
+        CancellationToken cancellationToken = default)
+    {
+        DateTimeOffset utcNow = clock.UtcNow;
+        DateTimeOffset dayStart = new(utcNow.UtcDateTime.Date, TimeSpan.Zero);
+
+        List<Ticket> tickets = await db.Tickets.AsNoTracking().ToListAsync(cancellationToken);
+        List<Ticket> open = tickets.Where(item => ActiveStatuses.Contains(item.Status)).ToList();
+
+        Dictionary<string, int> byStatus = tickets
+            .GroupBy(item => item.Status.ToString())
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        Dictionary<string, int> byPriority = open
+            .GroupBy(item => item.Priority.ToString())
+            .ToDictionary(group => group.Key, group => group.Count());
+
+        return new TicketDashboardDto(
+            OpenTickets: open.Count,
+            Unassigned: open.Count(item => item.AssignedUserId is null),
+            CriticalOpen: open.Count(item => item.Priority == TicketPriority.Critical),
+            SlaBreached: open.Count(item => item.ResponseBreached || item.ResolutionBreached),
+            MyAssigned: open.Count(item => item.AssignedUserId == currentUserId),
+            NewToday: tickets.Count(item => item.CreatedAtUtc >= dayStart),
+            ResolvedToday: tickets.Count(item =>
+                item.ResolvedAtUtc is DateTimeOffset resolved && resolved >= dayStart),
+            ByStatus: byStatus,
+            ByPriority: byPriority);
+    }
 
     public async Task<TicketListResult> ListAsync(
         int page = 1,
