@@ -13,12 +13,7 @@ public static class LocalReturnUrl
         }
 
         string candidate = returnUrl.Trim();
-        if (!IsLocalPath(candidate))
-        {
-            return "/";
-        }
-
-        return candidate;
+        return IsLocalPath(candidate) ? candidate : "/";
     }
 
     public static bool IsLocalPath(string returnUrl)
@@ -28,24 +23,29 @@ public static class LocalReturnUrl
             return false;
         }
 
-        // Absolute URLs and scheme-relative URLs are rejected.
-        if (Uri.TryCreate(returnUrl, UriKind.Absolute, out _))
-        {
-            return false;
-        }
-
+        // Match ASP.NET Core local-URL rules: allow "/..." but not "//..." or "/\...".
+        // Do not use UriKind.Absolute — on Linux "/employee" is treated as an absolute file URI.
         if (returnUrl[0] != '/')
         {
             return false;
         }
 
-        // "/\" and "//..." are not local application paths.
-        if (returnUrl.Length > 1 && (returnUrl[1] == '/' || returnUrl[1] == '\\'))
+        if (returnUrl.Length == 1)
+        {
+            return true;
+        }
+
+        if (returnUrl[1] is '/' or '\\')
         {
             return false;
         }
 
         if (returnUrl.Contains('\\', StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        if (returnUrl.Contains("://", StringComparison.Ordinal))
         {
             return false;
         }
