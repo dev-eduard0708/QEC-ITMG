@@ -9,10 +9,17 @@ public interface IAttachmentStorageService
         string originalFileName,
         string contentType,
         Guid uploadedByUserId,
+        string? resourceType = null,
+        Guid? resourceId = null,
         CancellationToken cancellationToken = default);
 
     Task<AttachmentMetadata?> GetMetadataAsync(
         Guid attachmentId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AttachmentMetadata>> ListByResourceAsync(
+        string resourceType,
+        Guid resourceId,
         CancellationToken cancellationToken = default);
 
     Task<Stream> OpenReadAsync(
@@ -23,4 +30,3 @@ public interface IAttachmentStorageService
         Guid attachmentId,
         CancellationToken cancellationToken = default);
 }
-

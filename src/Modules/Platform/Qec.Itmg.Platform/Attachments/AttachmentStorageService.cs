@@ -15,6 +15,8 @@ public sealed class AttachmentStorageService(
         string originalFileName,
         string contentType,
         Guid uploadedByUserId,
+        string? resourceType = null,
+        Guid? resourceId = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
@@ -38,7 +40,9 @@ public sealed class AttachmentStorageService(
             contentType: contentType,
             sizeBytes: stored.SizeBytes,
             sha256: stored.Sha256,
-            uploadedAtUtc: clock.UtcNow);
+            uploadedAtUtc: clock.UtcNow,
+            resourceType: resourceType,
+            resourceId: resourceId);
 
         db.Attachments.Add(metadata);
         await db.SaveChangesAsync(cancellationToken);
@@ -53,6 +57,26 @@ public sealed class AttachmentStorageService(
         return await db.Attachments
             .AsNoTracking()
             .SingleOrDefaultAsync(candidate => candidate.Id == attachmentId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<AttachmentMetadata>> ListByResourceAsync(
+        string resourceType,
+        Guid resourceId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceType);
+        if (resourceId == Guid.Empty)
+        {
+            throw new ArgumentException("ResourceId must not be empty.", nameof(resourceId));
+        }
+
+        string normalized = resourceType.Trim();
+        return await db.Attachments
+            .AsNoTracking()
+            .Where(item => item.ResourceType == normalized && item.ResourceId == resourceId)
+            .OrderByDescending(item => item.UploadedAtUtc)
+            .ThenBy(item => item.Id)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<Stream> OpenReadAsync(

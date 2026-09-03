@@ -54,6 +54,7 @@ try
     builder.Services.AddCmdbSeed();
     builder.Services.AddServiceDeskSeed();
     builder.Services.AddScoped<ISharedDbTransaction, SharedSqlTransaction>();
+    builder.Services.AddScoped<TicketNotificationService>();
 
     bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
     string? hangfireConnection = builder.Configuration.GetConnectionString(QecEfConventions.ConnectionStringName);
@@ -131,6 +132,7 @@ try
     app.MapMeNotificationEndpoints();
     app.MapMeEquipmentEndpoints();
     app.MapMeTicketEndpoints();
+    app.MapTicketCollaborationEndpoints();
     app.MapIdentityAdminEndpoints();
     app.MapLookupAdminEndpoints();
     app.MapCmdbEndpoints();

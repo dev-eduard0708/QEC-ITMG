@@ -46,6 +46,15 @@ public sealed class AttachmentMetadataConfiguration : IEntityTypeConfiguration<A
         builder.Property(candidate => candidate.UploadedAtUtc)
             .IsRequired();
 
+        builder.Property(candidate => candidate.ResourceType)
+            .HasMaxLength(64)
+            .HasColumnType("nvarchar(64)");
+
+        builder.Property(candidate => candidate.ResourceId);
+
+        builder.HasIndex(candidate => new { candidate.ResourceType, candidate.ResourceId })
+            .HasDatabaseName("IX_AttachmentMetadata_ResourceType_ResourceId");
+
         builder.Property(candidate => candidate.ScanStatus)
             .IsRequired();
 

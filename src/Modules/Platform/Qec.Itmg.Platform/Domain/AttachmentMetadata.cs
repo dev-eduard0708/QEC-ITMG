@@ -27,6 +27,16 @@ public sealed class AttachmentMetadata
 
     public DateTimeOffset UploadedAtUtc { get; private set; }
 
+    /// <summary>
+    /// Optional owning resource type (e.g. Ticket). Null = unbound metadata.
+    /// </summary>
+    public string? ResourceType { get; private set; }
+
+    /// <summary>
+    /// Optional owning resource id. Null = unbound metadata.
+    /// </summary>
+    public Guid? ResourceId { get; private set; }
+
     public MalwareScanStatus ScanStatus { get; private set; }
 
     public string? ScanProvider { get; private set; }
@@ -51,7 +61,9 @@ public sealed class AttachmentMetadata
         string contentType,
         long sizeBytes,
         string sha256,
-        DateTimeOffset uploadedAtUtc)
+        DateTimeOffset uploadedAtUtc,
+        string? resourceType = null,
+        Guid? resourceId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(originalFileName);
         ArgumentException.ThrowIfNullOrWhiteSpace(storageKey);
@@ -63,7 +75,7 @@ public sealed class AttachmentMetadata
             throw new ArgumentOutOfRangeException(nameof(sizeBytes), "File size must be > 0.");
         }
 
-        return new AttachmentMetadata
+        AttachmentMetadata metadata = new()
         {
             Id = Guid.CreateVersion7(),
             UploadedByUserId = uploadedByUserId,
@@ -73,9 +85,32 @@ public sealed class AttachmentMetadata
             SizeBytes = sizeBytes,
             Sha256 = sha256.Trim(),
             UploadedAtUtc = uploadedAtUtc,
-
             ScanStatus = MalwareScanStatus.Pending,
         };
+
+        if (!string.IsNullOrWhiteSpace(resourceType) && resourceId is Guid id && id != Guid.Empty)
+        {
+            metadata.BindToResource(resourceType, id);
+        }
+
+        return metadata;
+    }
+
+    public void BindToResource(string resourceType, Guid resourceId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceType);
+        if (resourceId == Guid.Empty)
+        {
+            throw new ArgumentException("ResourceId must not be empty.", nameof(resourceId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(ResourceType) || ResourceId is not null)
+        {
+            throw new InvalidOperationException("Attachment is already bound to a resource.");
+        }
+
+        ResourceType = resourceType.Trim();
+        ResourceId = resourceId;
     }
 
     public void StartScanning(DateTimeOffset utcNow)
