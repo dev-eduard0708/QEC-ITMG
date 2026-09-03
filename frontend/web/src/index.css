@@ -29,6 +29,32 @@
   --sidebar-accent: 199 89% 32%;
 }
 
+.dark {
+  --background: 222 47% 7%;
+  --foreground: 210 20% 96%;
+  --card: 222 40% 10%;
+  --card-foreground: 210 20% 96%;
+  --popover: 222 40% 10%;
+  --popover-foreground: 210 20% 96%;
+  --primary: 199 89% 48%;
+  --primary-foreground: 222 47% 8%;
+  --secondary: 217 25% 18%;
+  --secondary-foreground: 210 20% 96%;
+  --muted: 217 25% 18%;
+  --muted-foreground: 215 16% 70%;
+  --accent: 199 40% 18%;
+  --accent-foreground: 199 90% 80%;
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 217 25% 22%;
+  --input: 217 25% 22%;
+  --ring: 199 89% 48%;
+  --sidebar: 222 47% 6%;
+  --sidebar-foreground: 210 20% 96%;
+  --sidebar-muted: 215 16% 65%;
+  --sidebar-accent: 199 89% 40%;
+}
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -56,7 +82,7 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --font-sans: "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Segoe UI", "Segoe UI Historic", "Tahoma", ui-sans-serif, system-ui, sans-serif;
 }
 
 * {

@@ -1,46 +1,46 @@
-const messages = {
-  'brand.organization': 'Quality Education Company',
-  'brand.name': 'QEC ITMG',
-  'brand.product': 'IT Management & Governance Platform',
-  'nav.workspaces': 'Workspaces',
-  'nav.foundation': 'Foundation',
-  'nav.employee': 'Employee',
-  'nav.it': 'IT',
-  'nav.governance': 'Governance',
-  'status.development': 'Development',
-  'status.foundation': 'Foundation phase',
-  'shell.openMenu': 'Open navigation',
-  'shell.sidebarNote':
-    'Workspace shells only. Business modules will appear as implementation phases complete.',
-  'foundation.title': 'Platform foundation',
-  'foundation.description':
-    'This React shell establishes navigation, providers, and design primitives for QEC ITMG. No business modules are implemented yet.',
-  'foundation.card.title': 'Current status',
-  'foundation.card.body':
-    'Backend host and modular foundation are in place. This frontend shell is ready for Phase 1 identity and later operational modules.',
-  'foundation.next.title': 'What comes next',
-  'foundation.next.body':
-    'P0-04 adds EF Core and SQL foundation. Authentication, tickets, assets, and GRC arrive in later phases.',
-  'employee.title': 'Employee workspace',
-  'employee.description':
-    'Placeholder for My Tickets, requests, equipment, knowledge, and remote consent. Not implemented yet.',
-  'it.title': 'IT workspace',
-  'it.description':
-    'Placeholder for service desk, changes, assets, remote sessions, and operations. Not implemented yet.',
-  'governance.title': 'Governance workspace',
-  'governance.description':
-    'Placeholder for controls, policies, compliance, evidence, and audit. Not implemented yet.',
-  'placeholder.note': 'Shell route only — module features are intentionally deferred.',
-  'employee.planned':
-    'Planned later: My Tickets, Create Request, My Equipment, Knowledge Base, Remote consent.',
-  'it.planned':
-    'Planned later: Dashboard, Service Desk, Remote, Changes, Assets, Operations, Knowledge.',
-  'governance.planned':
-    'Planned later: Governance, Policies, Compliance, Evidence, Audit, Risks, Reports.',
-} as const
+import i18n from 'i18next'
+import { initReactI18next } from 'react-i18next'
+import ar from '@/i18n/ar.json'
+import en from '@/i18n/en.json'
 
-export type MessageKey = keyof typeof messages
+export const LANGUAGE_STORAGE_KEY = 'qec-itmg.language'
+export const supportedLanguages = ['en', 'ar'] as const
+export type AppLanguage = (typeof supportedLanguages)[number]
 
-export function t(key: MessageKey): string {
-  return messages[key]
+export function isAppLanguage(value: string | null | undefined): value is AppLanguage {
+  return value === 'en' || value === 'ar'
 }
+
+export function getStoredLanguage(): AppLanguage {
+  const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY)
+  return isAppLanguage(stored) ? stored : 'en'
+}
+
+export function applyDocumentLanguage(language: AppLanguage) {
+  const root = document.documentElement
+  root.lang = language
+  root.dir = language === 'ar' ? 'rtl' : 'ltr'
+}
+
+void i18n.use(initReactI18next).init({
+  resources: {
+    en: { translation: en },
+    ar: { translation: ar },
+  },
+  lng: getStoredLanguage(),
+  fallbackLng: 'en',
+  interpolation: {
+    escapeValue: false,
+  },
+})
+
+applyDocumentLanguage(getStoredLanguage())
+
+i18n.on('languageChanged', (language) => {
+  if (isAppLanguage(language)) {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, language)
+    applyDocumentLanguage(language)
+  }
+})
+
+export default i18n

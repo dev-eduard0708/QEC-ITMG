@@ -1,11 +1,34 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="QEC IT Management & Governance Platform" />
     <title>QEC ITMG</title>
+    <script>
+      (() => {
+        try {
+          const themeKey = 'qec-itmg.theme'
+          const languageKey = 'qec-itmg.language'
+          const storedTheme = localStorage.getItem(themeKey)
+          const theme = storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system'
+            ? storedTheme
+            : 'system'
+          const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          const resolved = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme
+          const root = document.documentElement
+          root.classList.toggle('dark', resolved === 'dark')
+          root.dataset.theme = resolved
+
+          const language = localStorage.getItem(languageKey) === 'ar' ? 'ar' : 'en'
+          root.lang = language
+          root.dir = language === 'ar' ? 'rtl' : 'ltr'
+        } catch (_) {
+          /* ignore preference bootstrap errors */
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

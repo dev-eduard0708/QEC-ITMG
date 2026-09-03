@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/page-header'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { t } from '@/i18n'
 
 export function GovernanceHomePage() {
+  const { t } = useTranslation()
+
   return (
     <div>
       <PageHeader title={t('governance.title')} description={t('governance.description')} />
