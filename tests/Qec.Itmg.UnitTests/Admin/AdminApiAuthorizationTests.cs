@@ -23,6 +23,46 @@ public sealed class AdminApiAuthorizationTests
     private static readonly DateTimeOffset Now = new(2026, 9, 3, 15, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public async Task Anonymous_AdminApis_Return401()
+    {
+        await using AdminApiWebApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/admin/users")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/admin/roles")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/v1/admin/permissions")).StatusCode);
+    }
+
+    [Fact]
+    public async Task AuthenticatedEmployee_WithoutAdminPermission_Gets403()
+    {
+        await using AdminApiWebApplicationFactory factory = new();
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            HandleCookies = true,
+        });
+
+        string externalId = $"oid-{Guid.NewGuid():N}";
+        string upn = $"{Guid.NewGuid():N}@qehc.edu.sa";
+        using (IServiceScope scope = factory.Services.CreateScope())
+        {
+            IdentityDbContext db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+            db.Users.Add(User.Create(upn, "Plain Employee", UserType.Employee, Now, directoryObjectId: externalId));
+            await db.SaveChangesAsync();
+        }
+
+        HttpResponseMessage signIn = await client.GetAsync(
+            $"/__test__/signin?externalId={Uri.EscapeDataString(externalId)}&upn={Uri.EscapeDataString(upn)}");
+        Assert.Equal(HttpStatusCode.NoContent, signIn.StatusCode);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/admin/users")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/v1/admin/roles")).StatusCode);
+    }
+
+    [Fact]
     public async Task UsersEndpoints_RequireAdminUsersPermission()
     {
         await using AdminApiWebApplicationFactory factory = new();
@@ -31,9 +71,6 @@ public sealed class AdminApiAuthorizationTests
             AllowAutoRedirect = false,
             HandleCookies = true,
         });
-
-        HttpResponseMessage anonymous = await client.GetAsync("/api/v1/admin/users");
-        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
 
         await SeedAndSignInAsync(factory, client, permissionKey: "admin.roles");
         HttpResponseMessage forbidden = await client.GetAsync("/api/v1/admin/users");
