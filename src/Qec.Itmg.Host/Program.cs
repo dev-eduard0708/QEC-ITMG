@@ -1,10 +1,13 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Qec.Itmg.Host;
+using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Persistence;
 using Serilog;
+using System.Security.Claims;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -28,6 +31,8 @@ try
         .WriteTo.Console());
 
     builder.AddQecModules();
+    builder.Services.AddIdentityAuthentication(builder.Configuration, builder.Environment);
+
     builder.Services
         .AddHealthChecks()
         .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live", "ready"])
@@ -38,6 +43,8 @@ try
     var app = builder.Build();
 
     app.UseSerilogRequestLogging();
+    app.UseAuthentication();
+    app.UseAuthorization();
 
     app.MapHealthChecks("/health/live", new HealthCheckOptions
     {
@@ -48,6 +55,31 @@ try
     {
         Predicate = check => check.Tags.Contains("ready"),
     });
+
+    app.MapIdentityAuthEndpoints();
+
+    if (app.Environment.IsEnvironment("Testing"))
+    {
+        app.MapGet("/__test__/signin", async (HttpContext httpContext) =>
+        {
+            ClaimsPrincipal principal = new(new ClaimsIdentity(
+                [
+                    new Claim(OidcPrincipalMapper.ExternalIdClaimType, "oid-1"),
+                    new Claim(ClaimTypes.Name, "Test User"),
+                ],
+                IdentityAuthenticationExtensions.CookieScheme));
+
+            await httpContext.SignInAsync(IdentityAuthenticationExtensions.CookieScheme, principal);
+            return Results.NoContent();
+        });
+
+        app.MapGet("/__test__/auth-state", async (HttpContext httpContext) =>
+        {
+            AuthenticateResult result =
+                await httpContext.AuthenticateAsync(IdentityAuthenticationExtensions.CookieScheme);
+            return Results.Text(result.Succeeded ? "authenticated" : "anonymous");
+        });
+    }
 
     Log.Information(
         "QEC ITMG host started. Environment={Environment}",

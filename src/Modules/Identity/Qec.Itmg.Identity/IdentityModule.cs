@@ -8,7 +8,7 @@ using Qec.Itmg.Identity.Persistence;
 namespace Qec.Itmg.Identity;
 
 /// <summary>
-/// Identity module composition. Domain types are added in Phase 1.
+/// Identity module composition: persistence and authentication helpers.
 /// </summary>
 public sealed class IdentityModule : IModule
 {

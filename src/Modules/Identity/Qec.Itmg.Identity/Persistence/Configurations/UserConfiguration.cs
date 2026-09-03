@@ -52,5 +52,10 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(user => user.Upn)
             .IsUnique()
             .HasDatabaseName("IX_User_Upn");
+
+        builder.HasIndex(user => user.DirectoryObjectId)
+            .IsUnique()
+            .HasFilter("[DirectoryObjectId] IS NOT NULL")
+            .HasDatabaseName("IX_User_DirectoryObjectId");
     }
 }

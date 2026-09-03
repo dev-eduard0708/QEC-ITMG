@@ -6,6 +6,7 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
@@ -20,5 +21,6 @@
     <ProjectReference Include="..\..\src\Modules\Identity\Qec.Itmg.Identity\Qec.Itmg.Identity.csproj" />
     <ProjectReference Include="..\..\src\Modules\Organization\Qec.Itmg.Organization\Qec.Itmg.Organization.csproj" />
     <ProjectReference Include="..\..\src\Modules\Platform\Qec.Itmg.Platform\Qec.Itmg.Platform.csproj" />
+    <ProjectReference Include="..\..\src\Qec.Itmg.Host\Qec.Itmg.Host.csproj" />
   </ItemGroup>
 </Project>

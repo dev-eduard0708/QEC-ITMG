@@ -21,6 +21,10 @@ public sealed class IdentityModelTests
         IEntityType rolePermission = GetEntity(model, typeof(RolePermission));
 
         Assert.Contains(user.GetIndexes(), index => index.IsUnique && IndexHasProperty(index, "Upn"));
+        Assert.Contains(user.GetIndexes(), index => index.IsUnique && IndexHasProperty(index, "DirectoryObjectId"));
+        IIndex directoryIndex = user.GetIndexes().Single(index => IndexHasProperty(index, "DirectoryObjectId"));
+        Assert.Equal("[DirectoryObjectId] IS NOT NULL", directoryIndex.GetFilter());
+
         Assert.Contains(role.GetIndexes(), index => index.IsUnique && IndexHasProperty(index, "Name"));
         Assert.Contains(permission.GetIndexes(), index => index.IsUnique && IndexHasProperty(index, "Key"));
 
