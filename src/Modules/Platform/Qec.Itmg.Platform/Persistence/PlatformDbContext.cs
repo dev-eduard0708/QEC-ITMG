@@ -19,6 +19,12 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<Comment> Comments => Set<Comment>();
 
+    public DbSet<WorkflowDefinition> WorkflowDefinitions => Set<WorkflowDefinition>();
+
+    public DbSet<WorkflowState> WorkflowStates => Set<WorkflowState>();
+
+    public DbSet<WorkflowTransition> WorkflowTransitions => Set<WorkflowTransition>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
