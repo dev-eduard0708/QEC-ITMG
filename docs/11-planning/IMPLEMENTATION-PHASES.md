@@ -146,10 +146,10 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 | ID | Work |
 |----|------|
-| P4-01 | Ticket domain |
-| P4-02 | Ticket API |
-| P4-03 | Assignment / queues |
-| P4-04 | SLA engine |
+| P4-01 | Ticket domain (Done) |
+| P4-02 | Ticket API (Done) |
+| P4-03 | Assignment / queues (Done) |
+| P4-04 | SLA engine (Done) |
 | P4-05 | Ticket UI employee + IT |
 | P4-06 | Attachments on ticket |
 | P4-07 | Timeline |
@@ -380,4 +380,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete.** Next: **P4-01 Service Desk / Ticket domain.**
+**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete.** Packages **P4-01..P4-04** (ticket domain, API, queues/assignment, SLA foundation) are done. Next: **P4-05 Ticket UI employee + IT.**
