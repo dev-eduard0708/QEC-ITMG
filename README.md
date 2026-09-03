@@ -6,7 +6,7 @@
 
 QEC ITMG is the internal enterprise platform for IT service management, operations, remote support, asset/CMDB, cybersecurity, governance, compliance, evidence, and audit. Operational work is designed to produce structured history and reusable audit evidence rather than living in disconnected tools.
 
-**Phase 0 (repository foundation) is complete.** Application source exists for the modular-monolith skeleton, frontend shell, persistence foundation, CI, and architecture tests. **No production business modules** (tickets, assets, change, GRC, remote support, and so on) are implemented yet. Production deployment has not started.
+**Phase 0 (repository foundation) and Phase 1 (Identity) are complete.** Application source includes the modular-monolith host, Google OIDC BFF + break-glass, SQL RBAC, `/me` SPA session, admin users/roles UI, audit foundation, and identity seeds. Broader business modules (tickets, assets, change, GRC, remote support) are not implemented yet. Production deployment has not started.
 
 ## Current project status
 
@@ -18,17 +18,17 @@ QEC ITMG is the internal enterprise platform for IT service management, operatio
 | Security and compliance design | Documented |
 | Implementation roadmap | Documented |
 | Phase 0 foundation | **Complete** |
-| ASP.NET Core 10 modular monolith | Host + BuildingBlocks + Contracts + Identity / Organization / Platform stubs |
-| Frontend shell (React 19 + TypeScript + Vite) | Present (routing stub; theme + en/ar + RTL) |
-| EF Core 10 + SQL Server foundation | Present (`QecItmg_Dev` foundation migrations; schemas `id` / `org` / `plt`) |
+| Phase 1 identity / org / audit | **Complete** |
+| ASP.NET Core 10 modular monolith | Host + BuildingBlocks + Contracts + Identity / Organization / Platform |
+| Frontend shell (React 19 + TypeScript + Vite) | Present (login, session, admin UI, theme + en/ar + RTL) |
+| EF Core 10 + SQL Server foundation | Present (`QecItmg_Dev`; schemas `id` / `org` / `plt`) |
 | Health / readiness + Serilog | Present |
 | CI build/test pipeline | Present |
 | Architecture boundary tests | Present |
-| Business domain (users, tickets, assets, GRC, …) | **Not started** |
-| Production APIs / authz product features | **Not started** |
+| Business domain (tickets, assets, GRC, …) | **Not started** |
 | Production deployment | **Not started** |
 
-**Next step:** Phase 1 — Identity, organization, users, roles, permissions, and audit foundation (package **P1-01**). See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) and [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md).
+**Next step:** Phase 2 — Shared platform foundations (package **P2-01 NumberSequence concurrency**). See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) and [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md).
 
 P0-07 (optional Docker Compose for SQL) is **deferred**: local SQL Express development already works.
 

@@ -48,30 +48,35 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ## Phase 1 — Identity, organization, users, roles, permissions, audit foundation
 
+**Status:** Complete (P1-01 through P1-10).
+
 **Objective:** Real users, RBAC, org lookups, immutable security + business audit for identity changes.
 
 **Prerequisites:** P0.
 
-**Out of scope:** Tickets, SSO polish can complete here (OIDC BFF).
+**Out of scope:** Tickets (later phases).
 
 ### Packages
 
-| ID | Work |
-|----|------|
-| P1-01 | User, Role, Permission entities |
-| P1-02 | OIDC BFF cookie auth |
-| P1-03 | Permission policies |
-| P1-04 | Departments, locations |
-| P1-05 | Admin UI users/roles |
-| P1-06 | BusinessAuditRecord + SecurityAuditEvent |
-| P1-07 | Break-glass local admin |
-| P1-08 | Authz tests |
-| P1-09 | `/me` endpoint and SPA session |
-| P1-10 | Seed Employee + Platform Administrator |
+| ID | Work | Status |
+|----|------|--------|
+| P1-01 | User, Role, Permission entities | Done |
+| P1-02 | OIDC BFF cookie auth (Google primary) | Done |
+| P1-03 | Permission policies | Done |
+| P1-04 | Departments, locations | Done |
+| P1-05 | Admin UI users/roles | Done |
+| P1-06 | BusinessAuditRecord + SecurityAuditEvent | Done |
+| P1-06B | Google OIDC pivot + Mailpit SMTP config | Done |
+| P1-07 | Break-glass local emergency login | Done |
+| P1-08 | Authz tests | Done |
+| P1-09 | `/me` endpoint and SPA session | Done |
+| P1-10 | Seed Employee + Platform Administrator | Done |
 
-**Security:** MFA story documented; Entra CA; step-up placeholder claim.
+**Security:** Google Workspace MFA for privileged accounts; app step-up placeholder claim.
 **Audit:** Role assignment history required.
-**Acceptance:** Cannot call admin API as Employee; history row on role change.
+**Acceptance:** Cannot call admin API as Employee; history row on role change; `/me` + SPA session; idempotent identity seed.
+
+**Next:** Phase 2 / **P2-01 NumberSequence concurrency**.
 
 ---
 
@@ -371,4 +376,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phase 0 is complete.** Next: **P1-01 User, Role, Permission domain** — do not implement service desk, assets, or MeshCentral in that task.
+**Phase 0 is complete. Phase 1 (Identity) is complete.** Next: **P2-01 NumberSequence concurrency** — do not implement service desk, assets, or MeshCentral in that task.

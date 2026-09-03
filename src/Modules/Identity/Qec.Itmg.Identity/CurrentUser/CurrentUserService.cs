@@ -6,6 +6,7 @@ using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
+using Qec.Itmg.Identity.Seed;
 
 namespace Qec.Itmg.Identity.CurrentUser;
 
@@ -20,7 +21,7 @@ public sealed class CurrentUserService(
     IBusinessAuditWriter businessAudit,
     ISharedDbTransaction sharedDbTransaction) : ICurrentUserService
 {
-    public const string EmployeeRoleName = "Employee";
+    public const string EmployeeRoleName = IdentitySeedCatalog.EmployeeRoleName;
 
     public async Task<CurrentUserDto?> GetSessionAsync(
         ClaimsPrincipal principal,

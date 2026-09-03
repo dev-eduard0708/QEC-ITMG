@@ -147,9 +147,9 @@ Authz + history + tests + docs for every package. [11-planning/DEFINITION-OF-DON
 
 **Phase 0 is complete** (including P0-08 closeout). Optional P0-07 Docker Compose for SQL remains deferred while local SQL Express works.
 
-**Next:** Phase 1 / package **P1-01 — User, Role, Permission domain.**
+**Next:** Phase 2 / package **P2-01 — NumberSequence concurrency.**
 
-Do not start with tickets or MeshCentral. Security and audit foundations are not deferred past Phase 1.
+Do not start with tickets or MeshCentral. Security and audit foundations for identity are complete (Phase 1).
 
 ---
 

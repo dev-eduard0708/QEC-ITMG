@@ -8,6 +8,7 @@ using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.CurrentUser;
 using Qec.Itmg.Identity.Persistence;
+using Qec.Itmg.Identity.Seed;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Persistence;
 using Serilog;
@@ -36,6 +37,7 @@ try
 
     builder.AddQecModules();
     builder.Services.AddIdentityAuthentication(builder.Configuration, builder.Environment);
+    builder.Services.AddIdentitySeed(builder.Configuration);
     builder.Services.AddScoped<ISharedDbTransaction, SharedSqlTransaction>();
 
     builder.Services
@@ -46,6 +48,8 @@ try
         .AddDbContextCheck<PlatformDbContext>("sql-platform", tags: ["ready"]);
 
     var app = builder.Build();
+
+    await app.RunIdentitySeedAsync();
 
     app.UseSerilogRequestLogging();
     app.UseAuthentication();

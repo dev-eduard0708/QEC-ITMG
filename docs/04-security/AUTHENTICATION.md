@@ -47,6 +47,14 @@ Emergency local login independent of Google, disabled by default:
 - Authorization remains SQL RBAC
 - Audit: `BreakGlassLoginSuccess` / `BreakGlassLoginFailed` (no password or hash logging)
 
+## Identity seed
+
+Startup bootstrap (`Identity:Seed`):
+
+- System permissions: `admin.users`, `admin.roles`, `admin.settings`, `admin.integrations`, `admin.lookups`
+- System roles: `Employee` (no admin permissions), `Platform Administrator` (admin.* above; never `remote.unattended`)
+- Optional `Identity:Seed:PlatformAdministratorUpn` pre-provisions/assigns first Platform Administrator (empty by default; set in local/env config)
+
 ## API / future services
 
 Client credentials or certificate for adapters. Not user passwords.
