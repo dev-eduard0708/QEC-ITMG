@@ -53,19 +53,6 @@ public sealed class OidcBffAuthenticationTests
     }
 
     [Fact]
-    public async Task DevLogin_WhenNotDevelopment_IsNotMapped_EvenIfOidcDisabled()
-    {
-        await using AuthWebApplicationFactory factory = new(oidcEnabled: false);
-        using HttpClient client = factory.CreateClient();
-
-        HttpResponseMessage admin = await client.PostAsync("/auth/dev-login/admin", content: null);
-        HttpResponseMessage employee = await client.PostAsync("/auth/dev-login/employee", content: null);
-
-        Assert.Equal(HttpStatusCode.NotFound, admin.StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, employee.StatusCode);
-    }
-
-    [Fact]
     public async Task Login_WhenOidcEnabled_ChallengesOidc()
     {
         await using AuthWebApplicationFactory factory = new(oidcEnabled: true);

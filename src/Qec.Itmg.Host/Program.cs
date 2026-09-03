@@ -123,10 +123,6 @@ try
     });
 
     app.MapIdentityAuthEndpoints();
-    if (app.Environment.IsDevelopment())
-    {
-        app.MapDevelopmentLoginEndpoints();
-    }
 
     app.MapCurrentUserEndpoints();
     app.MapMeNotificationEndpoints();
