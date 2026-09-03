@@ -103,6 +103,45 @@ public sealed class Asset
         UpdatedAtUtc = utcNow;
     }
 
+    public void UpdateProfile(
+        string assetType,
+        string name,
+        AssetStatus status,
+        Guid? configurationItemId,
+        string? serialNumber,
+        string? manufacturer,
+        string? model,
+        DateOnly? purchaseDate,
+        decimal? purchaseCost,
+        DateOnly? warrantyExpiry,
+        Guid? locationId,
+        string? notes,
+        DateTimeOffset utcNow)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assetType);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (!Enum.IsDefined(status))
+        {
+            throw new ArgumentOutOfRangeException(nameof(status));
+        }
+
+        AssetType = assetType.Trim();
+        Name = name.Trim();
+        Status = status;
+        ConfigurationItemId = configurationItemId is null || configurationItemId == Guid.Empty
+            ? null
+            : configurationItemId;
+        SerialNumber = NormalizeOptional(serialNumber);
+        Manufacturer = NormalizeOptional(manufacturer);
+        Model = NormalizeOptional(model);
+        PurchaseDate = purchaseDate;
+        PurchaseCost = purchaseCost;
+        WarrantyExpiry = warrantyExpiry;
+        LocationId = locationId is null || locationId == Guid.Empty ? null : locationId;
+        Notes = NormalizeOptional(notes);
+        UpdatedAtUtc = utcNow;
+    }
+
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

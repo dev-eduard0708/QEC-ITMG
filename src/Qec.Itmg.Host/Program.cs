@@ -7,6 +7,7 @@ using Hangfire.SqlServer;
 using Qec.Itmg.BuildingBlocks.Email;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.Host;
+using Qec.Itmg.Host.Cmdb;
 using Qec.Itmg.Host.Email;
 using Qec.Itmg.Host.Lookups;
 using Qec.Itmg.Host.Notifications;
@@ -111,8 +112,11 @@ try
 
     app.MapCurrentUserEndpoints();
     app.MapMeNotificationEndpoints();
+    app.MapMeEquipmentEndpoints();
     app.MapIdentityAdminEndpoints();
     app.MapLookupAdminEndpoints();
+    app.MapCmdbEndpoints();
+    app.MapAssetEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

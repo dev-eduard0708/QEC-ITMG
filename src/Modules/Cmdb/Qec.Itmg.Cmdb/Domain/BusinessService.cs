@@ -55,4 +55,30 @@ public sealed class BusinessService
             UpdatedAtUtc = utcNow,
         };
     }
+
+    public void Update(
+        string name,
+        CiCriticality criticality,
+        string? description,
+        Guid? ownerUserId,
+        int? rtoMinutes,
+        int? rpoMinutes,
+        bool isActive,
+        DateTimeOffset utcNow)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        if (!Enum.IsDefined(criticality))
+        {
+            throw new ArgumentOutOfRangeException(nameof(criticality));
+        }
+
+        Name = name.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+        OwnerUserId = ownerUserId is null || ownerUserId == Guid.Empty ? null : ownerUserId;
+        Criticality = criticality;
+        RtoMinutes = rtoMinutes;
+        RpoMinutes = rpoMinutes;
+        IsActive = isActive;
+        UpdatedAtUtc = utcNow;
+    }
 }

@@ -7,6 +7,23 @@ namespace Qec.Itmg.Cmdb.Services;
 
 public sealed class CiRelationshipService(CmdbDbContext db, IClock clock)
 {
+    public async Task<IReadOnlyList<CiRelationshipDto>> ListForCiAsync(
+        Guid ciId,
+        CancellationToken cancellationToken = default)
+    {
+        return await db.CiRelationships.AsNoTracking()
+            .Where(item => item.SourceCiId == ciId || item.TargetCiId == ciId)
+            .OrderByDescending(item => item.CreatedAtUtc)
+            .Select(item => new CiRelationshipDto(
+                item.Id,
+                item.SourceCiId,
+                item.TargetCiId,
+                item.RelationshipType.ToString(),
+                item.Notes,
+                item.CreatedAtUtc))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<CiRelationship> CreateAsync(
         Guid sourceCiId,
         Guid targetCiId,
@@ -37,5 +54,18 @@ public sealed class CiRelationshipService(CmdbDbContext db, IClock clock)
         db.CiRelationships.Add(entity);
         await db.SaveChangesAsync(cancellationToken);
         return entity;
+    }
+
+    public async Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        CiRelationship? entity = await db.CiRelationships.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        if (entity is null)
+        {
+            return false;
+        }
+
+        db.CiRelationships.Remove(entity);
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 }

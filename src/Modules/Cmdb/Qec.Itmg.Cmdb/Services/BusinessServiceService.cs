@@ -5,8 +5,35 @@ using Qec.Itmg.Cmdb.Persistence;
 
 namespace Qec.Itmg.Cmdb.Services;
 
+public sealed record BusinessServiceDto(
+    Guid Id,
+    string Name,
+    string? Description,
+    Guid? OwnerUserId,
+    string Criticality,
+    int? RtoMinutes,
+    int? RpoMinutes,
+    bool IsActive,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
 public sealed class BusinessServiceService(CmdbDbContext db, IClock clock)
 {
+    public async Task<IReadOnlyList<BusinessServiceDto>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        List<BusinessService> items = await db.BusinessServices.AsNoTracking()
+            .OrderBy(item => item.Name)
+            .ToListAsync(cancellationToken);
+        return items.Select(Map).ToList();
+    }
+
+    public async Task<BusinessServiceDto?> GetAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        BusinessService? entity = await db.BusinessServices.AsNoTracking()
+            .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+        return entity is null ? null : Map(entity);
+    }
+
     public async Task<BusinessService> CreateAsync(
         string name,
         CiCriticality criticality,
@@ -25,6 +52,33 @@ public sealed class BusinessServiceService(CmdbDbContext db, IClock clock)
             rtoMinutes,
             rpoMinutes);
         db.BusinessServices.Add(entity);
+        await db.SaveChangesAsync(cancellationToken);
+        return entity;
+    }
+
+    public async Task<BusinessService> UpdateAsync(
+        Guid id,
+        string name,
+        CiCriticality criticality,
+        string? description,
+        Guid? ownerUserId,
+        int? rtoMinutes,
+        int? rpoMinutes,
+        bool isActive,
+        CancellationToken cancellationToken = default)
+    {
+        BusinessService entity = await db.BusinessServices.FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Business service was not found.");
+
+        entity.Update(
+            name,
+            criticality,
+            description,
+            ownerUserId,
+            rtoMinutes,
+            rpoMinutes,
+            isActive,
+            clock.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
         return entity;
     }
@@ -57,4 +111,17 @@ public sealed class BusinessServiceService(CmdbDbContext db, IClock clock)
             BusinessServiceConfigurationItem.Create(businessServiceId, configurationItemId, clock.UtcNow));
         await db.SaveChangesAsync(cancellationToken);
     }
+
+    private static BusinessServiceDto Map(BusinessService item) =>
+        new(
+            item.Id,
+            item.Name,
+            item.Description,
+            item.OwnerUserId,
+            item.Criticality.ToString(),
+            item.RtoMinutes,
+            item.RpoMinutes,
+            item.IsActive,
+            item.CreatedAtUtc,
+            item.UpdatedAtUtc);
 }
