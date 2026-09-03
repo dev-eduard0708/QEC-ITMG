@@ -7,11 +7,17 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Qec.Itmg.Identity.Authentication;
+using Qec.Itmg.Identity.Persistence;
+using Qec.Itmg.Organization.Persistence;
+using Qec.Itmg.Platform.Persistence;
 using Xunit;
 
 namespace Qec.Itmg.UnitTests.Authentication;
@@ -162,6 +168,7 @@ public sealed class OidcBffAuthenticationTests
 internal sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly bool _oidcEnabled;
+    private readonly string _databaseName = Guid.NewGuid().ToString("N");
 
     public AuthWebApplicationFactory(bool oidcEnabled)
     {
@@ -178,10 +185,21 @@ internal sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
         builder.UseSetting("Authentication:Oidc:CallbackPath", "/signin-oidc");
         builder.UseSetting(
             "ConnectionStrings:QecItmg",
-            "Server=.\\SQLEXPRESS;Database=QecItmg_Dev;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true");
+            "Server=(localdb)\\mssqllocaldb;Database=unused;Trusted_Connection=True;TrustServerCertificate=True");
 
         builder.ConfigureTestServices(services =>
         {
+            RemoveDbContext<IdentityDbContext>(services);
+            RemoveDbContext<OrganizationDbContext>(services);
+            RemoveDbContext<PlatformDbContext>(services);
+
+            services.AddDbContext<IdentityDbContext>(options =>
+                options.UseInMemoryDatabase($"auth-identity-{_databaseName}"));
+            services.AddDbContext<OrganizationDbContext>(options =>
+                options.UseInMemoryDatabase($"auth-organization-{_databaseName}"));
+            services.AddDbContext<PlatformDbContext>(options =>
+                options.UseInMemoryDatabase($"auth-platform-{_databaseName}"));
+
             if (!_oidcEnabled)
             {
                 return;
@@ -203,5 +221,13 @@ internal sealed class AuthWebApplicationFactory : WebApplicationFactory<Program>
                     new StaticConfigurationManager<OpenIdConnectConfiguration>(configuration);
             });
         });
+    }
+
+    private static void RemoveDbContext<TContext>(IServiceCollection services)
+        where TContext : DbContext
+    {
+        services.RemoveAll(typeof(DbContextOptions<TContext>));
+        services.RemoveAll(typeof(IDbContextOptionsConfiguration<TContext>));
+        services.RemoveAll(typeof(TContext));
     }
 }
