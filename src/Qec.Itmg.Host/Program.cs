@@ -17,6 +17,7 @@ using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.CurrentUser;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Identity.Seed;
+using Qec.Itmg.Cmdb.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Platform.Persistence;
@@ -81,7 +82,8 @@ try
         .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live", "ready"])
         .AddDbContextCheck<IdentityDbContext>("sql-identity", tags: ["ready"])
         .AddDbContextCheck<OrganizationDbContext>("sql-organization", tags: ["ready"])
-        .AddDbContextCheck<PlatformDbContext>("sql-platform", tags: ["ready"]);
+        .AddDbContextCheck<PlatformDbContext>("sql-platform", tags: ["ready"])
+        .AddDbContextCheck<CmdbDbContext>("sql-cmdb", tags: ["ready"]);
 
     var app = builder.Build();
 

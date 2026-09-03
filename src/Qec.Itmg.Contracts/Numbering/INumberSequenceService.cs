@@ -1,6 +1,4 @@
-using Qec.Itmg.BuildingBlocks.Time;
-
-namespace Qec.Itmg.Platform.NumberSequence;
+namespace Qec.Itmg.Contracts.Numbering;
 
 public interface INumberSequenceService
 {
@@ -13,4 +11,3 @@ public interface INumberSequenceService
         string prefix,
         CancellationToken cancellationToken = default);
 }
-

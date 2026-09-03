@@ -5,6 +5,7 @@ using System.Data;
 using System.Globalization;
 using System.Threading;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Contracts.Numbering;
 using Qec.Itmg.Platform.Persistence;
 
 namespace Qec.Itmg.Platform.NumberSequence;

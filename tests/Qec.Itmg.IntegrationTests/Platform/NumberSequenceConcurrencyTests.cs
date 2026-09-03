@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Contracts.Numbering;
 using Qec.Itmg.Platform.NumberSequence;
 using Qec.Itmg.Platform.Persistence;
 using Xunit;

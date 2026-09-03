@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Contracts.Numbering;
 using Qec.Itmg.Platform.Domain;
 using Qec.Itmg.Platform.NumberSequence;
 using Qec.Itmg.Platform.Persistence;

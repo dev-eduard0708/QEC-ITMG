@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Qec.Itmg.BuildingBlocks.Persistence;
+using Qec.Itmg.Cmdb.Persistence;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Persistence;
@@ -43,5 +44,17 @@ public sealed class PlatformDbContextFactory : IDesignTimeDbContextFactory<Platf
             DesignTimeConnectionString.Resolve(),
             sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", PlatformDbContext.SchemaName));
         return new PlatformDbContext(optionsBuilder.Options);
+    }
+}
+
+public sealed class CmdbDbContextFactory : IDesignTimeDbContextFactory<CmdbDbContext>
+{
+    public CmdbDbContext CreateDbContext(string[] args)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<CmdbDbContext>();
+        optionsBuilder.UseSqlServer(
+            DesignTimeConnectionString.Resolve(),
+            sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", CmdbDbContext.SchemaName));
+        return new CmdbDbContext(optionsBuilder.Options);
     }
 }

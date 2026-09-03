@@ -14,6 +14,7 @@ using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.Authorization;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
+using Qec.Itmg.Cmdb.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Persistence;
 using Xunit;
@@ -181,6 +182,7 @@ internal sealed class BreakGlassWebApplicationFactory : WebApplicationFactory<Pr
             RemoveDbContext<IdentityDbContext>(services);
             RemoveDbContext<OrganizationDbContext>(services);
             RemoveDbContext<PlatformDbContext>(services);
+            RemoveDbContext<CmdbDbContext>(services);
 
             services.AddDbContext<IdentityDbContext>(options =>
                 options.UseInMemoryDatabase($"bg-identity-{_databaseName}"));
@@ -188,6 +190,8 @@ internal sealed class BreakGlassWebApplicationFactory : WebApplicationFactory<Pr
                 options.UseInMemoryDatabase($"bg-organization-{_databaseName}"));
             services.AddDbContext<PlatformDbContext>(options =>
                 options.UseInMemoryDatabase($"bg-platform-{_databaseName}"));
+            services.AddDbContext<CmdbDbContext>(options =>
+                options.UseInMemoryDatabase($"bg-cmdb-{_databaseName}"));
 
             services.PostConfigure<BreakGlassAuthenticationOptions>(options =>
             {

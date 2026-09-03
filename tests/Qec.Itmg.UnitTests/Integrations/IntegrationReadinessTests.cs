@@ -12,6 +12,7 @@ using Microsoft.Extensions.Options;
 using Qec.Itmg.Contracts.Integrations;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
+using Qec.Itmg.Cmdb.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Platform.Persistence;
@@ -182,6 +183,7 @@ internal sealed class IntegrationReadinessWebApplicationFactory : WebApplication
             RemoveDbContext<IdentityDbContext>(services);
             RemoveDbContext<OrganizationDbContext>(services);
             RemoveDbContext<PlatformDbContext>(services);
+            RemoveDbContext<CmdbDbContext>(services);
 
             services.AddDbContext<IdentityDbContext>(options =>
                 options.UseInMemoryDatabase($"integ-identity-{_databaseName}"));
@@ -189,6 +191,8 @@ internal sealed class IntegrationReadinessWebApplicationFactory : WebApplication
                 options.UseInMemoryDatabase($"integ-organization-{_databaseName}"));
             services.AddDbContext<PlatformDbContext>(options =>
                 options.UseInMemoryDatabase($"integ-platform-{_databaseName}"));
+            services.AddDbContext<CmdbDbContext>(options =>
+                options.UseInMemoryDatabase($"integ-cmdb-{_databaseName}"));
         });
     }
 

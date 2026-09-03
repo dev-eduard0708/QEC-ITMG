@@ -22,5 +22,6 @@
     <ProjectReference Include="..\Modules\Identity\Qec.Itmg.Identity\Qec.Itmg.Identity.csproj" />
     <ProjectReference Include="..\Modules\Organization\Qec.Itmg.Organization\Qec.Itmg.Organization.csproj" />
     <ProjectReference Include="..\Modules\Platform\Qec.Itmg.Platform\Qec.Itmg.Platform.csproj" />
+    <ProjectReference Include="..\Modules\Cmdb\Qec.Itmg.Cmdb\Qec.Itmg.Cmdb.csproj" />
   </ItemGroup>
 </Project>
