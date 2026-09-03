@@ -42,7 +42,9 @@ public sealed class CurrentUserService(
         bool isBreakGlass = BreakGlassPrincipalFactory.IsBreakGlass(principal);
         string authMethod = isBreakGlass
             ? BreakGlassPrincipalFactory.AuthMethodBreakGlass
-            : "Google";
+            : DevelopmentLoginPrincipalFactory.IsDevelopment(principal)
+                ? DevelopmentLoginPrincipalFactory.AuthMethodDevelopment
+                : "Google";
 
         string? externalId = principal.FindFirstValue(OidcPrincipalMapper.ExternalIdClaimType)
             ?? principal.FindFirstValue(ClaimTypes.NameIdentifier);

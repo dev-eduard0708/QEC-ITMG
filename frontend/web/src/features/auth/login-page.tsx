@@ -1,15 +1,43 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Languages } from 'lucide-react'
 import { isAppLanguage, type AppLanguage } from '@/i18n'
 import { useTheme } from '@/app/theme-provider'
 import type { ThemeOption } from '@/app/theme'
 import { Button } from '@/components/ui/button'
+import { ApiError, apiFetch } from '@/api/client'
+import { useAuth } from '@/auth/auth-provider'
+
+type QuickLoginKind = 'admin' | 'employee'
 
 export function LoginPage() {
   const { t, i18n } = useTranslation()
   const { theme, setTheme } = useTheme()
+  const { refresh } = useAuth()
+  const navigate = useNavigate()
   const language: AppLanguage = isAppLanguage(i18n.language) ? i18n.language : 'en'
+  const [busyKind, setBusyKind] = useState<QuickLoginKind | null>(null)
+  const [quickLoginError, setQuickLoginError] = useState<string | null>(null)
+
+  async function quickLogin(kind: QuickLoginKind) {
+    if (busyKind) return
+    setQuickLoginError(null)
+    setBusyKind(kind)
+    try {
+      await apiFetch(`/auth/dev-login/${kind}`, { method: 'POST' })
+      await refresh()
+      navigate(kind === 'admin' ? '/it' : '/employee', { replace: true })
+    } catch (caught) {
+      setQuickLoginError(
+        caught instanceof ApiError && caught.message
+          ? caught.message
+          : t('login.quickLogin.error'),
+      )
+    } finally {
+      setBusyKind(null)
+    }
+  }
 
   return (
     <div className="relative flex min-h-svh flex-col bg-[radial-gradient(ellipse_at_top,_hsl(199_55%_88%)_0%,_hsl(var(--background))_52%)] dark:bg-[radial-gradient(ellipse_at_top,_hsl(199_35%_18%)_0%,_hsl(var(--background))_55%)]">
@@ -59,6 +87,30 @@ export function LoginPage() {
           <Button asChild className="w-full" size="lg">
             <a href="/auth/login?returnUrl=/it">{t('login.google')}</a>
           </Button>
+
+          {import.meta.env.DEV ? (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                disabled={busyKind !== null}
+                onClick={() => void quickLogin('admin')}
+              >
+                {busyKind === 'admin' ? t('login.quickLogin.busy') : t('login.quickLogin.admin')}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                disabled={busyKind !== null}
+                onClick={() => void quickLogin('employee')}
+              >
+                {busyKind === 'employee' ? t('login.quickLogin.busy') : t('login.quickLogin.employee')}
+              </Button>
+              {quickLoginError ? <p className="text-sm text-destructive">{quickLoginError}</p> : null}
+            </div>
+          ) : null}
 
           <p className="text-center text-sm text-muted-foreground">
             <Link to="/break-glass" className="underline underline-offset-4 hover:text-foreground">

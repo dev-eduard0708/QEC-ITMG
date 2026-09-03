@@ -15,6 +15,7 @@ using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Audit;
 using Qec.Itmg.Identity.Authorization;
 using Qec.Itmg.Identity.CurrentUser;
+using Qec.Itmg.Identity.Domain;
 
 namespace Qec.Itmg.Identity.Authentication;
 
@@ -46,6 +47,7 @@ public static class IdentityAuthenticationExtensions
             options.Accounts = breakGlassOptions.Accounts;
         });
         services.AddScoped<IBreakGlassLoginService, BreakGlassLoginService>();
+        services.AddScoped<IDevelopmentQuickLoginService, DevelopmentQuickLoginService>();
 
         AuthenticationBuilder authentication = services.AddAuthentication(options =>
         {
@@ -266,6 +268,43 @@ public static class IdentityAuthenticationExtensions
                 signedIn = true,
                 authMethod = BreakGlassPrincipalFactory.AuthMethodBreakGlass,
                 upn = result.User!.Upn,
+            });
+        });
+
+        return endpoints;
+    }
+
+    public static IEndpointRouteBuilder MapDevelopmentLoginEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapPost("/auth/dev-login/admin", async (
+            HttpContext httpContext,
+            IDevelopmentQuickLoginService quickLogin,
+            CancellationToken cancellationToken) =>
+        {
+            User user = await quickLogin.EnsureAdministratorAsync(cancellationToken);
+            ClaimsPrincipal principal = DevelopmentLoginPrincipalFactory.Create(user);
+            await httpContext.SignInAsync(CookieScheme, principal);
+            return Results.Ok(new
+            {
+                signedIn = true,
+                authMethod = DevelopmentLoginPrincipalFactory.AuthMethodDevelopment,
+                upn = user.Upn,
+            });
+        });
+
+        endpoints.MapPost("/auth/dev-login/employee", async (
+            HttpContext httpContext,
+            IDevelopmentQuickLoginService quickLogin,
+            CancellationToken cancellationToken) =>
+        {
+            User user = await quickLogin.EnsureEmployeeAsync(cancellationToken);
+            ClaimsPrincipal principal = DevelopmentLoginPrincipalFactory.Create(user);
+            await httpContext.SignInAsync(CookieScheme, principal);
+            return Results.Ok(new
+            {
+                signedIn = true,
+                authMethod = DevelopmentLoginPrincipalFactory.AuthMethodDevelopment,
+                upn = user.Upn,
             });
         });
 
