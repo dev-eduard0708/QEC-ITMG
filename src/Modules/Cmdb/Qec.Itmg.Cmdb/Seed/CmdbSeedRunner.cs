@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Cmdb.Domain;
 using Qec.Itmg.Cmdb.Persistence;
-using Qec.Itmg.Contracts.Audit;
 
 namespace Qec.Itmg.Cmdb.Seed;
 
@@ -15,7 +14,6 @@ public interface ICmdbSeedRunner
 public sealed class CmdbSeedRunner(
     CmdbDbContext db,
     IClock clock,
-    ISharedDbTransaction sharedDbTransaction,
     ILogger<CmdbSeedRunner> logger) : ICmdbSeedRunner
 {
     private static readonly (string Key, string Name, string Description)[] DefaultTypes =
@@ -27,35 +25,32 @@ public sealed class CmdbSeedRunner(
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
-        await sharedDbTransaction.ExecuteAsync(async ct =>
+        string[] keys = DefaultTypes.Select(static item => item.Key).ToArray();
+        HashSet<string> existing = (await db.CiTypes.AsNoTracking()
+            .Where(item => keys.Contains(item.Key))
+            .Select(item => item.Key)
+            .ToListAsync(cancellationToken))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        int added = 0;
+        foreach ((string key, string name, string description) in DefaultTypes)
         {
-            string[] keys = DefaultTypes.Select(static item => item.Key).ToArray();
-            HashSet<string> existing = (await db.CiTypes.AsNoTracking()
-                .Where(item => keys.Contains(item.Key))
-                .Select(item => item.Key)
-                .ToListAsync(ct))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            int added = 0;
-            foreach ((string key, string name, string description) in DefaultTypes)
+            if (existing.Contains(key))
             {
-                if (existing.Contains(key))
-                {
-                    continue;
-                }
-
-                db.CiTypes.Add(CiType.Create(key, name, clock.UtcNow, description));
-                added++;
+                continue;
             }
 
-            if (added > 0)
-            {
-                await db.SaveChangesAsync(ct);
-            }
+            db.CiTypes.Add(CiType.Create(key, name, clock.UtcNow, description));
+            added++;
+        }
 
-            logger.LogInformation(
-                "CMDB seed completed. Ensured CI types laptop/server/application (added {AddedCount}).",
-                added);
-        }, cancellationToken);
+        if (added > 0)
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        logger.LogInformation(
+            "CMDB seed completed. Ensured CI types laptop/server/application (added {AddedCount}).",
+            added);
     }
 }
