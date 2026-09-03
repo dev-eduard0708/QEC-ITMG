@@ -11,6 +11,9 @@ import { LoginPage } from '@/features/auth/login-page'
 import { UnauthorizedPage } from '@/features/auth/unauthorized-page'
 import { EmployeeHomePage } from '@/features/employee/employee-home-page'
 import { GovernanceHomePage } from '@/features/governance/governance-home-page'
+import { AssetDetailPage } from '@/features/it/asset-detail-page'
+import { AssetsPage } from '@/features/it/assets-page'
+import { CmdbPage } from '@/features/it/cmdb-page'
 import { ItHomePage } from '@/features/it/it-home-page'
 import { FoundationHomePage } from '@/features/foundation/foundation-home-page'
 
@@ -25,6 +28,13 @@ export function AppRouter() {
           <Route index element={<FoundationHomePage />} />
           <Route path="employee" element={<EmployeeHomePage />} />
           <Route path="it" element={<ItHomePage />} />
+          <Route element={<RequirePermission permission="assets.read" />}>
+            <Route path="it/assets" element={<AssetsPage />} />
+            <Route path="it/assets/:id" element={<AssetDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="cmdb.read" />}>
+            <Route path="it/cmdb" element={<CmdbPage />} />
+          </Route>
           <Route path="it/admin" element={<RequireAnyPermission permissions={['admin.users', 'admin.roles', 'admin.lookups']} />}>
             <Route element={<AdminLayout />}>
               <Route index element={<AdminIndexRedirect />} />

@@ -7,6 +7,7 @@ import {
   Menu,
   Monitor,
   Moon,
+  Network,
   Settings2,
   Shield,
   Sun,
@@ -42,6 +43,20 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
       { to: '/', labelKey: 'nav.foundation', icon: LayoutDashboard, end: true, visible: true },
       { to: '/employee', labelKey: 'nav.employee', icon: Users, end: false, visible: true },
       { to: '/it', labelKey: 'nav.it', icon: Building2, end: true, visible: true },
+      {
+        to: '/it/assets',
+        labelKey: 'nav.assets',
+        icon: Monitor,
+        end: false,
+        visible: can('assets.read'),
+      },
+      {
+        to: '/it/cmdb',
+        labelKey: 'nav.cmdb',
+        icon: Network,
+        end: false,
+        visible: can('cmdb.read'),
+      },
       {
         to: '/it/admin',
         labelKey: 'nav.admin',
@@ -203,6 +218,9 @@ function UserSessionControls() {
 
 function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/admin')) return t('nav.admin')
+  if (pathname.startsWith('/it/assets')) return t('nav.assets')
+  if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
+  if (pathname.startsWith('/employee/equipment')) return t('nav.equipment')
   if (pathname.startsWith('/employee')) return t('nav.employee')
   if (pathname.startsWith('/it')) return t('nav.it')
   if (pathname.startsWith('/governance')) return t('nav.governance')

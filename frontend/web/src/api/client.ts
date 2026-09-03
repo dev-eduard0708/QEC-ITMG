@@ -191,5 +191,186 @@ export const adminApi = {
     }),
 }
 
+export type CiType = {
+  id: string
+  key: string
+  name: string
+  description: string | null
+  isActive: boolean
+}
+
+export type ConfigurationItem = {
+  id: string
+  ciNumber: string
+  ciTypeId: string
+  ciTypeKey: string
+  ciTypeName: string
+  name: string
+  description: string | null
+  status: string
+  criticality: string | null
+  locationId: string | null
+  departmentId: string | null
+  ownerUserId: string | null
+  serialNumber: string | null
+  manufacturer: string | null
+  model: string | null
+  notes: string | null
+  rowVersion: string
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type CiRelationship = {
+  id: string
+  sourceCiId: string
+  targetCiId: string
+  relationshipType: string
+  notes: string | null
+  createdAtUtc: string
+}
+
+export type Asset = {
+  id: string
+  assetNumber: string
+  configurationItemId: string | null
+  configurationItemNumber: string | null
+  assetType: string
+  name: string
+  serialNumber: string | null
+  manufacturer: string | null
+  model: string | null
+  purchaseDate: string | null
+  purchaseCost: number | null
+  warrantyExpiry: string | null
+  status: string
+  locationId: string | null
+  notes: string | null
+  activeAssignedToUserId: string | null
+  activeAssignedAtUtc: string | null
+  rowVersion: string
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type AssetAssignment = {
+  id: string
+  assetId: string
+  assignedToUserId: string
+  assignedByUserId: string
+  assignedAtUtc: string
+  returnedAtUtc: string | null
+  notes: string | null
+  isActive: boolean
+}
+
+export type CreateAssetPayload = {
+  assetType: string
+  name: string
+  configurationItemId?: string | null
+  serialNumber?: string | null
+  manufacturer?: string | null
+  model?: string | null
+  locationId?: string | null
+  notes?: string | null
+}
+
+export type UpdateAssetPayload = {
+  assetType: string
+  name: string
+  status: string
+  configurationItemId?: string | null
+  serialNumber?: string | null
+  manufacturer?: string | null
+  model?: string | null
+  locationId?: string | null
+  notes?: string | null
+  rowVersion: string
+}
+
+export type CreateCiPayload = {
+  ciTypeId: string
+  name: string
+  description?: string | null
+  criticality?: string | null
+  locationId?: string | null
+  notes?: string | null
+}
+
+export type UpdateCiPayload = {
+  name: string
+  description?: string | null
+  status: string
+  criticality?: string | null
+  locationId?: string | null
+  notes?: string | null
+  rowVersion: string
+}
+
+export const assetsApi = {
+  list: (search?: string) => {
+    const query = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : ''
+    return apiFetch<Asset[]>(`/api/v1/assets${query}`)
+  },
+  get: (id: string) => apiFetch<Asset>(`/api/v1/assets/${id}`),
+  create: (payload: CreateAssetPayload) =>
+    apiFetch<Asset>('/api/v1/assets', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  update: (id: string, payload: UpdateAssetPayload) =>
+    apiFetch<Asset>(`/api/v1/assets/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  listAssignments: (id: string) =>
+    apiFetch<AssetAssignment[]>(`/api/v1/assets/${id}/assignments`),
+  assign: (id: string, assignedToUserId: string, notes?: string | null) =>
+    apiFetch<AssetAssignment>(`/api/v1/assets/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ assignedToUserId, notes: notes ?? null }),
+    }),
+  returnAsset: (id: string, notes?: string | null) =>
+    apiFetch<AssetAssignment>(`/api/v1/assets/${id}/return`, {
+      method: 'POST',
+      body: JSON.stringify({ notes: notes ?? null }),
+    }),
+}
+
+export const cmdbApi = {
+  listCiTypes: () => apiFetch<CiType[]>('/api/v1/cmdb/ci-types'),
+  listCis: (search?: string) => {
+    const query = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : ''
+    return apiFetch<ConfigurationItem[]>(`/api/v1/cmdb/cis${query}`)
+  },
+  getCi: (id: string) => apiFetch<ConfigurationItem>(`/api/v1/cmdb/cis/${id}`),
+  createCi: (payload: CreateCiPayload) =>
+    apiFetch<ConfigurationItem>('/api/v1/cmdb/cis', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateCi: (id: string, payload: UpdateCiPayload) =>
+    apiFetch<ConfigurationItem>(`/api/v1/cmdb/cis/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  listRelationships: (ciId: string) =>
+    apiFetch<CiRelationship[]>(`/api/v1/cmdb/cis/${ciId}/relationships`),
+  createRelationship: (
+    ciId: string,
+    payload: { targetCiId: string; relationshipType: string; notes?: string | null },
+  ) =>
+    apiFetch<CiRelationship>(`/api/v1/cmdb/cis/${ciId}/relationships`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  deleteRelationship: (id: string) =>
+    apiFetch<void>(`/api/v1/cmdb/relationships/${id}`, { method: 'DELETE' }),
+}
+
+export const meApi = {
+  listEquipment: () => apiFetch<Asset[]>('/api/v1/me/equipment'),
+}
+
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
