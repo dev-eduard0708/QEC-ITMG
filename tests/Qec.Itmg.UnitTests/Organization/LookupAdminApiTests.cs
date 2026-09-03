@@ -11,6 +11,7 @@ using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Organization.Admin;
 using Qec.Itmg.Cmdb.Persistence;
+using Qec.Itmg.ServiceDesk.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Persistence;
 using Xunit;
@@ -141,6 +142,7 @@ internal sealed class LookupAdminWebApplicationFactory : WebApplicationFactory<P
             RemoveDbContext<OrganizationDbContext>(services);
             RemoveDbContext<PlatformDbContext>(services);
             RemoveDbContext<CmdbDbContext>(services);
+            RemoveDbContext<ServiceDeskDbContext>(services);
 
             services.AddDbContext<IdentityDbContext>(options =>
                 options.UseInMemoryDatabase($"lookup-identity-{_databaseName}"));
@@ -150,6 +152,8 @@ internal sealed class LookupAdminWebApplicationFactory : WebApplicationFactory<P
                 options.UseInMemoryDatabase($"lookup-platform-{_databaseName}"));
             services.AddDbContext<CmdbDbContext>(options =>
                 options.UseInMemoryDatabase($"lookup-cmdb-{_databaseName}"));
+            services.AddDbContext<ServiceDeskDbContext>(options =>
+                options.UseInMemoryDatabase($"lookup-sd-{_databaseName}"));
         });
     }
 

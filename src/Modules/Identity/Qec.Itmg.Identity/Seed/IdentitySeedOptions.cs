@@ -32,5 +32,7 @@ public static class IdentitySeedCatalog
         ("cmdb.manage", "Manage configuration items and CMDB data"),
         ("assets.read", "View assets"),
         ("assets.manage", "Manage assets"),
+        ("tickets.read", "View service desk tickets"),
+        ("tickets.manage", "Manage service desk tickets, queues, and assignment"),
     ];
 }

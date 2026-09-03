@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Qec.Itmg.Cmdb.Domain;
 using Qec.Itmg.Cmdb.Persistence;
+using Qec.Itmg.ServiceDesk.Persistence;
 using Qec.Itmg.Cmdb.Services;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
@@ -240,6 +241,7 @@ internal sealed class CmdbApiWebApplicationFactory : WebApplicationFactory<Progr
             RemoveDbContext<OrganizationDbContext>(services);
             RemoveDbContext<PlatformDbContext>(services);
             RemoveDbContext<CmdbDbContext>(services);
+            RemoveDbContext<ServiceDeskDbContext>(services);
 
             services.AddDbContext<IdentityDbContext>(options =>
                 options.UseInMemoryDatabase($"cmdb-api-identity-{_databaseName}"));
@@ -249,6 +251,8 @@ internal sealed class CmdbApiWebApplicationFactory : WebApplicationFactory<Progr
                 options.UseInMemoryDatabase($"cmdb-api-platform-{_databaseName}"));
             services.AddDbContext<CmdbDbContext>(options =>
                 options.UseInMemoryDatabase($"cmdb-api-cmdb-{_databaseName}"));
+            services.AddDbContext<ServiceDeskDbContext>(options =>
+                options.UseInMemoryDatabase($"cmdb-api-sd-{_databaseName}"));
         });
     }
 

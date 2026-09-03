@@ -13,6 +13,7 @@ using Qec.Itmg.Identity.CurrentUser;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Cmdb.Persistence;
+using Qec.Itmg.ServiceDesk.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Domain;
 using Qec.Itmg.Platform.Notifications;
@@ -148,6 +149,7 @@ internal sealed class NotificationWebApplicationFactory : WebApplicationFactory<
             RemoveDbContext<OrganizationDbContext>(services);
             RemoveDbContext<PlatformDbContext>(services);
             RemoveDbContext<CmdbDbContext>(services);
+            RemoveDbContext<ServiceDeskDbContext>(services);
 
             services.AddDbContext<IdentityDbContext>(options =>
                 options.UseInMemoryDatabase($"notify-identity-{_databaseName}"));
@@ -157,6 +159,8 @@ internal sealed class NotificationWebApplicationFactory : WebApplicationFactory<
                 options.UseInMemoryDatabase($"notify-platform-{_databaseName}"));
             services.AddDbContext<CmdbDbContext>(options =>
                 options.UseInMemoryDatabase($"notify-cmdb-{_databaseName}"));
+            services.AddDbContext<ServiceDeskDbContext>(options =>
+                options.UseInMemoryDatabase($"notify-sd-{_databaseName}"));
         });
     }
 

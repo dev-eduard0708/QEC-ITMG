@@ -12,6 +12,7 @@ using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Cmdb.Persistence;
+using Qec.Itmg.ServiceDesk.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Persistence;
 using Xunit;
@@ -224,6 +225,7 @@ internal sealed class AdminApiWebApplicationFactory : WebApplicationFactory<Prog
             RemoveDbContext<OrganizationDbContext>(services);
             RemoveDbContext<PlatformDbContext>(services);
             RemoveDbContext<CmdbDbContext>(services);
+            RemoveDbContext<ServiceDeskDbContext>(services);
 
             services.AddDbContext<IdentityDbContext>(options =>
                 options.UseInMemoryDatabase($"identity-{_databaseName}"));
@@ -233,6 +235,8 @@ internal sealed class AdminApiWebApplicationFactory : WebApplicationFactory<Prog
                 options.UseInMemoryDatabase($"platform-{_databaseName}"));
             services.AddDbContext<CmdbDbContext>(options =>
                 options.UseInMemoryDatabase($"cmdb-{_databaseName}"));
+            services.AddDbContext<ServiceDeskDbContext>(options =>
+                options.UseInMemoryDatabase($"sd-{_databaseName}"));
         });
     }
 

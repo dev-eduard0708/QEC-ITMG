@@ -12,6 +12,7 @@ using Qec.Itmg.Host.Email;
 using Qec.Itmg.Host.Lookups;
 using Qec.Itmg.Host.Notifications;
 using Qec.Itmg.Host.Persistence;
+using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Authentication;
@@ -22,6 +23,7 @@ using Qec.Itmg.Cmdb.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Platform.Persistence;
+using Qec.Itmg.ServiceDesk.Persistence;
 using Serilog;
 using System.Security.Claims;
 
@@ -50,6 +52,7 @@ try
     builder.Services.AddIdentityAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddIdentitySeed(builder.Configuration);
     builder.Services.AddCmdbSeed();
+    builder.Services.AddServiceDeskSeed();
     builder.Services.AddScoped<ISharedDbTransaction, SharedSqlTransaction>();
 
     bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
@@ -75,6 +78,7 @@ try
 
         builder.Services.AddHangfireServer();
         builder.Services.AddTransient<NotificationEmailJob>();
+        builder.Services.AddTransient<SlaBreachDetectionJob>();
         builder.Services.RemoveAll<IEmailQueue>();
         builder.Services.AddSingleton<IEmailQueue, HangfireEmailQueue>();
     }
@@ -85,12 +89,23 @@ try
         .AddDbContextCheck<IdentityDbContext>("sql-identity", tags: ["ready"])
         .AddDbContextCheck<OrganizationDbContext>("sql-organization", tags: ["ready"])
         .AddDbContextCheck<PlatformDbContext>("sql-platform", tags: ["ready"])
-        .AddDbContextCheck<CmdbDbContext>("sql-cmdb", tags: ["ready"]);
+        .AddDbContextCheck<CmdbDbContext>("sql-cmdb", tags: ["ready"])
+        .AddDbContextCheck<ServiceDeskDbContext>("sql-service-desk", tags: ["ready"]);
 
     var app = builder.Build();
 
     await app.RunIdentitySeedAsync();
     await app.RunCmdbSeedAsync();
+    await app.RunServiceDeskSeedAsync();
+
+    if (enableHangfire)
+    {
+        IRecurringJobManager recurringJobs = app.Services.GetRequiredService<IRecurringJobManager>();
+        recurringJobs.AddOrUpdate<SlaBreachDetectionJob>(
+            "sla-breach-detection",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "*/5 * * * *");
+    }
 
     app.UseSerilogRequestLogging();
     app.UseAuthentication();
@@ -115,10 +130,12 @@ try
     app.MapCurrentUserEndpoints();
     app.MapMeNotificationEndpoints();
     app.MapMeEquipmentEndpoints();
+    app.MapMeTicketEndpoints();
     app.MapIdentityAdminEndpoints();
     app.MapLookupAdminEndpoints();
     app.MapCmdbEndpoints();
     app.MapAssetEndpoints();
+    app.MapTicketEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))
