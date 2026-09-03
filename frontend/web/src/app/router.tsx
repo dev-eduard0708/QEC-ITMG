@@ -10,6 +10,8 @@ import { BreakGlassPage } from '@/features/auth/break-glass-page'
 import { LoginPage } from '@/features/auth/login-page'
 import { UnauthorizedPage } from '@/features/auth/unauthorized-page'
 import { EmployeeHomePage } from '@/features/employee/employee-home-page'
+import { KnowledgeArticlePage } from '@/features/employee/knowledge-article-page'
+import { KnowledgePage } from '@/features/employee/knowledge-page'
 import { MyEquipmentPage } from '@/features/employee/my-equipment-page'
 import { MyRequestsPage } from '@/features/employee/my-requests-page'
 import { NewRequestPage } from '@/features/employee/new-request-page'
@@ -19,6 +21,7 @@ import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
 import { ItHomePage } from '@/features/it/it-home-page'
+import { ItKnowledgePage } from '@/features/it/knowledge-page'
 import { TicketDetailPage } from '@/features/it/ticket-detail-page'
 import { TicketsPage } from '@/features/it/tickets-page'
 import { FoundationHomePage } from '@/features/foundation/foundation-home-page'
@@ -37,6 +40,8 @@ export function AppRouter() {
           <Route path="employee/requests" element={<MyRequestsPage />} />
           <Route path="employee/requests/new" element={<NewRequestPage />} />
           <Route path="employee/requests/:id" element={<RequestDetailPage />} />
+          <Route path="employee/knowledge" element={<KnowledgePage />} />
+          <Route path="employee/knowledge/:slug" element={<KnowledgeArticlePage />} />
           <Route path="it" element={<ItHomePage />} />
           <Route element={<RequirePermission permission="assets.read" />}>
             <Route path="it/assets" element={<AssetsPage />} />
@@ -48,6 +53,9 @@ export function AppRouter() {
           <Route element={<RequirePermission permission="tickets.read" />}>
             <Route path="it/tickets" element={<TicketsPage />} />
             <Route path="it/tickets/:id" element={<TicketDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="kb.read" />}>
+            <Route path="it/knowledge" element={<ItKnowledgePage />} />
           </Route>
           <Route path="it/admin" element={<RequireAnyPermission permissions={['admin.users', 'admin.roles', 'admin.lookups']} />}>
             <Route element={<AdminLayout />}>

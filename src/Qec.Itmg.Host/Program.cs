@@ -138,6 +138,7 @@ try
     app.MapCmdbEndpoints();
     app.MapAssetEndpoints();
     app.MapTicketEndpoints();
+    app.MapKnowledgeBaseEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

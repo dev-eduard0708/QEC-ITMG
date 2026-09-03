@@ -20,6 +20,9 @@ export function EmployeeHomePage() {
             <Link to="/employee/requests">{t('nav.requests')}</Link>
           </Button>
           <Button asChild variant="secondary">
+            <Link to="/employee/knowledge">{t('nav.knowledge')}</Link>
+          </Button>
+          <Button asChild variant="secondary">
             <Link to="/employee/equipment">{t('nav.equipment')}</Link>
           </Button>
         </CardContent>

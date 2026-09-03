@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
+  BookOpen,
   Building2,
   HardDrive,
   Languages,
@@ -58,6 +59,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         end: false,
         visible: true,
       },
+      {
+        to: '/employee/knowledge',
+        labelKey: 'nav.knowledge',
+        icon: BookOpen,
+        end: false,
+        visible: true,
+      },
       { to: '/it', labelKey: 'nav.it', icon: Building2, end: true, visible: true },
       {
         to: '/it/tickets',
@@ -65,6 +73,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         icon: Ticket,
         end: false,
         visible: can('tickets.read'),
+      },
+      {
+        to: '/it/knowledge',
+        labelKey: 'nav.knowledgeAdmin',
+        icon: BookOpen,
+        end: false,
+        visible: can('kb.read'),
       },
       {
         to: '/it/assets',
@@ -243,7 +258,9 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/admin')) return t('nav.admin')
   if (pathname.startsWith('/it/assets')) return t('nav.assets')
   if (pathname.startsWith('/it/tickets')) return t('nav.tickets')
+  if (pathname.startsWith('/it/knowledge')) return t('nav.knowledgeAdmin')
   if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
+  if (pathname.startsWith('/employee/knowledge')) return t('nav.knowledge')
   if (pathname.startsWith('/employee/requests')) return t('nav.requests')
   if (pathname.startsWith('/employee/equipment')) return t('nav.equipment')
   if (pathname.startsWith('/employee')) return t('nav.employee')

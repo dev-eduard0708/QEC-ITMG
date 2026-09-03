@@ -543,6 +543,70 @@ export const ticketsApi = {
     apiFetch<TicketTimelineItem[]>(`/api/v1/tickets/${id}/timeline`),
   attachmentContentUrl: (ticketId: string, attachmentId: string) =>
     `/api/v1/tickets/${ticketId}/attachments/${attachmentId}/content`,
+  dashboard: () => apiFetch<TicketDashboard>('/api/v1/tickets/dashboard'),
+}
+
+export type TicketDashboard = {
+  openTickets: number
+  unassigned: number
+  criticalOpen: number
+  slaBreached: number
+  myAssigned: number
+  newToday: number
+  resolvedToday: number
+  byStatus: Record<string, number>
+  byPriority: Record<string, number>
+}
+
+export type KnowledgeArticle = {
+  id: string
+  title: string
+  slug: string
+  summary: string | null
+  body: string
+  status: string
+  createdByUserId: string
+  updatedByUserId: string
+  createdAtUtc: string
+  updatedAtUtc: string
+  publishedAtUtc: string | null
+}
+
+export type UpsertKnowledgeArticlePayload = {
+  title: string
+  slug: string
+  body: string
+  summary?: string | null
+}
+
+export const kbApi = {
+  listPublished: (search?: string) => {
+    const query = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : ''
+    return apiFetch<KnowledgeArticle[]>(`/api/v1/kb${query}`)
+  },
+  getPublished: (slug: string) => apiFetch<KnowledgeArticle>(`/api/v1/kb/${encodeURIComponent(slug)}`),
+  listAdmin: (params?: { status?: string; search?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.status?.trim()) query.set('status', params.status.trim())
+    if (params?.search?.trim()) query.set('search', params.search.trim())
+    const qs = query.toString()
+    return apiFetch<KnowledgeArticle[]>(`/api/v1/kb/admin${qs ? `?${qs}` : ''}`)
+  },
+  getAdmin: (id: string) => apiFetch<KnowledgeArticle>(`/api/v1/kb/admin/${id}`),
+  create: (payload: UpsertKnowledgeArticlePayload) =>
+    apiFetch<KnowledgeArticle>('/api/v1/kb/admin', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  update: (id: string, payload: UpsertKnowledgeArticlePayload) =>
+    apiFetch<KnowledgeArticle>(`/api/v1/kb/admin/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  publish: (id: string) =>
+    apiFetch<KnowledgeArticle>(`/api/v1/kb/admin/${id}/publish`, { method: 'POST' }),
+  archive: (id: string) =>
+    apiFetch<KnowledgeArticle>(`/api/v1/kb/admin/${id}/archive`, { method: 'POST' }),
 }
 
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */

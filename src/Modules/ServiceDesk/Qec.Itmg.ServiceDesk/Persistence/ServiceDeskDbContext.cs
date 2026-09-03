@@ -18,6 +18,8 @@ public sealed class ServiceDeskDbContext(DbContextOptions<ServiceDeskDbContext> 
 
     public DbSet<TicketStatusHistory> TicketStatusHistories => Set<TicketStatusHistory>();
 
+    public DbSet<KnowledgeArticle> KnowledgeArticles => Set<KnowledgeArticle>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
