@@ -9,6 +9,7 @@ using Qec.Itmg.Contracts.Integrations;
 using Qec.Itmg.Contracts.Modules;
 using Qec.Itmg.Platform.Attachments;
 using Qec.Itmg.Platform.Audit;
+using Qec.Itmg.Platform.Comments;
 using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Platform.NumberSequence;
 using Qec.Itmg.Platform.Persistence;
@@ -66,5 +67,6 @@ public sealed class PlatformModule : IModule
         services.AddScoped<ISecurityAuditLogger, EfSecurityAuditLogger>();
 
         services.AddScoped<INumberSequenceService, NumberSequenceService>();
+        services.AddScoped<ICommentService, CommentService>();
     }
 }
