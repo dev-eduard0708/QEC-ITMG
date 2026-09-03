@@ -1,5 +1,7 @@
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/page-header'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export function EmployeeHomePage() {
@@ -11,9 +13,13 @@ export function EmployeeHomePage() {
       <Card>
         <CardHeader>
           <CardTitle>{t('nav.employee')}</CardTitle>
-          <CardDescription>{t('placeholder.note')}</CardDescription>
+          <CardDescription>{t('employee.homeHint')}</CardDescription>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">{t('employee.planned')}</CardContent>
+        <CardContent>
+          <Button asChild>
+            <Link to="/employee/equipment">{t('nav.equipment')}</Link>
+          </Button>
+        </CardContent>
       </Card>
     </div>
   )

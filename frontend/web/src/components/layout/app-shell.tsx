@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Building2,
+  HardDrive,
   Languages,
   LayoutDashboard,
   LogOut,
@@ -41,7 +42,14 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
   const workspaces = useMemo<WorkspaceItem[]>(
     () => [
       { to: '/', labelKey: 'nav.foundation', icon: LayoutDashboard, end: true, visible: true },
-      { to: '/employee', labelKey: 'nav.employee', icon: Users, end: false, visible: true },
+      { to: '/employee', labelKey: 'nav.employee', icon: Users, end: true, visible: true },
+      {
+        to: '/employee/equipment',
+        labelKey: 'nav.equipment',
+        icon: HardDrive,
+        end: false,
+        visible: true,
+      },
       { to: '/it', labelKey: 'nav.it', icon: Building2, end: true, visible: true },
       {
         to: '/it/assets',

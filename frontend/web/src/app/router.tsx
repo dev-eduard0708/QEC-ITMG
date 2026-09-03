@@ -10,6 +10,7 @@ import { BreakGlassPage } from '@/features/auth/break-glass-page'
 import { LoginPage } from '@/features/auth/login-page'
 import { UnauthorizedPage } from '@/features/auth/unauthorized-page'
 import { EmployeeHomePage } from '@/features/employee/employee-home-page'
+import { MyEquipmentPage } from '@/features/employee/my-equipment-page'
 import { GovernanceHomePage } from '@/features/governance/governance-home-page'
 import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
@@ -27,6 +28,7 @@ export function AppRouter() {
         <Route element={<AppShell />}>
           <Route index element={<FoundationHomePage />} />
           <Route path="employee" element={<EmployeeHomePage />} />
+          <Route path="employee/equipment" element={<MyEquipmentPage />} />
           <Route path="it" element={<ItHomePage />} />
           <Route element={<RequirePermission permission="assets.read" />}>
             <Route path="it/assets" element={<AssetsPage />} />
