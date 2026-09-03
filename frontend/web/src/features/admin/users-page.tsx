@@ -35,15 +35,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { DataTable } from '@/components/shared/data-table'
 import { adminKeys } from '@/features/admin/query-keys'
+import type { ColumnDef } from '@tanstack/react-table'
 
 const createSchema = z.object({
   displayName: z.string().trim().min(1),
@@ -162,6 +156,73 @@ export function AdminUsersPage() {
     })
   }
 
+  const columns = useMemo<ColumnDef<AdminUser>[]>(
+    () => [
+      {
+        accessorKey: 'displayName',
+        header: t('admin.users.columns.displayName'),
+        cell: ({ row }) => <span className="font-medium">{row.original.displayName}</span>,
+      },
+      {
+        accessorKey: 'upn',
+        header: t('admin.users.columns.upn'),
+      },
+      {
+        id: 'userType',
+        header: t('admin.users.columns.type'),
+        cell: ({ row }) =>
+          t(`admin.users.type.${row.original.userType}`, { defaultValue: row.original.userType }),
+      },
+      {
+        accessorKey: 'status',
+        header: t('admin.users.columns.status'),
+        cell: ({ row }) => statusBadge(row.original.status),
+      },
+      {
+        id: 'roles',
+        header: t('admin.users.columns.roles'),
+        cell: ({ row }) => (
+          <div className="flex flex-wrap gap-1">
+            {row.original.roles.length === 0 ? (
+              <span className="text-muted-foreground">—</span>
+            ) : (
+              row.original.roles.map((role) => (
+                <Badge key={role.id} variant="secondary">
+                  {role.name}
+                </Badge>
+              ))
+            )}
+          </div>
+        ),
+      },
+      {
+        id: 'actions',
+        header: () => null,
+        size: 48,
+        cell: ({ row }) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t('admin.users.actions')}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => openEdit(row.original)}>
+                {t('admin.users.edit')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
+      },
+    ],
+    [statusBadge, t],
+  )
+
   return (
     <div>
       <PageHeader
@@ -220,56 +281,14 @@ export function AdminUsersPage() {
 
       {!usersQuery.isLoading && !usersQuery.isError ? (
         <>
-          <div className="hidden md:block rounded-lg border border-border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('admin.users.columns.displayName')}</TableHead>
-                  <TableHead>{t('admin.users.columns.upn')}</TableHead>
-                  <TableHead>{t('admin.users.columns.type')}</TableHead>
-                  <TableHead>{t('admin.users.columns.status')}</TableHead>
-                  <TableHead>{t('admin.users.columns.roles')}</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.displayName}</TableCell>
-                    <TableCell>{user.upn}</TableCell>
-                    <TableCell>{t(`admin.users.type.${user.userType}`, { defaultValue: user.userType })}</TableCell>
-                    <TableCell>{statusBadge(user.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {user.roles.length === 0 ? (
-                          <span className="text-muted-foreground">—</span>
-                        ) : (
-                          user.roles.map((role) => (
-                            <Badge key={role.id} variant="secondary">
-                              {role.name}
-                            </Badge>
-                          ))
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" aria-label={t('admin.users.actions')}>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => openEdit(user)}>
-                            {t('admin.users.edit')}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="hidden md:block">
+            <DataTable
+              columns={columns}
+              data={users}
+              emptyMessage={t('admin.users.empty')}
+              getRowId={(user) => user.id}
+              onRowClick={openEdit}
+            />
           </div>
 
           <div className="grid gap-3 md:hidden">
@@ -302,7 +321,7 @@ export function AdminUsersPage() {
           </div>
 
           {users.length === 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">{t('admin.users.empty')}</p>
+            <p className="mt-4 text-sm text-muted-foreground md:hidden">{t('admin.users.empty')}</p>
           ) : null}
         </>
       ) : null}

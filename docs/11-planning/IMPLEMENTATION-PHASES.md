@@ -99,9 +99,11 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 | P2-05 | Workflow engine (data-driven states) (Done) |
 | P2-06 | Notification entity + in-app (Done) |
 | P2-07 | Email channel Hangfire (Done) |
-| P2-08 | Lookup admin |
-| P2-09 | Tests numbering races |
-| P2-10 | SPA shared components (table, timeline) |
+| P2-08 | Lookup admin (Done) |
+| P2-09 | Tests numbering races (Done) |
+| P2-10 | SPA shared components (table, timeline) (Done) |
+
+**Phase 2 status: COMPLETE.**
 
 ---
 
@@ -376,4 +378,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phase 0 is complete. Phase 1 (Identity) is complete.** Next: **P2-08 Lookup admin** — do not implement numbering race suite yet (P2-09).
+**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete.** Next: **P3-01 Asset management / CMDB foundation.**
