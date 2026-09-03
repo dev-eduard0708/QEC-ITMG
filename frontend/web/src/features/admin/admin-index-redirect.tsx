@@ -9,5 +9,8 @@ export function AdminIndexRedirect() {
   if (can('admin.roles')) {
     return <Navigate to="roles" replace />
   }
+  if (can('admin.lookups')) {
+    return <Navigate to="lookups" replace />
+  }
   return <Navigate to="/unauthorized" replace />
 }

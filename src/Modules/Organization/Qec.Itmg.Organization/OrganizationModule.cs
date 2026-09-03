@@ -23,5 +23,6 @@ public sealed class OrganizationModule : IModule
         services.AddQecSqlServerDbContext<OrganizationDbContext>(
             connectionString,
             OrganizationDbContext.SchemaName);
+        services.AddScoped<Admin.LookupAdminService>();
     }
 }

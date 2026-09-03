@@ -59,6 +59,28 @@ export type UpdateAdminRolePayload = {
   rowVersion: string
 }
 
+export type LookupItem = {
+  id: string
+  name: string
+  description: string | null
+  isActive: boolean
+  rowVersion: string
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type CreateLookupItemPayload = {
+  name: string
+  description?: string | null
+}
+
+export type UpdateLookupItemPayload = {
+  name: string
+  description?: string | null
+  isActive: boolean
+  rowVersion: string
+}
+
 export class ApiError extends Error {
   readonly status: number
   readonly code?: string
@@ -145,6 +167,28 @@ export const adminApi = {
       body: JSON.stringify({ permissionIds }),
     }),
   listPermissions: () => apiFetch<AdminPermission[]>('/api/v1/admin/permissions'),
+  listDepartments: () => apiFetch<LookupItem[]>('/api/v1/admin/lookups/departments'),
+  createDepartment: (payload: CreateLookupItemPayload) =>
+    apiFetch<LookupItem>('/api/v1/admin/lookups/departments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateDepartment: (id: string, payload: UpdateLookupItemPayload) =>
+    apiFetch<LookupItem>(`/api/v1/admin/lookups/departments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  listLocations: () => apiFetch<LookupItem[]>('/api/v1/admin/lookups/locations'),
+  createLocation: (payload: CreateLookupItemPayload) =>
+    apiFetch<LookupItem>('/api/v1/admin/lookups/locations', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateLocation: (id: string, payload: UpdateLookupItemPayload) =>
+    apiFetch<LookupItem>(`/api/v1/admin/lookups/locations/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
 }
 
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */

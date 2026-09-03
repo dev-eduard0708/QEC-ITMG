@@ -8,6 +8,7 @@ using Qec.Itmg.BuildingBlocks.Email;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.Host;
 using Qec.Itmg.Host.Email;
+using Qec.Itmg.Host.Lookups;
 using Qec.Itmg.Host.Notifications;
 using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Contracts.Audit;
@@ -109,6 +110,7 @@ try
     app.MapCurrentUserEndpoints();
     app.MapMeNotificationEndpoints();
     app.MapIdentityAdminEndpoints();
+    app.MapLookupAdminEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

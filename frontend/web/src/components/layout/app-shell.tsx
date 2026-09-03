@@ -47,7 +47,7 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         labelKey: 'nav.admin',
         icon: Settings2,
         end: false,
-        visible: can('admin.users') || can('admin.roles'),
+        visible: can('admin.users') || can('admin.roles') || can('admin.lookups'),
       },
       { to: '/governance', labelKey: 'nav.governance', icon: Shield, end: false, visible: true },
     ],
