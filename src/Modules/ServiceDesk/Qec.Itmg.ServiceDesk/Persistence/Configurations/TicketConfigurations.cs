@@ -149,3 +149,35 @@ internal sealed class TicketAssignmentHistoryConfiguration : IEntityTypeConfigur
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal sealed class TicketStatusHistoryConfiguration : IEntityTypeConfiguration<TicketStatusHistory>
+{
+    public void Configure(EntityTypeBuilder<TicketStatusHistory> builder)
+    {
+        builder.ToTable("TicketStatusHistory");
+        builder.HasKey(item => item.Id);
+
+        builder.Property(item => item.FromStatus)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .HasColumnType("nvarchar(32)");
+
+        builder.Property(item => item.ToStatus)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .HasColumnType("nvarchar(32)");
+
+        builder.Property(item => item.ChangedByUserId).IsRequired();
+        builder.Property(item => item.ChangedAtUtc).IsRequired();
+
+        builder.HasIndex(item => new { item.TicketId, item.ChangedAtUtc })
+            .HasDatabaseName("IX_TicketStatusHistory_TicketId_ChangedAtUtc");
+
+        builder.HasOne<Ticket>()
+            .WithMany()
+            .HasForeignKey(item => item.TicketId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

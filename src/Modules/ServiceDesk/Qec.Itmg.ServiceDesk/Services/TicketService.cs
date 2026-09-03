@@ -37,6 +37,31 @@ public sealed record SupportQueueDto(
     string? Description,
     bool IsActive);
 
+public sealed record TicketAssignmentHistoryDto(
+    Guid Id,
+    Guid TicketId,
+    Guid? QueueId,
+    Guid? AssignedUserId,
+    Guid AssignedByUserId,
+    DateTimeOffset AssignedAtUtc,
+    string? Notes);
+
+public sealed record TicketStatusHistoryDto(
+    Guid Id,
+    Guid TicketId,
+    string FromStatus,
+    string ToStatus,
+    Guid ChangedByUserId,
+    DateTimeOffset ChangedAtUtc);
+
+public sealed record SlaBreachEvent(
+    Guid TicketId,
+    string TicketNumber,
+    Guid? AssignedUserId,
+    Guid RequesterUserId,
+    bool ResponseNewlyBreached,
+    bool ResolutionNewlyBreached);
+
 public sealed record TicketListResult(
     IReadOnlyList<TicketDto> Items,
     int TotalCount,
@@ -193,13 +218,21 @@ public sealed class TicketService(
     public async Task<Ticket> ChangeStatusAsync(
         Guid id,
         TicketStatus status,
+        Guid changedByUserId,
         string? rowVersion = null,
         CancellationToken cancellationToken = default)
     {
         Ticket ticket = await db.Tickets.FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
             ?? throw new InvalidOperationException("Ticket was not found.");
 
+        TicketStatus from = ticket.Status;
         ticket.ChangeStatus(status, clock.UtcNow, rowVersion);
+        if (from != ticket.Status)
+        {
+            db.TicketStatusHistories.Add(
+                TicketStatusHistory.Create(ticket.Id, from, ticket.Status, changedByUserId, clock.UtcNow));
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         return ticket;
     }
@@ -220,6 +253,7 @@ public sealed class TicketService(
             await EnsureQueueExistsAsync(qid, cancellationToken);
         }
 
+        TicketStatus beforeStatus = ticket.Status;
         ticket.Assign(queueId, assignedUserId, clock.UtcNow);
 
         db.TicketAssignmentHistories.Add(
@@ -231,8 +265,56 @@ public sealed class TicketService(
                 ticket.AssignedUserId,
                 notes));
 
+        if (beforeStatus != ticket.Status)
+        {
+            db.TicketStatusHistories.Add(
+                TicketStatusHistory.Create(
+                    ticket.Id,
+                    beforeStatus,
+                    ticket.Status,
+                    assignedByUserId,
+                    clock.UtcNow));
+        }
+
         await db.SaveChangesAsync(cancellationToken);
         return ticket;
+    }
+
+    public async Task<IReadOnlyList<TicketAssignmentHistoryDto>> ListAssignmentHistoryAsync(
+        Guid ticketId,
+        CancellationToken cancellationToken = default)
+    {
+        return await db.TicketAssignmentHistories.AsNoTracking()
+            .Where(item => item.TicketId == ticketId)
+            .OrderBy(item => item.AssignedAtUtc)
+            .ThenBy(item => item.Id)
+            .Select(item => new TicketAssignmentHistoryDto(
+                item.Id,
+                item.TicketId,
+                item.QueueId,
+                item.AssignedUserId,
+                item.AssignedByUserId,
+                item.AssignedAtUtc,
+                item.Notes))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<TicketStatusHistoryDto>> ListStatusHistoryAsync(
+        Guid ticketId,
+        CancellationToken cancellationToken = default)
+    {
+        return await db.TicketStatusHistories.AsNoTracking()
+            .Where(item => item.TicketId == ticketId)
+            .OrderBy(item => item.ChangedAtUtc)
+            .ThenBy(item => item.Id)
+            .Select(item => new TicketStatusHistoryDto(
+                item.Id,
+                item.TicketId,
+                item.FromStatus.ToString(),
+                item.ToStatus.ToString(),
+                item.ChangedByUserId,
+                item.ChangedAtUtc))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<SupportQueueDto>> ListQueuesAsync(CancellationToken cancellationToken = default)

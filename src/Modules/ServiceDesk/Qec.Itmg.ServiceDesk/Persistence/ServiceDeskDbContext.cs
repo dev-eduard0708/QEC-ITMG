@@ -16,6 +16,8 @@ public sealed class ServiceDeskDbContext(DbContextOptions<ServiceDeskDbContext> 
 
     public DbSet<TicketAssignmentHistory> TicketAssignmentHistories => Set<TicketAssignmentHistory>();
 
+    public DbSet<TicketStatusHistory> TicketStatusHistories => Set<TicketStatusHistory>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);

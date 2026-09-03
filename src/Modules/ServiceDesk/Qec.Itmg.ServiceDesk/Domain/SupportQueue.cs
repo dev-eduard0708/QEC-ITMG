@@ -157,3 +157,50 @@ public sealed class TicketAssignmentHistory
         };
     }
 }
+
+public sealed class TicketStatusHistory
+{
+    private TicketStatusHistory()
+    {
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid TicketId { get; private set; }
+
+    public TicketStatus FromStatus { get; private set; }
+
+    public TicketStatus ToStatus { get; private set; }
+
+    public Guid ChangedByUserId { get; private set; }
+
+    public DateTimeOffset ChangedAtUtc { get; private set; }
+
+    public static TicketStatusHistory Create(
+        Guid ticketId,
+        TicketStatus fromStatus,
+        TicketStatus toStatus,
+        Guid changedByUserId,
+        DateTimeOffset utcNow)
+    {
+        if (ticketId == Guid.Empty)
+        {
+            throw new ArgumentException("Ticket is required.", nameof(ticketId));
+        }
+
+        if (changedByUserId == Guid.Empty)
+        {
+            throw new ArgumentException("Changed-by user is required.", nameof(changedByUserId));
+        }
+
+        return new TicketStatusHistory
+        {
+            Id = Guid.CreateVersion7(),
+            TicketId = ticketId,
+            FromStatus = fromStatus,
+            ToStatus = toStatus,
+            ChangedByUserId = changedByUserId,
+            ChangedAtUtc = utcNow,
+        };
+    }
+}
