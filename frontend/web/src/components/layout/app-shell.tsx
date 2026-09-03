@@ -18,6 +18,7 @@ import { useAuth } from '@/auth/auth-provider'
 import { isAppLanguage, type AppLanguage } from '@/i18n'
 import { useTheme } from '@/app/theme-provider'
 import type { ThemeOption } from '@/app/theme'
+import { NotificationBell } from '@/components/layout/notification-bell'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -243,6 +244,7 @@ export function AppShell() {
             <div className="hidden sm:block">
               <PreferenceControls />
             </div>
+            <NotificationBell />
             <UserSessionControls />
             <Badge variant="secondary">{t('status.foundation')}</Badge>
           </div>

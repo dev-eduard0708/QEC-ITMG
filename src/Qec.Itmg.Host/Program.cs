@@ -12,6 +12,7 @@ using Qec.Itmg.Identity.Seed;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Platform.Persistence;
+using Qec.Itmg.Host.Notifications;
 using Serilog;
 using System.Security.Claims;
 
@@ -68,6 +69,7 @@ try
 
     app.MapIdentityAuthEndpoints();
     app.MapCurrentUserEndpoints();
+    app.MapMeNotificationEndpoints();
     app.MapIdentityAdminEndpoints();
     app.MapIntegrationReadinessEndpoints();
 

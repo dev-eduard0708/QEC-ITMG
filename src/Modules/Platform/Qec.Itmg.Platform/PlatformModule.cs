@@ -11,6 +11,7 @@ using Qec.Itmg.Platform.Attachments;
 using Qec.Itmg.Platform.Audit;
 using Qec.Itmg.Platform.Comments;
 using Qec.Itmg.Platform.Integrations;
+using Qec.Itmg.Platform.Notifications;
 using Qec.Itmg.Platform.NumberSequence;
 using Qec.Itmg.Platform.Persistence;
 using Qec.Itmg.Platform.Workflow;
@@ -70,5 +71,6 @@ public sealed class PlatformModule : IModule
         services.AddScoped<INumberSequenceService, NumberSequenceService>();
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<IWorkflowService, WorkflowService>();
+        services.AddScoped<INotificationService, NotificationService>();
     }
 }
