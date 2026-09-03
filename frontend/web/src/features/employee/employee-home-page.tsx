@@ -15,8 +15,11 @@ export function EmployeeHomePage() {
           <CardTitle>{t('nav.employee')}</CardTitle>
           <CardDescription>{t('employee.homeHint')}</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-wrap gap-2">
           <Button asChild>
+            <Link to="/employee/requests">{t('nav.requests')}</Link>
+          </Button>
+          <Button asChild variant="secondary">
             <Link to="/employee/equipment">{t('nav.equipment')}</Link>
           </Button>
         </CardContent>

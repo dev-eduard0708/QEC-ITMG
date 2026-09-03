@@ -19,8 +19,13 @@ export function ItHomePage() {
             <CardDescription>{t('it.homeHint')}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {can('assets.read') ? (
+            {can('tickets.read') ? (
               <Button asChild>
+                <Link to="/it/tickets">{t('nav.tickets')}</Link>
+              </Button>
+            ) : null}
+            {can('assets.read') ? (
+              <Button asChild variant={can('tickets.read') ? 'secondary' : 'default'}>
                 <Link to="/it/assets">{t('nav.assets')}</Link>
               </Button>
             ) : null}

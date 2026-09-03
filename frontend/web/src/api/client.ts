@@ -97,12 +97,13 @@ export class ApiError extends Error {
  * Same-origin cookie credentials. Prefer relative URLs via Vite proxy in development.
  */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData
   const response = await fetch(path, {
     ...init,
     credentials: 'include',
     headers: {
       Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(init?.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
   })
@@ -370,6 +371,178 @@ export const cmdbApi = {
 
 export const meApi = {
   listEquipment: () => apiFetch<Asset[]>('/api/v1/me/equipment'),
+  listTickets: (params?: { page?: number; pageSize?: number; search?: string; status?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+    if (params?.search?.trim()) query.set('search', params.search.trim())
+    if (params?.status?.trim()) query.set('status', params.status.trim())
+    const qs = query.toString()
+    return apiFetch<TicketListResult>(`/api/v1/me/tickets${qs ? `?${qs}` : ''}`)
+  },
+  getTicket: (id: string) => apiFetch<Ticket>(`/api/v1/me/tickets/${id}`),
+  createTicket: (payload: CreateMeTicketPayload) =>
+    apiFetch<Ticket>('/api/v1/me/tickets', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listTicketComments: (id: string) =>
+    apiFetch<TicketComment[]>(`/api/v1/me/tickets/${id}/comments`),
+  addTicketComment: (id: string, body: string) =>
+    apiFetch<TicketComment>(`/api/v1/me/tickets/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+  listTicketAttachments: (id: string) =>
+    apiFetch<TicketAttachment[]>(`/api/v1/me/tickets/${id}/attachments`),
+  uploadTicketAttachment: async (id: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiFetch<TicketAttachment>(`/api/v1/me/tickets/${id}/attachments`, {
+      method: 'POST',
+      body: form,
+    })
+  },
+  listTicketTimeline: (id: string) =>
+    apiFetch<TicketTimelineItem[]>(`/api/v1/me/tickets/${id}/timeline`),
+  ticketAttachmentContentUrl: (ticketId: string, attachmentId: string) =>
+    `/api/v1/me/tickets/${ticketId}/attachments/${attachmentId}/content`,
+}
+
+export type Ticket = {
+  id: string
+  ticketNumber: string
+  type: string
+  title: string
+  description: string
+  status: string
+  priority: string
+  requesterUserId: string
+  assignedUserId: string | null
+  queueId: string | null
+  configurationItemId: string | null
+  category: string | null
+  slaPolicyId: string | null
+  responseDueAtUtc: string | null
+  resolutionDueAtUtc: string | null
+  respondedAtUtc: string | null
+  responseBreached: boolean
+  resolutionBreached: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  resolvedAtUtc: string | null
+  closedAtUtc: string | null
+  rowVersion: string
+}
+
+export type TicketListResult = {
+  items: Ticket[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type SupportQueue = {
+  id: string
+  name: string
+  description: string | null
+  isActive: boolean
+}
+
+export type CreateMeTicketPayload = {
+  type?: string
+  title: string
+  description: string
+  priority?: string
+  configurationItemId?: string | null
+  category?: string | null
+}
+
+export type TicketComment = {
+  id: string
+  resourceType: string
+  resourceId: string
+  authorUserId: string
+  body: string
+  visibility: string
+  createdAtUtc: string
+  editedAtUtc: string | null
+}
+
+export type TicketAttachment = {
+  id: string
+  fileName: string
+  contentType: string
+  sizeBytes: number
+  scanStatus: string
+  uploadedByUserId: string
+  uploadedAtUtc: string
+}
+
+export type TicketTimelineItem = {
+  id: string
+  type: string
+  timestamp: string
+  title: string
+  description: string | null
+  actor: string | null
+  status: string | null
+}
+
+export const ticketsApi = {
+  list: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    status?: string
+    type?: string
+    priority?: string
+  }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+    if (params?.search?.trim()) query.set('search', params.search.trim())
+    if (params?.status?.trim()) query.set('status', params.status.trim())
+    if (params?.type?.trim()) query.set('type', params.type.trim())
+    if (params?.priority?.trim()) query.set('priority', params.priority.trim())
+    const qs = query.toString()
+    return apiFetch<TicketListResult>(`/api/v1/tickets${qs ? `?${qs}` : ''}`)
+  },
+  get: (id: string) => apiFetch<Ticket>(`/api/v1/tickets/${id}`),
+  listQueues: () => apiFetch<SupportQueue[]>('/api/v1/tickets/queues'),
+  changeStatus: (id: string, status: string, rowVersion?: string | null) =>
+    apiFetch<Ticket>(`/api/v1/tickets/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, rowVersion: rowVersion ?? null }),
+    }),
+  assign: (
+    id: string,
+    payload: { queueId?: string | null; assignedUserId?: string | null; notes?: string | null },
+  ) =>
+    apiFetch<Ticket>(`/api/v1/tickets/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listComments: (id: string) => apiFetch<TicketComment[]>(`/api/v1/tickets/${id}/comments`),
+  addComment: (id: string, body: string, visibility: string) =>
+    apiFetch<TicketComment>(`/api/v1/tickets/${id}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body, visibility }),
+    }),
+  listAttachments: (id: string) =>
+    apiFetch<TicketAttachment[]>(`/api/v1/tickets/${id}/attachments`),
+  uploadAttachment: async (id: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiFetch<TicketAttachment>(`/api/v1/tickets/${id}/attachments`, {
+      method: 'POST',
+      body: form,
+    })
+  },
+  listTimeline: (id: string) =>
+    apiFetch<TicketTimelineItem[]>(`/api/v1/tickets/${id}/timeline`),
+  attachmentContentUrl: (ticketId: string, attachmentId: string) =>
+    `/api/v1/tickets/${ticketId}/attachments/${attachmentId}/content`,
 }
 
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */

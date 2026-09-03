@@ -12,6 +12,7 @@ import {
   Settings2,
   Shield,
   Sun,
+  Ticket,
   Users,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -50,7 +51,21 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         end: false,
         visible: true,
       },
+      {
+        to: '/employee/requests',
+        labelKey: 'nav.requests',
+        icon: Ticket,
+        end: false,
+        visible: true,
+      },
       { to: '/it', labelKey: 'nav.it', icon: Building2, end: true, visible: true },
+      {
+        to: '/it/tickets',
+        labelKey: 'nav.tickets',
+        icon: Ticket,
+        end: false,
+        visible: can('tickets.read'),
+      },
       {
         to: '/it/assets',
         labelKey: 'nav.assets',
@@ -227,7 +242,9 @@ function UserSessionControls() {
 function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/admin')) return t('nav.admin')
   if (pathname.startsWith('/it/assets')) return t('nav.assets')
+  if (pathname.startsWith('/it/tickets')) return t('nav.tickets')
   if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
+  if (pathname.startsWith('/employee/requests')) return t('nav.requests')
   if (pathname.startsWith('/employee/equipment')) return t('nav.equipment')
   if (pathname.startsWith('/employee')) return t('nav.employee')
   if (pathname.startsWith('/it')) return t('nav.it')
