@@ -95,5 +95,15 @@
   "admin.roles.columns.permissions": "Permissions",
   "admin.roles.fields.name": "Role name",
   "admin.roles.fields.description": "Description",
-  "admin.roles.fields.permissions": "Permissions"
+  "admin.roles.fields.permissions": "Permissions",
+  "breakGlass.title": "Emergency break-glass sign-in",
+  "breakGlass.description": "Use only when Google sign-in is unavailable. Access still follows SQL role permissions for the mapped user.",
+  "breakGlass.username": "Username",
+  "breakGlass.password": "Password",
+  "breakGlass.signIn": "Sign in",
+  "breakGlass.signingIn": "Signing in…",
+  "breakGlass.error.disabled": "Break-glass sign-in is disabled in this environment.",
+  "breakGlass.error.invalidCredentials": "Invalid username or password.",
+  "breakGlass.error.userInactive": "Mapped ITMG user is missing or inactive.",
+  "breakGlass.error.generic": "Break-glass sign-in failed."
 }

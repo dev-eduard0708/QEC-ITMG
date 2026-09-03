@@ -37,7 +37,15 @@ On first login: create User from `sub` + email UPN. Assign Employee. IT roles as
 
 ## Break-glass
 
-Local identity (ASP.NET Identity) **disabled** except two named accounts in secrets, IP restricted if possible, alert on use.
+Emergency local login independent of Google, disabled by default:
+
+- Config: `Authentication:BreakGlass` (`Enabled`, `Accounts[]` with `Username`, `UserUpn`, `PasswordHash`)
+- Endpoint: `POST /auth/break-glass`
+- SPA route: `/break-glass`
+- Password hashes use ASP.NET Identity `PasswordHasher` and must live in secrets / `appsettings.*.local.json` — never commit real hashes
+- Maps to an existing **Active** ITMG user by `UserUpn`; does **not** grant admin permissions
+- Authorization remains SQL RBAC
+- Audit: `BreakGlassLoginSuccess` / `BreakGlassLoginFailed` (no password or hash logging)
 
 ## API / future services
 

@@ -95,5 +95,15 @@
   "admin.roles.columns.permissions": "الصلاحيات",
   "admin.roles.fields.name": "اسم الدور",
   "admin.roles.fields.description": "الوصف",
-  "admin.roles.fields.permissions": "الصلاحيات"
+  "admin.roles.fields.permissions": "الصلاحيات",
+  "breakGlass.title": "تسجيل دخول طارئ (كسر الزجاج)",
+  "breakGlass.description": "يُستخدم فقط عند تعذر تسجيل الدخول عبر Google. تبقى الصلاحيات وفق أدوار SQL للمستخدم المرتبط.",
+  "breakGlass.username": "اسم المستخدم",
+  "breakGlass.password": "كلمة المرور",
+  "breakGlass.signIn": "تسجيل الدخول",
+  "breakGlass.signingIn": "جارٍ تسجيل الدخول…",
+  "breakGlass.error.disabled": "تسجيل الدخول الطارئ معطّل في هذه البيئة.",
+  "breakGlass.error.invalidCredentials": "اسم المستخدم أو كلمة المرور غير صحيحة.",
+  "breakGlass.error.userInactive": "المستخدم المرتبط في المنصة غير موجود أو غير نشط.",
+  "breakGlass.error.generic": "فشل تسجيل الدخول الطارئ."
 }

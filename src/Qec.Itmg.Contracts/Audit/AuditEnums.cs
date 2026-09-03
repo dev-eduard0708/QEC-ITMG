@@ -44,6 +44,8 @@ public enum SecurityEventType
     PermissionRevoked = 8,
     UserDisabled = 9,
     UserEnabled = 10,
+    BreakGlassLoginSuccess = 11,
+    BreakGlassLoginFailed = 12,
 }
 
 public enum SecurityEventOutcome

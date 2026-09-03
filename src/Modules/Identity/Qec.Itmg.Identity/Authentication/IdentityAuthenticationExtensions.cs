@@ -35,6 +35,17 @@ public static class IdentityAuthenticationExtensions
         oidcOptions.EnsureValidWhenEnabled();
         services.AddSingleton(Options.Create(oidcOptions));
 
+        BreakGlassAuthenticationOptions breakGlassOptions = configuration
+            .GetSection(BreakGlassAuthenticationOptions.SectionName)
+            .Get<BreakGlassAuthenticationOptions>()
+            ?? new BreakGlassAuthenticationOptions();
+        services.Configure<BreakGlassAuthenticationOptions>(options =>
+        {
+            options.Enabled = breakGlassOptions.Enabled;
+            options.Accounts = breakGlassOptions.Accounts;
+        });
+        services.AddScoped<IBreakGlassLoginService, BreakGlassLoginService>();
+
         AuthenticationBuilder authentication = services.AddAuthentication(options =>
         {
             options.DefaultScheme = CookieScheme;
@@ -65,6 +76,12 @@ public static class IdentityAuthenticationExtensions
                     context.Principal = OidcPrincipalMapper.MapAuthenticatedPrincipal(
                         context.Principal,
                         optionsSnapshot.AllowedDomains);
+                }
+
+                if (BreakGlassPrincipalFactory.IsBreakGlass(context.Principal))
+                {
+                    // Break-glass success is audited by the break-glass endpoint with username context.
+                    return;
                 }
 
                 await SecurityAuditHooks.LogLoginSuccessAsync(context.HttpContext);
@@ -201,6 +218,53 @@ public static class IdentityAuthenticationExtensions
 
             await httpContext.SignOutAsync(CookieScheme);
             return Results.Ok(new { signedOut = true });
+        });
+
+        endpoints.MapPost("/auth/break-glass", async (
+            BreakGlassLoginRequest request,
+            HttpContext httpContext,
+            IBreakGlassLoginService breakGlassLogin,
+            CancellationToken cancellationToken) =>
+        {
+            BreakGlassLoginResult result = await breakGlassLogin.AuthenticateAsync(request, cancellationToken);
+            if (!result.Succeeded)
+            {
+                string reason = result.FailureReason switch
+                {
+                    BreakGlassLoginFailureReason.Disabled => "disabled",
+                    BreakGlassLoginFailureReason.UserInactiveOrMissing => "user_inactive_or_missing",
+                    _ => "invalid_credentials",
+                };
+
+                await SecurityAuditHooks.LogBreakGlassLoginFailedAsync(
+                    httpContext,
+                    request.Username,
+                    reason);
+
+                return result.FailureReason switch
+                {
+                    BreakGlassLoginFailureReason.Disabled => Results.Json(
+                        new { error = new { code = "break_glass_disabled", message = "Break-glass authentication is disabled." } },
+                        statusCode: StatusCodes.Status503ServiceUnavailable),
+                    BreakGlassLoginFailureReason.UserInactiveOrMissing => Results.Json(
+                        new { error = new { code = "break_glass_user_inactive", message = "Mapped ITMG user is missing or inactive." } },
+                        statusCode: StatusCodes.Status403Forbidden),
+                    _ => Results.Json(
+                        new { error = new { code = "break_glass_invalid_credentials", message = "Invalid break-glass credentials." } },
+                        statusCode: StatusCodes.Status401Unauthorized),
+                };
+            }
+
+            ClaimsPrincipal principal = BreakGlassPrincipalFactory.Create(result.User!);
+            await httpContext.SignInAsync(CookieScheme, principal);
+            await SecurityAuditHooks.LogBreakGlassLoginSuccessAsync(httpContext, request.Username);
+
+            return Results.Ok(new
+            {
+                signedIn = true,
+                authMethod = BreakGlassPrincipalFactory.AuthMethodBreakGlass,
+                upn = result.User!.Upn,
+            });
         });
 
         return endpoints;

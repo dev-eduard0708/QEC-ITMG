@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
 using Qec.Itmg.Contracts.Audit;
 
@@ -39,6 +37,42 @@ internal static class SecurityAuditHooks
         });
     }
 
+    public static async Task LogBreakGlassLoginSuccessAsync(HttpContext httpContext, string username)
+    {
+        ISecurityAuditLogger? logger = httpContext.RequestServices.GetService(typeof(ISecurityAuditLogger)) as ISecurityAuditLogger;
+        if (logger is null)
+        {
+            return;
+        }
+
+        await logger.WriteImmediateAsync(new SecurityAuditEntry
+        {
+            EventType = SecurityEventType.BreakGlassLoginSuccess,
+            Outcome = SecurityEventOutcome.Success,
+            Details = $"Break-glass session established for username '{SanitizeUsername(username)}'",
+        });
+    }
+
+    public static async Task LogBreakGlassLoginFailedAsync(HttpContext httpContext, string? username, string reason)
+    {
+        ISecurityAuditLogger? logger = httpContext.RequestServices.GetService(typeof(ISecurityAuditLogger)) as ISecurityAuditLogger;
+        if (logger is null)
+        {
+            return;
+        }
+
+        string userPart = string.IsNullOrWhiteSpace(username)
+            ? "unknown"
+            : SanitizeUsername(username);
+
+        await logger.WriteImmediateAsync(new SecurityAuditEntry
+        {
+            EventType = SecurityEventType.BreakGlassLoginFailed,
+            Outcome = SecurityEventOutcome.Failure,
+            Details = $"Break-glass login failed ({reason}) for username '{userPart}'",
+        });
+    }
+
     public static async Task LogLogoutAsync(HttpContext httpContext)
     {
         ISecurityAuditLogger? logger = httpContext.RequestServices.GetService(typeof(ISecurityAuditLogger)) as ISecurityAuditLogger;
@@ -73,5 +107,11 @@ internal static class SecurityAuditHooks
             Outcome = SecurityEventOutcome.Denied,
             Details = $"Permission:{permissionKey}",
         });
+    }
+
+    private static string SanitizeUsername(string username)
+    {
+        string trimmed = username.Trim();
+        return trimmed.Length <= 64 ? trimmed : trimmed[..64];
     }
 }
