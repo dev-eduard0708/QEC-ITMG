@@ -67,6 +67,34 @@ public sealed class NumberSequenceConcurrencyTests
         }
     }
 
+    [Fact]
+    public async Task NextAsync_FirstUseParallelIssuance_AllUnique_NoExceptions()
+    {
+        if (!SqlServerTestGate.TryCreate(out SqlServerFixture? created))
+        {
+            return; // skip locally/CI without SQL Server
+        }
+
+        await using SqlServerFixture fixture = created!;
+        await fixture.Platform.Database.MigrateAsync();
+
+        // Brand-new (SequenceKey, Year): every parallel caller hits first-use insert/update path.
+        string sequenceKey = $"first-use-{Guid.NewGuid():N}";
+        const string prefix = "INC";
+
+        int workers = 20;
+        Task<string>[] tasks = new Task<string>[workers];
+        for (int i = 0; i < workers; i++)
+        {
+            tasks[i] = IssueAsync(fixture.Provider, sequenceKey, prefix);
+        }
+
+        string[] issued = await Task.WhenAll(tasks);
+
+        Assert.Equal(workers, issued.Distinct(StringComparer.Ordinal).Count());
+        Assert.All(issued, number => Assert.StartsWith($"{prefix}-2026-", number, StringComparison.Ordinal));
+    }
+
     private static async Task<string> IssueAsync(IServiceProvider provider, string sequenceKey, string prefix)
     {
         using IServiceScope scope = provider.CreateScope();

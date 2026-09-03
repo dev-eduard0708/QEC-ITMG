@@ -103,7 +103,7 @@ public sealed class NumberSequenceService(
             command.CommandText = @"
 DECLARE @Out TABLE (Issued bigint);
 
-;MERGE [plt].[NumberSequence] AS target
+;MERGE [plt].[NumberSequence] WITH (HOLDLOCK) AS target
 USING (SELECT @sequenceKey AS [SequenceKey], @year AS [Year]) AS source
     ON target.[SequenceKey] = source.[SequenceKey] AND target.[Year] = source.[Year]
 WHEN MATCHED THEN
