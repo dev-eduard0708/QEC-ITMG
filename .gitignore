@@ -50,3 +50,8 @@ appsettings.*.local.json
 # Logs
 *.log
 logs/
+
+# Local CI log downloads
+ci-logs/
+ci-logs.zip
+
