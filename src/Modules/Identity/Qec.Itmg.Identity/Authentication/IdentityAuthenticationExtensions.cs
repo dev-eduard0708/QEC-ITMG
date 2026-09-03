@@ -271,4 +271,39 @@ public static class IdentityAuthenticationExtensions
 
         return endpoints;
     }
+
+    public static IEndpointRouteBuilder MapDevelopmentLoginEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapPost("/auth/dev-login/admin", async (HttpContext httpContext) =>
+        {
+            ClaimsPrincipal principal = DevelopmentLoginPrincipalFactory.Create(
+                DevelopmentLoginPrincipalFactory.AdminUpn,
+                DevelopmentLoginPrincipalFactory.AdminDisplayName,
+                DevelopmentLoginPrincipalFactory.AdminExternalId);
+            await httpContext.SignInAsync(CookieScheme, principal);
+            return Results.Ok(new
+            {
+                signedIn = true,
+                authMethod = DevelopmentLoginPrincipalFactory.AuthMethodDevelopment,
+                upn = DevelopmentLoginPrincipalFactory.AdminUpn,
+            });
+        });
+
+        endpoints.MapPost("/auth/dev-login/employee", async (HttpContext httpContext) =>
+        {
+            ClaimsPrincipal principal = DevelopmentLoginPrincipalFactory.Create(
+                DevelopmentLoginPrincipalFactory.EmployeeUpn,
+                DevelopmentLoginPrincipalFactory.EmployeeDisplayName,
+                DevelopmentLoginPrincipalFactory.EmployeeExternalId);
+            await httpContext.SignInAsync(CookieScheme, principal);
+            return Results.Ok(new
+            {
+                signedIn = true,
+                authMethod = DevelopmentLoginPrincipalFactory.AuthMethodDevelopment,
+                upn = DevelopmentLoginPrincipalFactory.EmployeeUpn,
+            });
+        });
+
+        return endpoints;
+    }
 }

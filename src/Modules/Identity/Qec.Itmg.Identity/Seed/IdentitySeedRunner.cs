@@ -120,18 +120,30 @@ public sealed class IdentitySeedRunner(
             return;
         }
 
+        string displayName = string.IsNullOrWhiteSpace(options.Value.PlatformAdministratorDisplayName)
+            ? upn
+            : options.Value.PlatformAdministratorDisplayName.Trim();
+
         User? user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Upn == upn, cancellationToken);
         if (user is null)
         {
-            user = User.Create(upn, upn, UserType.Employee, clock.UtcNow);
+            user = User.Create(upn, displayName, UserType.Employee, clock.UtcNow);
             db.Users.Add(user);
             await businessAudit.AppendAsync(AdminAuditComposer.UserCreated(user), cancellationToken);
             logger.LogInformation("Bootstrap Platform Administrator user pre-provisioned for configured UPN.");
         }
-        else if (user.Status != UserStatus.Active)
+        else
         {
-            user.Enable(clock.UtcNow);
-            logger.LogInformation("Bootstrap Platform Administrator user re-enabled for configured UPN.");
+            if (user.Status != UserStatus.Active)
+            {
+                user.Enable(clock.UtcNow);
+                logger.LogInformation("Bootstrap Platform Administrator user re-enabled for configured UPN.");
+            }
+
+            if (!string.Equals(user.DisplayName, displayName, StringComparison.Ordinal))
+            {
+                user.Rename(displayName, clock.UtcNow);
+            }
         }
 
         bool alreadyAssigned = await db.UserRoles.AnyAsync(

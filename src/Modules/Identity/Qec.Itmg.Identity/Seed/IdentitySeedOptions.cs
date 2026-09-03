@@ -9,6 +9,11 @@ public sealed class IdentitySeedOptions
     /// Empty by default — set via environment or local config (never commit a real mailbox).
     /// </summary>
     public string? PlatformAdministratorUpn { get; set; }
+
+    /// <summary>
+    /// Optional display name for the bootstrap Platform Administrator (development convenience).
+    /// </summary>
+    public string? PlatformAdministratorDisplayName { get; set; }
 }
 
 public static class IdentitySeedCatalog
