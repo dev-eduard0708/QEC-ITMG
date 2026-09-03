@@ -10,6 +10,7 @@ using Qec.Itmg.Identity.CurrentUser;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Identity.Seed;
 using Qec.Itmg.Organization.Persistence;
+using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Platform.Persistence;
 using Serilog;
 using System.Security.Claims;
@@ -68,6 +69,7 @@ try
     app.MapIdentityAuthEndpoints();
     app.MapCurrentUserEndpoints();
     app.MapIdentityAdminEndpoints();
+    app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))
     {

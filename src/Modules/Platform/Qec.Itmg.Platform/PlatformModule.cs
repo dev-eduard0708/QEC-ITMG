@@ -5,14 +5,16 @@ using Qec.Itmg.BuildingBlocks.Email;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Contracts.Audit;
+using Qec.Itmg.Contracts.Integrations;
 using Qec.Itmg.Contracts.Modules;
 using Qec.Itmg.Platform.Audit;
+using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Platform.Persistence;
 
 namespace Qec.Itmg.Platform;
 
 /// <summary>
-/// Platform module composition: shared platform services and audit persistence.
+/// Platform module composition: shared platform services, audit persistence, and disabled integration adapters.
 /// </summary>
 public sealed class PlatformModule : IModule
 {
@@ -26,6 +28,16 @@ public sealed class PlatformModule : IModule
             ?? new SmtpEmailOptions();
         services.AddSingleton(Options.Create(smtpOptions));
         services.AddSingleton<IEmailSender, NullEmailSender>();
+
+        // Integration adapters — all disabled by default; production connections require QEC authorization.
+        IntegrationOptions integrationOptions = configuration
+            .GetSection(IntegrationOptions.SectionName)
+            .Get<IntegrationOptions>()
+            ?? new IntegrationOptions();
+        services.AddSingleton(Options.Create(integrationOptions));
+        services.AddSingleton<IVeeamClient, DisabledVeeamClient>();
+        services.AddSingleton<ISonicWallCaptureClient, DisabledSonicWallClient>();
+        services.AddSingleton<ISynologyMonitor, DisabledSynologyMonitor>();
 
         string? connectionString = configuration.GetConnectionString(QecEfConventions.ConnectionStringName);
         if (string.IsNullOrWhiteSpace(connectionString))

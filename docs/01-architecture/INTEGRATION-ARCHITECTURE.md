@@ -1,81 +1,59 @@
 # Integration architecture
 
-Related: [../03-modules/REMOTE-SUPPORT.md](../03-modules/REMOTE-SUPPORT.md) · [ADR-0008](../12-decisions/ADR-0008-remote-support-integration.md) · [../11-planning/MASTER-ROADMAP.md](../11-planning/MASTER-ROADMAP.md)
+Related: [SYSTEM-ARCHITECTURE.md](SYSTEM-ARCHITECTURE.md) · [../10-operations/CONFIGURATION.md](../10-operations/CONFIGURATION.md)
 
-Integrations are **not implemented** in the documentation phase. This document defines boundaries.
+## Status: readiness stubs only
 
-## Pattern
+Three vendor integrations are defined as **disabled adapters**.
+No outbound vendor connections exist. Production integration requires explicit **QEC authorization**.
 
-Each external system has an **adapter** behind an application interface.
+## Approved vendors (disabled)
 
+| Vendor | Interface | Config prefix |
+|--------|-----------|---------------|
+| Veeam Backup & Replication / Enterprise Manager | `IVeeamClient` | `Integrations:Veeam` |
+| SonicWall Capture Client | `ISonicWallCaptureClient` | `Integrations:SonicWallCaptureClient` |
+| Synology DSM | `ISynologyMonitor` | `Integrations:Synology` |
+
+All three default to `Enabled: false` and `RuntimeMode: Disabled`.
+
+## Configuration
+
+```json
+"Integrations": {
+  "Veeam":                 { "Enabled": false, "BaseUrl": "", "CredentialReference": "" },
+  "SonicWallCaptureClient": { "Enabled": false, "BaseUrl": "", "CredentialReference": "" },
+  "Synology":              { "Enabled": false, "BaseUrl": "", "CredentialReference": "" }
+}
 ```
-Use case → IRemoteSupportEngine / IMailSender / IIdentityDirectory
-                ↓
-         Adapter (HTTP/SDK)
-                ↓
-         External system
-```
 
-Adapters:
+- `CredentialReference` is a **secret-store reference name only** — never an actual API key, token, username, or password.
+- `Configured` becomes `true` only when `Enabled`, `BaseUrl`, and `CredentialReference` are all non-empty.
 
-- Map external errors to platform results
-- Never persist “engine admin = authorized”
-- Log with correlation id; redact secrets
-- Are disabled by feature flags per environment
+## Contracts
 
-## Identity
+Interfaces and snapshot DTOs live under `src/Qec.Itmg.Contracts/Integrations/`.
+Read-only data retrieval only. No write, remote-control, or scan/remediation commands are defined.
 
-| System | Direction | Purpose |
-|--------|-----------|---------|
-| Microsoft Entra ID | Inbound OIDC | Authentication |
-| Active Directory | Inbound LDAP/GC or Entra sync | Groups, disablement later for JML |
-| HR system | Inbound (future) | Joiner/mover/leaver triggers |
+## Readiness API
 
-QEC ITMG stores **authorization** (roles/permissions). IdP stores **authentication**.
+`GET /api/v1/admin/integrations/readiness` — requires `admin.integrations` permission.
 
-## Collaboration
+Returns configuration/readiness state. **Never contacts any vendor system.**
 
-| System | Direction | Purpose |
-|--------|-----------|---------|
-| SMTP | Outbound | Email notifications |
-| Microsoft 365 | Future | Mailbox/calendar actions for leaver, optional |
-| Microsoft Teams | Future | Notification channel |
+## Road map
 
-## Remote support
+| Phase | Work |
+|-------|------|
+| P2-03 | Generic `IMalwareScanner` abstraction for attachment scanning — SonicWall Capture Client is **not** the scanner |
+| P3 | Map external devices and workloads to CMDB entities |
+| P8 | Consume Veeam / Synology backup and replication operational data |
+| P15 | Consume SonicWall Capture Client endpoint security and detection data |
+| P19 | Implement real vendor adapters after production authorization is granted |
 
-See remote-support module. ITMG → engine: create/join session, list agent online, optionally record metadata. Engine → ITMG: webhooks for session end if available; otherwise polling job.
-
-## Operations / security telemetry (future)
+## Inbound integrations (existing)
 
 | System | Direction | Purpose |
 |--------|-----------|---------|
-| Veeam | Inbound | Backup job success/fail as Events |
-| VMware / Hyper-V | Inbound | Inventory enrichment for CIs |
-| Network monitoring / SNMP | Inbound | Events (normalized, not raw) |
-| Firewalls | Inbound | Change/event hints — careful, high volume |
-| Vulnerability scanners | Inbound | Vulnerability findings |
-| Endpoint security | Inbound | Device health / incidents |
-| Certificate sources | Inbound | Certificate inventory |
-| Windows event collection | Generally out — SIEM | Optional alerts as Events |
-| SIEM | Outbound | Security audit log stream |
-
-## Business systems (future)
-
-| System | Direction | Purpose |
-|--------|-----------|---------|
-| Procurement | Inbound | Asset purchase |
-| Discovery / agent inventory | Inbound | Hostname, serial enrichment |
-
-## AI platform (future)
-
-Outbound prompts with **redaction** and **user-bound tokens**. Must call QEC ITMG APIs as the user (or a constrained service that re-checks RBAC per tool). See Phase 20.
-
-## Webhooks inbound
-
-- Authenticated (HMAC or mTLS)
-- Idempotency keys
-- Never grant unattended remote or role changes from a webhook alone
-
-## Credential store
-
-Integration secrets in configuration/vault. Table `adm.IntegrationCredential` stores **references and metadata**, not raw passwords if a vault exists. If vault is unavailable in v1, encrypted-at-rest secrets with strict ACL and audit on read.
+| Google OIDC | Inbound | Authentication (primary) |
+| SMTP / Mailpit | Outbound | Email notifications (future) |
