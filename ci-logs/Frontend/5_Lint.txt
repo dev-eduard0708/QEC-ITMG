@@ -1,0 +1,16 @@
+﻿2026-09-03T11:09:59.5165741Z ##[group]Run npm run lint
+2026-09-03T11:09:59.5166175Z [36;1mnpm run lint[0m
+2026-09-03T11:09:59.5208217Z shell: /usr/bin/bash -e {0}
+2026-09-03T11:09:59.5208572Z ##[endgroup]
+2026-09-03T11:09:59.6385817Z 
+2026-09-03T11:09:59.6386795Z > qec-itmg-web@0.0.0 lint
+2026-09-03T11:09:59.6387508Z > oxlint
+2026-09-03T11:09:59.6387803Z 
+2026-09-03T11:09:59.7084760Z ##[warning]src/app/theme-provider.tsx:74:17: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+2026-09-03T11:09:59.7104082Z ##[warning]src/features/admin/roles-page.tsx:132:33: Use of incompatible library
+2026-09-03T11:09:59.7106126Z ##[warning]src/features/admin/roles-page.tsx:131:65: React hook useMemo depends on `permissions`, which changes every render
+2026-09-03T11:09:59.7108359Z ##[warning]src/components/ui/button.tsx:30:10: Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+2026-09-03T11:09:59.7110892Z ##[warning]src/features/admin/users-page.tsx:140:27: Use of incompatible library
+2026-09-03T11:09:59.7111900Z 
+2026-09-03T11:09:59.7112280Z Found 5 warnings and 0 errors.
+2026-09-03T11:09:59.7112788Z Finished in 30ms on 35 files with 116 rules using 4 threads.

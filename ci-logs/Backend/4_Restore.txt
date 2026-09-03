@@ -1,0 +1,16 @@
+﻿2026-09-03T11:09:54.7035125Z ##[group]Run dotnet restore Qec.Itmg.sln
+2026-09-03T11:09:54.7035821Z [36;1mdotnet restore Qec.Itmg.sln[0m
+2026-09-03T11:09:54.7084935Z shell: /usr/bin/bash -e {0}
+2026-09-03T11:09:54.7085510Z env:
+2026-09-03T11:09:54.7085937Z   DOTNET_ROOT: /usr/share/dotnet
+2026-09-03T11:09:54.7086391Z ##[endgroup]
+2026-09-03T11:09:57.5300757Z   Determining projects to restore...
+2026-09-03T11:10:00.2994059Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.Contracts/Qec.Itmg.Contracts.csproj (in 1.58 sec).
+2026-09-03T11:10:00.4089799Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.IntegrationTests/Qec.Itmg.IntegrationTests.csproj (in 1.7 sec).
+2026-09-03T11:10:00.9104397Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Modules/Identity/Qec.Itmg.Identity/Qec.Itmg.Identity.csproj (in 2.2 sec).
+2026-09-03T11:10:01.4534325Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Modules/Organization/Qec.Itmg.Organization/Qec.Itmg.Organization.csproj (in 960 ms).
+2026-09-03T11:10:01.4647738Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.BuildingBlocks/Qec.Itmg.BuildingBlocks.csproj (in 4 ms).
+2026-09-03T11:10:01.4781390Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Modules/Platform/Qec.Itmg.Platform/Qec.Itmg.Platform.csproj (in 7 ms).
+2026-09-03T11:10:01.4835381Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.ArchitectureTests/Qec.Itmg.ArchitectureTests.csproj (in 1.13 sec).
+2026-09-03T11:10:01.5281991Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.UnitTests/Qec.Itmg.UnitTests.csproj (in 2.81 sec).
+2026-09-03T11:10:02.5196975Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.Host/Qec.Itmg.Host.csproj (in 1.38 sec).

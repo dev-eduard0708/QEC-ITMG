@@ -1,0 +1,23 @@
+﻿2026-09-03T11:09:59.7288786Z ##[group]Run npm run build
+2026-09-03T11:09:59.7289248Z [36;1mnpm run build[0m
+2026-09-03T11:09:59.7343858Z shell: /usr/bin/bash -e {0}
+2026-09-03T11:09:59.7344370Z ##[endgroup]
+2026-09-03T11:09:59.8452211Z 
+2026-09-03T11:09:59.8452968Z > qec-itmg-web@0.0.0 build
+2026-09-03T11:09:59.8453444Z > tsc -b && vite build
+2026-09-03T11:09:59.8453656Z 
+2026-09-03T11:10:03.0482245Z [36mvite v8.2.2 [32mbuilding client environment for production...[36m[39m
+2026-09-03T11:10:03.0585341Z transforming...
+2026-09-03T11:10:03.2810110Z ✓ 2104 modules transformed.
+2026-09-03T11:10:03.3425803Z rendering chunks...
+2026-09-03T11:10:03.4333934Z computing gzip size...
+2026-09-03T11:10:03.4425856Z dist/index.html                   1.50 kB │ gzip:   0.67 kB
+2026-09-03T11:10:03.4426741Z dist/assets/index-C1Sg3UYi.css   25.86 kB │ gzip:   5.79 kB
+2026-09-03T11:10:03.4427963Z dist/assets/index-DGbZaG1J.js   610.91 kB │ gzip: 189.35 kB
+2026-09-03T11:10:03.4428489Z 
+2026-09-03T11:10:03.4429369Z [32m✓ built in 393ms[39m
+2026-09-03T11:10:03.4435648Z [33m[plugin builtin:vite-reporter] 
+2026-09-03T11:10:03.4436663Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-09-03T11:10:03.4437285Z - Using dynamic import() to code-split the application
+2026-09-03T11:10:03.4767439Z - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+2026-09-03T11:10:03.4769009Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m

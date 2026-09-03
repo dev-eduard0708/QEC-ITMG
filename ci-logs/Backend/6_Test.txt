@@ -1,0 +1,68 @@
+﻿2026-09-03T11:10:15.3999089Z ##[group]Run dotnet test Qec.Itmg.sln -c Release --no-build
+2026-09-03T11:10:15.3999635Z [36;1mdotnet test Qec.Itmg.sln -c Release --no-build[0m
+2026-09-03T11:10:15.4040092Z shell: /usr/bin/bash -e {0}
+2026-09-03T11:10:15.4040395Z env:
+2026-09-03T11:10:15.4040610Z   DOTNET_ROOT: /usr/share/dotnet
+2026-09-03T11:10:15.4040875Z ##[endgroup]
+2026-09-03T11:10:16.8895569Z Test run for /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.UnitTests/bin/Release/net10.0/Qec.Itmg.UnitTests.dll (.NETCoreApp,Version=v10.0)
+2026-09-03T11:10:17.3734833Z Test run for /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.IntegrationTests/bin/Release/net10.0/Qec.Itmg.IntegrationTests.dll (.NETCoreApp,Version=v10.0)
+2026-09-03T11:10:17.4924831Z Test run for /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.ArchitectureTests/bin/Release/net10.0/Qec.Itmg.ArchitectureTests.dll (.NETCoreApp,Version=v10.0)
+2026-09-03T11:10:17.6941892Z A total of 1 test files matched the specified pattern.
+2026-09-03T11:10:17.7431443Z A total of 1 test files matched the specified pattern.
+2026-09-03T11:10:17.9184012Z A total of 1 test files matched the specified pattern.
+2026-09-03T11:10:19.0528236Z No test is available in /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.IntegrationTests/bin/Release/net10.0/Qec.Itmg.IntegrationTests.dll. Make sure that test discoverer & executors are registered and platform & framework version settings are appropriate and try again.
+2026-09-03T11:10:19.1558082Z 
+2026-09-03T11:10:19.1625066Z Additionally, path to test adapters can be specified using /TestAdapterPath command. Example  /TestAdapterPath:<pathToCustomAdapters>.
+2026-09-03T11:10:19.6023005Z 
+2026-09-03T11:10:19.6078089Z Passed!  - Failed:     0, Passed:     7, Skipped:     0, Total:     7, Duration: 256 ms - Qec.Itmg.ArchitectureTests.dll (net10.0)
+2026-09-03T11:10:20.6952151Z [xUnit.net 00:00:02.08]     Qec.Itmg.UnitTests.Authentication.OidcBffAuthenticationTests.OidcScheme_IsRegistered_WhenEnabled [FAIL]
+2026-09-03T11:10:21.2704043Z   Failed Qec.Itmg.UnitTests.Authentication.OidcBffAuthenticationTests.OidcScheme_IsRegistered_WhenEnabled [781 ms]
+2026-09-03T11:10:21.2705115Z   Error Message:
+2026-09-03T11:10:21.2705780Z    System.InvalidOperationException : The logger is already frozen.
+2026-09-03T11:10:21.2706672Z   Stack Trace:
+2026-09-03T11:10:21.2707104Z      at Serilog.Extensions.Hosting.ReloadableLogger.Freeze()
+2026-09-03T11:10:21.2707960Z    at Serilog.SerilogServiceCollectionExtensions.<>c__DisplayClass3_0.<AddSerilog>b__0(IServiceProvider services)
+2026-09-03T11:10:21.2709707Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2711594Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.CreateServiceAccessor(ServiceIdentifier serviceIdentifier)
+2026-09-03T11:10:21.2713581Z    at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd(TKey key, Func`2 valueFactory)
+2026-09-03T11:10:21.2715195Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+2026-09-03T11:10:21.2717217Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+2026-09-03T11:10:21.2719040Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+2026-09-03T11:10:21.2720554Z    at Serilog.SerilogServiceCollectionExtensions.<>c__DisplayClass3_0.<AddSerilog>b__2(IServiceProvider services)
+2026-09-03T11:10:21.2722365Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2724620Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2727115Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2729384Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2731632Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2743823Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.CreateServiceAccessor(ServiceIdentifier serviceIdentifier)
+2026-09-03T11:10:21.2744969Z    at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd(TKey key, Func`2 valueFactory)
+2026-09-03T11:10:21.2745994Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+2026-09-03T11:10:21.2747216Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+2026-09-03T11:10:21.2748297Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+2026-09-03T11:10:21.2749215Z    at Microsoft.Extensions.Hosting.HostBuilder.<>c__DisplayClass36_0.<PopulateServiceCollection>b__2(IServiceProvider _)
+2026-09-03T11:10:21.2750222Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2751279Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.CreateServiceAccessor(ServiceIdentifier serviceIdentifier)
+2026-09-03T11:10:21.2752077Z    at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd(TKey key, Func`2 valueFactory)
+2026-09-03T11:10:21.2753793Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+2026-09-03T11:10:21.2755844Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+2026-09-03T11:10:21.2757716Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+2026-09-03T11:10:21.2759388Z    at Microsoft.Extensions.Hosting.HostBuilder.ResolveHost(IServiceProvider serviceProvider, DiagnosticListener diagnosticListener)
+2026-09-03T11:10:21.2760572Z    at Microsoft.Extensions.Hosting.HostApplicationBuilder.Build()
+2026-09-03T11:10:21.2761349Z    at Microsoft.AspNetCore.Builder.WebApplicationBuilder.Build()
+2026-09-03T11:10:21.2762906Z    at Program.<Main>$(String[] args) in /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.Host/Program.cs:line 44
+2026-09-03T11:10:21.2764028Z    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+2026-09-03T11:10:21.2765381Z    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+2026-09-03T11:10:21.2766608Z --- End of stack trace from previous location ---
+2026-09-03T11:10:21.2767159Z    at Microsoft.Extensions.Hosting.HostFactoryResolver.HostingListener.CreateHost()
+2026-09-03T11:10:21.2767920Z    at Microsoft.Extensions.Hosting.HostFactoryResolver.<>c__DisplayClass10_0.<ResolveHostFactory>b__0(String[] args)
+2026-09-03T11:10:21.2768557Z    at Microsoft.AspNetCore.Mvc.Testing.DeferredHostBuilder.Build()
+2026-09-03T11:10:21.2769124Z    at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.CreateHost(IHostBuilder builder)
+2026-09-03T11:10:21.2769882Z    at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.ConfigureHostBuilder(IHostBuilder hostBuilder)
+2026-09-03T11:10:21.2770572Z    at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.StartServer()
+2026-09-03T11:10:21.2771374Z    at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.get_Services()
+2026-09-03T11:10:21.2772721Z    at Qec.Itmg.UnitTests.Authentication.OidcBffAuthenticationTests.OidcScheme_IsRegistered_WhenEnabled() in /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.UnitTests/Authentication/OidcBffAuthenticationTests.cs:line 145
+2026-09-03T11:10:21.2774260Z    at Qec.Itmg.UnitTests.Authentication.OidcBffAuthenticationTests.OidcScheme_IsRegistered_WhenEnabled() in /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.UnitTests/Authentication/OidcBffAuthenticationTests.cs:line 157
+2026-09-03T11:10:21.2775295Z --- End of stack trace from previous location ---
+2026-09-03T11:10:21.6763485Z 
+2026-09-03T11:10:21.6824557Z Failed!  - Failed:     1, Passed:    60, Skipped:     0, Total:    61, Duration: 2 s - Qec.Itmg.UnitTests.dll (net10.0)
+2026-09-03T11:10:21.7597210Z ##[error]Process completed with exit code 1.

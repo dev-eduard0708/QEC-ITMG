@@ -1,0 +1,244 @@
+﻿2026-09-03T11:09:52.5331671Z Current runner version: '2.337.0'
+2026-09-03T11:09:52.5359009Z ##[group]Runner Image Provisioner
+2026-09-03T11:09:52.5359924Z Hosted Compute Agent
+2026-09-03T11:09:52.5360631Z Version: 20260828.587
+2026-09-03T11:09:52.5361330Z Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
+2026-09-03T11:09:52.5362152Z Build Date: 2026-08-28T16:44:25Z
+2026-09-03T11:09:52.5363271Z Worker ID: {8d48ac73-ac4f-4f2f-96bc-a8ed75bff59c}
+2026-09-03T11:09:52.5364033Z Azure Region: eastus2
+2026-09-03T11:09:52.5364679Z ##[endgroup]
+2026-09-03T11:09:52.5366556Z ##[group]Operating System
+2026-09-03T11:09:52.5367231Z Ubuntu
+2026-09-03T11:09:52.5367877Z 24.04.4
+2026-09-03T11:09:52.5368463Z LTS
+2026-09-03T11:09:52.5368989Z ##[endgroup]
+2026-09-03T11:09:52.5369647Z ##[group]Runner Image
+2026-09-03T11:09:52.5370354Z Image: ubuntu-24.04
+2026-09-03T11:09:52.5371040Z Version: 20260831.293.1
+2026-09-03T11:09:52.5372615Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260831.293/images/ubuntu/Ubuntu2404-Readme.md
+2026-09-03T11:09:52.5374364Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260831.293
+2026-09-03T11:09:52.5375423Z ##[endgroup]
+2026-09-03T11:09:52.5376778Z ##[group]GITHUB_TOKEN Permissions
+2026-09-03T11:09:52.5379167Z Contents: read
+2026-09-03T11:09:52.5380218Z Metadata: read
+2026-09-03T11:09:52.5380824Z Packages: read
+2026-09-03T11:09:52.5381396Z ##[endgroup]
+2026-09-03T11:09:52.5384304Z Secret source: Actions
+2026-09-03T11:09:52.5385425Z Prepare workflow directory
+2026-09-03T11:09:52.5820705Z Prepare all required actions
+2026-09-03T11:09:52.5888807Z Getting action download info
+2026-09-03T11:09:52.8117504Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-09-03T11:09:52.9265642Z Download action repository 'actions/setup-dotnet@v4' (SHA:67a3573c9a986a3f9c594539f4ab511d57bb3ce9)
+2026-09-03T11:09:53.2823080Z Complete job name: Backend
+2026-09-03T11:09:53.3588287Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-09-03T11:09:53.3597410Z ##[group]Run actions/checkout@v4
+2026-09-03T11:09:53.3598112Z with:
+2026-09-03T11:09:53.3598583Z   repository: dev-eduard0708/QEC-ITMG
+2026-09-03T11:09:53.3602699Z   token: ***
+2026-09-03T11:09:53.3603168Z   ssh-strict: true
+2026-09-03T11:09:53.3603625Z   ssh-user: git
+2026-09-03T11:09:53.3604082Z   persist-credentials: true
+2026-09-03T11:09:53.3604573Z   clean: true
+2026-09-03T11:09:53.3605028Z   sparse-checkout-cone-mode: true
+2026-09-03T11:09:53.3605552Z   fetch-depth: 1
+2026-09-03T11:09:53.3605997Z   fetch-tags: false
+2026-09-03T11:09:53.3606447Z   show-progress: true
+2026-09-03T11:09:53.3606910Z   lfs: false
+2026-09-03T11:09:53.3607394Z   submodules: false
+2026-09-03T11:09:53.3607856Z   set-safe-directory: true
+2026-09-03T11:09:53.3608382Z   allow-unsafe-pr-checkout: false
+2026-09-03T11:09:53.3609148Z ##[endgroup]
+2026-09-03T11:09:53.4649844Z Syncing repository: dev-eduard0708/QEC-ITMG
+2026-09-03T11:09:53.4651907Z ##[group]Getting Git version info
+2026-09-03T11:09:53.4652984Z Working directory is '/home/runner/work/QEC-ITMG/QEC-ITMG'
+2026-09-03T11:09:53.4654090Z [command]/usr/bin/git version
+2026-09-03T11:09:53.4723262Z git version 2.55.0
+2026-09-03T11:09:53.4760115Z ##[endgroup]
+2026-09-03T11:09:53.4767942Z Temporarily overriding HOME='/home/runner/work/_temp/9cddc87b-b64d-4fe4-bd60-f25b6d53c5b1' before making global git config changes
+2026-09-03T11:09:53.4769374Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-03T11:09:53.4770797Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/QEC-ITMG/QEC-ITMG
+2026-09-03T11:09:53.4833754Z Deleting the contents of '/home/runner/work/QEC-ITMG/QEC-ITMG'
+2026-09-03T11:09:53.4836251Z ##[group]Initializing the repository
+2026-09-03T11:09:53.4838334Z [command]/usr/bin/git init /home/runner/work/QEC-ITMG/QEC-ITMG
+2026-09-03T11:09:53.4942216Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-09-03T11:09:53.4947317Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-09-03T11:09:53.4949265Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-09-03T11:09:53.4950869Z hint: call:
+2026-09-03T11:09:53.4951726Z hint:
+2026-09-03T11:09:53.4952890Z hint: 	git config --global init.defaultBranch <name>
+2026-09-03T11:09:53.4954086Z hint:
+2026-09-03T11:09:53.4955234Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-09-03T11:09:53.4956932Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-09-03T11:09:53.4958346Z hint:
+2026-09-03T11:09:53.4959208Z hint: 	git branch -m <name>
+2026-09-03T11:09:53.4960217Z hint:
+2026-09-03T11:09:53.4961231Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-09-03T11:09:53.4962849Z Initialized empty Git repository in /home/runner/work/QEC-ITMG/QEC-ITMG/.git/
+2026-09-03T11:09:53.4966214Z [command]/usr/bin/git remote add origin https://github.com/dev-eduard0708/QEC-ITMG
+2026-09-03T11:09:53.5017693Z ##[endgroup]
+2026-09-03T11:09:53.5018938Z ##[group]Disabling automatic garbage collection
+2026-09-03T11:09:53.5019979Z [command]/usr/bin/git config --local gc.auto 0
+2026-09-03T11:09:53.5053677Z ##[endgroup]
+2026-09-03T11:09:53.5055061Z ##[group]Setting up auth
+2026-09-03T11:09:53.5064070Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-03T11:09:53.5103941Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-03T11:09:53.5512761Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-03T11:09:53.5579728Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-03T11:09:53.5909261Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-03T11:09:53.5953593Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-03T11:09:53.6250700Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-09-03T11:09:53.6303179Z ##[endgroup]
+2026-09-03T11:09:53.6304032Z ##[group]Fetching the repository
+2026-09-03T11:09:53.6318553Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3aa9fe6f5e48d1890cfadc82a3c40452dfd142f3:refs/remotes/origin/feat/p1-05-admin-users-roles
+2026-09-03T11:09:53.9454408Z From https://github.com/dev-eduard0708/QEC-ITMG
+2026-09-03T11:09:53.9456009Z  * [new ref]         3aa9fe6f5e48d1890cfadc82a3c40452dfd142f3 -> origin/feat/p1-05-admin-users-roles
+2026-09-03T11:09:53.9458728Z ##[endgroup]
+2026-09-03T11:09:53.9459702Z ##[group]Determining the checkout info
+2026-09-03T11:09:53.9460786Z ##[endgroup]
+2026-09-03T11:09:53.9483613Z [command]/usr/bin/git sparse-checkout disable
+2026-09-03T11:09:53.9530864Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-09-03T11:09:53.9570701Z ##[group]Checking out the ref
+2026-09-03T11:09:53.9577079Z [command]/usr/bin/git checkout --progress --force -B feat/p1-05-admin-users-roles refs/remotes/origin/feat/p1-05-admin-users-roles
+2026-09-03T11:09:53.9775658Z Switched to a new branch 'feat/p1-05-admin-users-roles'
+2026-09-03T11:09:53.9778769Z branch 'feat/p1-05-admin-users-roles' set up to track 'origin/feat/p1-05-admin-users-roles'.
+2026-09-03T11:09:53.9785268Z ##[endgroup]
+2026-09-03T11:09:53.9834335Z [command]/usr/bin/git log -1 --format=%H
+2026-09-03T11:09:53.9864340Z 3aa9fe6f5e48d1890cfadc82a3c40452dfd142f3
+2026-09-03T11:09:54.0193894Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-09-03T11:09:54.0200026Z ##[group]Run actions/setup-dotnet@v4
+2026-09-03T11:09:54.0201165Z with:
+2026-09-03T11:09:54.0201997Z   dotnet-version: 10.0.400
+2026-09-03T11:09:54.0203144Z   cache: false
+2026-09-03T11:09:54.0204013Z ##[endgroup]
+2026-09-03T11:09:54.1672791Z (node:2310) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-09-03T11:09:54.1675758Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-09-03T11:09:54.1699740Z [command]/home/runner/work/_actions/actions/setup-dotnet/v4/externals/install-dotnet.sh --skip-non-versioned-files --runtime dotnet --channel LTS
+2026-09-03T11:09:54.5010778Z dotnet-install: .NET Core Runtime with version '10.0.11' is already installed.
+2026-09-03T11:09:54.5040094Z [command]/home/runner/work/_actions/actions/setup-dotnet/v4/externals/install-dotnet.sh --skip-non-versioned-files --version 10.0.400
+2026-09-03T11:09:54.6853799Z dotnet-install: .NET Core SDK with version '10.0.400' is already installed.
+2026-09-03T11:09:54.7035158Z ##[group]Run dotnet restore Qec.Itmg.sln
+2026-09-03T11:09:54.7035833Z [36;1mdotnet restore Qec.Itmg.sln[0m
+2026-09-03T11:09:54.7084959Z shell: /usr/bin/bash -e {0}
+2026-09-03T11:09:54.7085515Z env:
+2026-09-03T11:09:54.7085940Z   DOTNET_ROOT: /usr/share/dotnet
+2026-09-03T11:09:54.7086394Z ##[endgroup]
+2026-09-03T11:09:57.5300971Z   Determining projects to restore...
+2026-09-03T11:10:00.2994142Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.Contracts/Qec.Itmg.Contracts.csproj (in 1.58 sec).
+2026-09-03T11:10:00.4089881Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.IntegrationTests/Qec.Itmg.IntegrationTests.csproj (in 1.7 sec).
+2026-09-03T11:10:00.9104471Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Modules/Identity/Qec.Itmg.Identity/Qec.Itmg.Identity.csproj (in 2.2 sec).
+2026-09-03T11:10:01.4534394Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Modules/Organization/Qec.Itmg.Organization/Qec.Itmg.Organization.csproj (in 960 ms).
+2026-09-03T11:10:01.4647905Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.BuildingBlocks/Qec.Itmg.BuildingBlocks.csproj (in 4 ms).
+2026-09-03T11:10:01.4781462Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Modules/Platform/Qec.Itmg.Platform/Qec.Itmg.Platform.csproj (in 7 ms).
+2026-09-03T11:10:01.4835435Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.ArchitectureTests/Qec.Itmg.ArchitectureTests.csproj (in 1.13 sec).
+2026-09-03T11:10:01.5282384Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.UnitTests/Qec.Itmg.UnitTests.csproj (in 2.81 sec).
+2026-09-03T11:10:02.5197051Z   Restored /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.Host/Qec.Itmg.Host.csproj (in 1.38 sec).
+2026-09-03T11:10:02.5810360Z ##[group]Run dotnet build Qec.Itmg.sln -c Release --no-restore
+2026-09-03T11:10:02.5810936Z [36;1mdotnet build Qec.Itmg.sln -c Release --no-restore[0m
+2026-09-03T11:10:02.5854234Z shell: /usr/bin/bash -e {0}
+2026-09-03T11:10:02.5854519Z env:
+2026-09-03T11:10:02.5854772Z   DOTNET_ROOT: /usr/share/dotnet
+2026-09-03T11:10:02.5855076Z ##[endgroup]
+2026-09-03T11:10:09.0951664Z   Qec.Itmg.BuildingBlocks -> /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.BuildingBlocks/bin/Release/net10.0/Qec.Itmg.BuildingBlocks.dll
+2026-09-03T11:10:09.0954675Z   Qec.Itmg.Contracts -> /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.Contracts/bin/Release/net10.0/Qec.Itmg.Contracts.dll
+2026-09-03T11:10:09.1343916Z   Qec.Itmg.IntegrationTests -> /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.IntegrationTests/bin/Release/net10.0/Qec.Itmg.IntegrationTests.dll
+2026-09-03T11:10:10.1203448Z   Qec.Itmg.Organization -> /home/runner/work/QEC-ITMG/QEC-ITMG/src/Modules/Organization/Qec.Itmg.Organization/bin/Release/net10.0/Qec.Itmg.Organization.dll
+2026-09-03T11:10:10.3954396Z   Qec.Itmg.Platform -> /home/runner/work/QEC-ITMG/QEC-ITMG/src/Modules/Platform/Qec.Itmg.Platform/bin/Release/net10.0/Qec.Itmg.Platform.dll
+2026-09-03T11:10:12.7430563Z   Qec.Itmg.Identity -> /home/runner/work/QEC-ITMG/QEC-ITMG/src/Modules/Identity/Qec.Itmg.Identity/bin/Release/net10.0/Qec.Itmg.Identity.dll
+2026-09-03T11:10:13.7516124Z   Qec.Itmg.Host -> /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.Host/bin/Release/net10.0/Qec.Itmg.Host.dll
+2026-09-03T11:10:14.9534427Z   Qec.Itmg.UnitTests -> /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.UnitTests/bin/Release/net10.0/Qec.Itmg.UnitTests.dll
+2026-09-03T11:10:15.3129397Z   Qec.Itmg.ArchitectureTests -> /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.ArchitectureTests/bin/Release/net10.0/Qec.Itmg.ArchitectureTests.dll
+2026-09-03T11:10:15.3488912Z 
+2026-09-03T11:10:15.3489666Z Build succeeded.
+2026-09-03T11:10:15.3490144Z     0 Warning(s)
+2026-09-03T11:10:15.3490574Z     0 Error(s)
+2026-09-03T11:10:15.3490932Z 
+2026-09-03T11:10:15.3491257Z Time Elapsed 00:00:12.41
+2026-09-03T11:10:15.3999105Z ##[group]Run dotnet test Qec.Itmg.sln -c Release --no-build
+2026-09-03T11:10:15.3999645Z [36;1mdotnet test Qec.Itmg.sln -c Release --no-build[0m
+2026-09-03T11:10:15.4040115Z shell: /usr/bin/bash -e {0}
+2026-09-03T11:10:15.4040398Z env:
+2026-09-03T11:10:15.4040612Z   DOTNET_ROOT: /usr/share/dotnet
+2026-09-03T11:10:15.4040878Z ##[endgroup]
+2026-09-03T11:10:16.8895626Z Test run for /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.UnitTests/bin/Release/net10.0/Qec.Itmg.UnitTests.dll (.NETCoreApp,Version=v10.0)
+2026-09-03T11:10:17.3734893Z Test run for /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.IntegrationTests/bin/Release/net10.0/Qec.Itmg.IntegrationTests.dll (.NETCoreApp,Version=v10.0)
+2026-09-03T11:10:17.4924894Z Test run for /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.ArchitectureTests/bin/Release/net10.0/Qec.Itmg.ArchitectureTests.dll (.NETCoreApp,Version=v10.0)
+2026-09-03T11:10:17.6941957Z A total of 1 test files matched the specified pattern.
+2026-09-03T11:10:17.7431633Z A total of 1 test files matched the specified pattern.
+2026-09-03T11:10:17.9184081Z A total of 1 test files matched the specified pattern.
+2026-09-03T11:10:19.0528291Z No test is available in /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.IntegrationTests/bin/Release/net10.0/Qec.Itmg.IntegrationTests.dll. Make sure that test discoverer & executors are registered and platform & framework version settings are appropriate and try again.
+2026-09-03T11:10:19.1558144Z 
+2026-09-03T11:10:19.1625110Z Additionally, path to test adapters can be specified using /TestAdapterPath command. Example  /TestAdapterPath:<pathToCustomAdapters>.
+2026-09-03T11:10:19.6023074Z 
+2026-09-03T11:10:19.6078126Z Passed!  - Failed:     0, Passed:     7, Skipped:     0, Total:     7, Duration: 256 ms - Qec.Itmg.ArchitectureTests.dll (net10.0)
+2026-09-03T11:10:20.6952204Z [xUnit.net 00:00:02.08]     Qec.Itmg.UnitTests.Authentication.OidcBffAuthenticationTests.OidcScheme_IsRegistered_WhenEnabled [FAIL]
+2026-09-03T11:10:21.2704134Z   Failed Qec.Itmg.UnitTests.Authentication.OidcBffAuthenticationTests.OidcScheme_IsRegistered_WhenEnabled [781 ms]
+2026-09-03T11:10:21.2705118Z   Error Message:
+2026-09-03T11:10:21.2705785Z    System.InvalidOperationException : The logger is already frozen.
+2026-09-03T11:10:21.2706682Z   Stack Trace:
+2026-09-03T11:10:21.2707108Z      at Serilog.Extensions.Hosting.ReloadableLogger.Freeze()
+2026-09-03T11:10:21.2707965Z    at Serilog.SerilogServiceCollectionExtensions.<>c__DisplayClass3_0.<AddSerilog>b__0(IServiceProvider services)
+2026-09-03T11:10:21.2709714Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2711599Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.CreateServiceAccessor(ServiceIdentifier serviceIdentifier)
+2026-09-03T11:10:21.2713588Z    at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd(TKey key, Func`2 valueFactory)
+2026-09-03T11:10:21.2715222Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+2026-09-03T11:10:21.2717221Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+2026-09-03T11:10:21.2719045Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+2026-09-03T11:10:21.2720559Z    at Serilog.SerilogServiceCollectionExtensions.<>c__DisplayClass3_0.<AddSerilog>b__2(IServiceProvider services)
+2026-09-03T11:10:21.2722369Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2724918Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2727120Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2729388Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitConstructor(ConstructorCallSite constructorCallSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2731636Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2743852Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.CreateServiceAccessor(ServiceIdentifier serviceIdentifier)
+2026-09-03T11:10:21.2744974Z    at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd(TKey key, Func`2 valueFactory)
+2026-09-03T11:10:21.2746009Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+2026-09-03T11:10:21.2747218Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+2026-09-03T11:10:21.2748300Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+2026-09-03T11:10:21.2749218Z    at Microsoft.Extensions.Hosting.HostBuilder.<>c__DisplayClass36_0.<PopulateServiceCollection>b__2(IServiceProvider _)
+2026-09-03T11:10:21.2750225Z    at Microsoft.Extensions.DependencyInjection.ServiceLookup.CallSiteRuntimeResolver.VisitRootCache(ServiceCallSite callSite, RuntimeResolverContext context)
+2026-09-03T11:10:21.2751281Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.CreateServiceAccessor(ServiceIdentifier serviceIdentifier)
+2026-09-03T11:10:21.2752080Z    at System.Collections.Concurrent.ConcurrentDictionary`2.GetOrAdd(TKey key, Func`2 valueFactory)
+2026-09-03T11:10:21.2753807Z    at Microsoft.Extensions.DependencyInjection.ServiceProvider.GetService(ServiceIdentifier serviceIdentifier, ServiceProviderEngineScope serviceProviderEngineScope)
+2026-09-03T11:10:21.2755849Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService(IServiceProvider provider, Type serviceType)
+2026-09-03T11:10:21.2757721Z    at Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService[T](IServiceProvider provider)
+2026-09-03T11:10:21.2759395Z    at Microsoft.Extensions.Hosting.HostBuilder.ResolveHost(IServiceProvider serviceProvider, DiagnosticListener diagnosticListener)
+2026-09-03T11:10:21.2760576Z    at Microsoft.Extensions.Hosting.HostApplicationBuilder.Build()
+2026-09-03T11:10:21.2761353Z    at Microsoft.AspNetCore.Builder.WebApplicationBuilder.Build()
+2026-09-03T11:10:21.2762913Z    at Program.<Main>$(String[] args) in /home/runner/work/QEC-ITMG/QEC-ITMG/src/Qec.Itmg.Host/Program.cs:line 44
+2026-09-03T11:10:21.2764043Z    at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)
+2026-09-03T11:10:21.2765389Z    at System.Reflection.MethodBaseInvoker.InvokeDirectByRefWithFewArgs(Object obj, Span`1 copyOfArgs, BindingFlags invokeAttr)
+2026-09-03T11:10:21.2766612Z --- End of stack trace from previous location ---
+2026-09-03T11:10:21.2767162Z    at Microsoft.Extensions.Hosting.HostFactoryResolver.HostingListener.CreateHost()
+2026-09-03T11:10:21.2767923Z    at Microsoft.Extensions.Hosting.HostFactoryResolver.<>c__DisplayClass10_0.<ResolveHostFactory>b__0(String[] args)
+2026-09-03T11:10:21.2768562Z    at Microsoft.AspNetCore.Mvc.Testing.DeferredHostBuilder.Build()
+2026-09-03T11:10:21.2769127Z    at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.CreateHost(IHostBuilder builder)
+2026-09-03T11:10:21.2769884Z    at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.ConfigureHostBuilder(IHostBuilder hostBuilder)
+2026-09-03T11:10:21.2770798Z    at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.StartServer()
+2026-09-03T11:10:21.2771376Z    at Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactory`1.get_Services()
+2026-09-03T11:10:21.2772724Z    at Qec.Itmg.UnitTests.Authentication.OidcBffAuthenticationTests.OidcScheme_IsRegistered_WhenEnabled() in /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.UnitTests/Authentication/OidcBffAuthenticationTests.cs:line 145
+2026-09-03T11:10:21.2774263Z    at Qec.Itmg.UnitTests.Authentication.OidcBffAuthenticationTests.OidcScheme_IsRegistered_WhenEnabled() in /home/runner/work/QEC-ITMG/QEC-ITMG/tests/Qec.Itmg.UnitTests/Authentication/OidcBffAuthenticationTests.cs:line 157
+2026-09-03T11:10:21.2775298Z --- End of stack trace from previous location ---
+2026-09-03T11:10:21.6763554Z 
+2026-09-03T11:10:21.6824604Z Failed!  - Failed:     1, Passed:    60, Skipped:     0, Total:    61, Duration: 2 s - Qec.Itmg.UnitTests.dll (net10.0)
+2026-09-03T11:10:21.7597257Z ##[error]Process completed with exit code 1.
+2026-09-03T11:10:21.7745906Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-09-03T11:10:21.7747109Z Post job cleanup.
+2026-09-03T11:10:21.8686493Z [command]/usr/bin/git version
+2026-09-03T11:10:21.8739102Z git version 2.55.0
+2026-09-03T11:10:21.8783743Z Temporarily overriding HOME='/home/runner/work/_temp/87ccdaf3-9b03-4084-84b6-0c6a3e7464b4' before making global git config changes
+2026-09-03T11:10:21.8785500Z Adding repository directory to the temporary git global config as a safe directory
+2026-09-03T11:10:21.8789600Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/QEC-ITMG/QEC-ITMG
+2026-09-03T11:10:21.8844788Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-09-03T11:10:21.8899847Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-09-03T11:10:21.9246860Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-09-03T11:10:21.9286107Z http.https://github.com/.extraheader
+2026-09-03T11:10:21.9301640Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-09-03T11:10:21.9348671Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-09-03T11:10:21.9641490Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-09-03T11:10:21.9730601Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-09-03T11:10:22.0230032Z Cleaning up orphan processes
+2026-09-03T11:10:22.0593612Z Terminate orphan process: pid (2515) (dotnet)
+2026-09-03T11:10:22.0618278Z Terminate orphan process: pid (2516) (dotnet)
+2026-09-03T11:10:22.0651127Z Terminate orphan process: pid (2517) (dotnet)
+2026-09-03T11:10:22.0687019Z Terminate orphan process: pid (2666) (VBCSCompiler)
+2026-09-03T11:10:22.0702843Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-dotnet@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

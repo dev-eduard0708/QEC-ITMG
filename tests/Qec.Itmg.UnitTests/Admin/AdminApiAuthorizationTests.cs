@@ -17,6 +17,7 @@ using Xunit;
 
 namespace Qec.Itmg.UnitTests.Admin;
 
+[Collection(WebApplicationFactoryCollection.Name)]
 public sealed class AdminApiAuthorizationTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 3, 15, 0, 0, TimeSpan.Zero);

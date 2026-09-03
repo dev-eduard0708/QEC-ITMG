@@ -16,6 +16,7 @@ using Xunit;
 
 namespace Qec.Itmg.UnitTests.Authentication;
 
+[Collection(WebApplicationFactoryCollection.Name)]
 public sealed class OidcBffAuthenticationTests
 {
     [Fact]
