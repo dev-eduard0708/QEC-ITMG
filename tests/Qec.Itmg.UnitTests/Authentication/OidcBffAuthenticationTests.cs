@@ -112,8 +112,9 @@ public sealed class OidcBffAuthenticationTests
     public void OidcPrincipalMapper_DropsIdpRolesAndGroups()
     {
         ClaimsIdentity inbound = new("oidc");
-        inbound.AddClaim(new Claim("oid", "object-1"));
-        inbound.AddClaim(new Claim("preferred_username", "user@qehc.edu.sa"));
+        inbound.AddClaim(new Claim("sub", "google-sub-1"));
+        inbound.AddClaim(new Claim("email", "user@qehc.edu.sa"));
+        inbound.AddClaim(new Claim("email_verified", "true"));
         inbound.AddClaim(new Claim("name", "User Example"));
         inbound.AddClaim(new Claim(ClaimTypes.Role, "Domain Admins"));
         inbound.AddClaim(new Claim("roles", "IT-Admins"));
@@ -121,7 +122,7 @@ public sealed class OidcBffAuthenticationTests
 
         ClaimsPrincipal mapped = OidcPrincipalMapper.MapAuthenticatedPrincipal(new ClaimsPrincipal(inbound));
 
-        Assert.Equal("object-1", mapped.FindFirst(OidcPrincipalMapper.ExternalIdClaimType)?.Value);
+        Assert.Equal("google-sub-1", mapped.FindFirst(OidcPrincipalMapper.ExternalIdClaimType)?.Value);
         Assert.Equal("user@qehc.edu.sa", mapped.FindFirst(OidcPrincipalMapper.UpnClaimType)?.Value);
         Assert.Equal("User Example", mapped.FindFirst(ClaimTypes.Name)?.Value);
         Assert.False(OidcPrincipalMapper.ContainsAuthorizationRoleClaims(mapped));

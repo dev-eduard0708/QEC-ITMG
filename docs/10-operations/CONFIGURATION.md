@@ -4,8 +4,8 @@ ASP.NET configuration:
 
 - Connection strings
 - File root path
-- OIDC client id/secret (secret store)
-- SMTP
+- OIDC (Google): Authority, ClientId/ClientSecret (secret store), AllowedDomains
+- SMTP (`Email:Smtp` — Development defaults target Mailpit on localhost:1025; UI on :8025)
 - Engine base URL + service credential
 - Hangfire
 - Feature flags (unattended, modules)

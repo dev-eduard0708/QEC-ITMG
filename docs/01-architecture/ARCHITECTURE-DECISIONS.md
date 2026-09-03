@@ -15,7 +15,7 @@ Canonical records live in [../12-decisions/ADR-INDEX.md](../12-decisions/ADR-IND
 | Compliance | Internal-control-first | 0007 |
 | Remote access | Integrate MeshCentral (adapter), not a custom protocol | 0008 |
 | Files | Metadata in SQL, blob via `IFileStorage` | 0009 |
-| Authentication | Entra ID / AD OIDC + app RBAC | 0010 |
+| Authentication | Google OIDC BFF + app SQL RBAC | 0010 |
 | History | Explicit business audit history | 0011 |
 | Jobs | Hangfire + SQL | 0012 |
 | Charts | Recharts | 0013 |

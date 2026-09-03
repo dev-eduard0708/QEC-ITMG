@@ -10,7 +10,7 @@ QEC ITMG is an **internal on-premises** modular monolith:
 - ASP.NET Core application host (REST + SignalR + Hangfire)
 - Microsoft SQL Server (system of record)
 - File storage (local/SMB via abstraction)
-- Microsoft Entra ID / Active Directory (identity)
+- Google Workspace OIDC (primary identity); Active Directory may remain for directory sync later
 - Remote-support engine (MeshCentral recommended) on a dedicated host
 - SMTP for email notifications
 - Reverse proxy terminating TLS
@@ -27,8 +27,8 @@ QEC ITMG is an **internal on-premises** modular monolith:
                      └────────┬────────┘
                               │ REST + SignalR
                      ┌────────▼────────┐     ┌──────────────────┐
-                     │ ASP.NET Core    │────▶│ Entra ID / AD    │
-                     │ Modular host    │     │ (OIDC / LDAP)    │
+                     │ ASP.NET Core    │────▶│ Google OIDC      │
+                     │ Modular host    │     │ (accounts.google)│
                      │ Hangfire        │     └──────────────────┘
                      └────┬───────┬────┘
                           │       │

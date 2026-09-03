@@ -4,14 +4,16 @@ namespace Qec.Itmg.Identity.Authentication;
 
 /// <summary>
 /// Maps inbound OIDC claims into the application cookie principal.
-/// IdP roles/groups are intentionally discarded — ITMG authorization is SQL RBAC.
+/// Primary provider is Google OIDC (sub/email/name). IdP roles/groups are discarded — ITMG authorization is SQL RBAC.
 /// </summary>
 public static class OidcPrincipalMapper
 {
     public const string ExternalIdClaimType = "qec_external_id";
     public const string UpnClaimType = "upn";
 
-    public static ClaimsPrincipal MapAuthenticatedPrincipal(ClaimsPrincipal inbound)
+    public static ClaimsPrincipal MapAuthenticatedPrincipal(
+        ClaimsPrincipal inbound,
+        IReadOnlyList<string>? allowedDomains = null)
     {
         ArgumentNullException.ThrowIfNull(inbound);
 
@@ -19,8 +21,11 @@ public static class OidcPrincipalMapper
             ?? inbound.Identity as ClaimsIdentity
             ?? throw new InvalidOperationException("Authenticated OIDC principal is required.");
 
+        EnsureEmailVerified(source);
+
         string externalId = ResolveExternalId(source);
-        string? upn = ResolveUpn(source);
+        string email = ResolveEmail(source);
+        EnsureAllowedDomain(email, allowedDomains);
         string? displayName = ResolveDisplayName(source);
 
         ClaimsIdentity mapped = new(
@@ -30,12 +35,9 @@ public static class OidcPrincipalMapper
 
         mapped.AddClaim(new Claim(ExternalIdClaimType, externalId));
         mapped.AddClaim(new Claim(ClaimTypes.NameIdentifier, externalId));
-
-        if (!string.IsNullOrWhiteSpace(upn))
-        {
-            mapped.AddClaim(new Claim(UpnClaimType, upn));
-            mapped.AddClaim(new Claim(ClaimTypes.Upn, upn));
-        }
+        mapped.AddClaim(new Claim(UpnClaimType, email));
+        mapped.AddClaim(new Claim(ClaimTypes.Upn, email));
+        mapped.AddClaim(new Claim(ClaimTypes.Email, email));
 
         if (!string.IsNullOrWhiteSpace(displayName))
         {
@@ -52,26 +54,70 @@ public static class OidcPrincipalMapper
             || claim.Type.EndsWith("/roles", StringComparison.OrdinalIgnoreCase)
             || claim.Type.EndsWith("/groups", StringComparison.OrdinalIgnoreCase));
 
+    private static void EnsureEmailVerified(ClaimsIdentity identity)
+    {
+        string? verified = identity.FindFirst("email_verified")?.Value;
+        if (!IsTruthy(verified))
+        {
+            throw new InvalidOperationException("OIDC principal email_verified must be true.");
+        }
+    }
+
     private static string ResolveExternalId(ClaimsIdentity identity)
     {
-        string? value = identity.FindFirst("oid")?.Value
-            ?? identity.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value
-            ?? identity.FindFirst("sub")?.Value;
+        string? value = identity.FindFirst("sub")?.Value
+            ?? identity.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new InvalidOperationException("OIDC principal is missing both oid and sub claims.");
+            throw new InvalidOperationException("OIDC principal is missing the sub claim.");
         }
 
-        return value;
+        return value.Trim();
     }
 
-    private static string? ResolveUpn(ClaimsIdentity identity) =>
-        identity.FindFirst("preferred_username")?.Value
-        ?? identity.FindFirst("upn")?.Value
-        ?? identity.FindFirst(ClaimTypes.Upn)?.Value;
+    private static string ResolveEmail(ClaimsIdentity identity)
+    {
+        string? value = identity.FindFirst("email")?.Value
+            ?? identity.FindFirst(ClaimTypes.Email)?.Value;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException("OIDC principal is missing the email claim.");
+        }
+
+        return value.Trim();
+    }
 
     private static string? ResolveDisplayName(ClaimsIdentity identity) =>
         identity.FindFirst("name")?.Value
         ?? identity.FindFirst(ClaimTypes.Name)?.Value;
+
+    private static void EnsureAllowedDomain(string email, IReadOnlyList<string>? allowedDomains)
+    {
+        if (allowedDomains is null || allowedDomains.Count == 0)
+        {
+            return;
+        }
+
+        int at = email.LastIndexOf('@');
+        if (at <= 0 || at == email.Length - 1)
+        {
+            throw new InvalidOperationException("OIDC email claim is not a valid address.");
+        }
+
+        string domain = email[(at + 1)..];
+        bool allowed = allowedDomains.Any(allowedDomain =>
+            string.Equals(allowedDomain.Trim(), domain, StringComparison.OrdinalIgnoreCase));
+
+        if (!allowed)
+        {
+            throw new InvalidOperationException(
+                $"Email domain '{domain}' is not in Authentication:Oidc:AllowedDomains.");
+        }
+    }
+
+    private static bool IsTruthy(string? value) =>
+        string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(value, "1", StringComparison.OrdinalIgnoreCase);
 }

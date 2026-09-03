@@ -10,7 +10,7 @@ Protect confidentiality, integrity, and availability of QEC operational and GRC 
 
 | Theme | Approach |
 |-------|----------|
-| Authentication | Entra ID / AD OIDC; MFA for privileged; break-glass |
+| Authentication | Google OIDC BFF; MFA for privileged; break-glass |
 | Authorization | Permission keys + resource checks; SoD on approve vs implement |
 | Session | Short idle timeout for privileged; server-side revoke |
 | CSRF | SameSite cookies + antiforgery if cookie auth |

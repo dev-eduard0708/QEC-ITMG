@@ -6,7 +6,10 @@ public sealed class OidcAuthenticationOptions
 
     public bool Enabled { get; set; }
 
-    public string Authority { get; set; } = string.Empty;
+    /// <summary>
+    /// OIDC authority. Default Google accounts endpoint for the current primary provider.
+    /// </summary>
+    public string Authority { get; set; } = "https://accounts.google.com";
 
     public string ClientId { get; set; } = string.Empty;
 
@@ -17,6 +20,12 @@ public sealed class OidcAuthenticationOptions
     public string SignedOutCallbackPath { get; set; } = "/signout-callback-oidc";
 
     public TimeSpan SessionLifetime { get; set; } = TimeSpan.FromHours(8);
+
+    /// <summary>
+    /// When empty, any verified Google account is accepted (typical for Development).
+    /// Production should list allowed Google Workspace domains (e.g. qehc.edu.sa).
+    /// </summary>
+    public List<string> AllowedDomains { get; set; } = [];
 
     public void EnsureValidWhenEnabled()
     {

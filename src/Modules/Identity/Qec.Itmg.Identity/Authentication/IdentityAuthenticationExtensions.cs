@@ -59,7 +59,12 @@ public static class IdentityAuthenticationExtensions
                 if (context.Principal is not null
                     && OidcPrincipalMapper.ContainsAuthorizationRoleClaims(context.Principal))
                 {
-                    context.Principal = OidcPrincipalMapper.MapAuthenticatedPrincipal(context.Principal);
+                    OidcAuthenticationOptions optionsSnapshot = context.HttpContext.RequestServices
+                        .GetRequiredService<IOptions<OidcAuthenticationOptions>>()
+                        .Value;
+                    context.Principal = OidcPrincipalMapper.MapAuthenticatedPrincipal(
+                        context.Principal,
+                        optionsSnapshot.AllowedDomains);
                 }
 
                 await SecurityAuditHooks.LogLoginSuccessAsync(context.HttpContext);
@@ -119,7 +124,17 @@ public static class IdentityAuthenticationExtensions
                             return Task.CompletedTask;
                         }
 
-                        context.Principal = OidcPrincipalMapper.MapAuthenticatedPrincipal(context.Principal);
+                        try
+                        {
+                            context.Principal = OidcPrincipalMapper.MapAuthenticatedPrincipal(
+                                context.Principal,
+                                oidcOptions.AllowedDomains);
+                        }
+                        catch (InvalidOperationException exception)
+                        {
+                            context.Fail(exception.Message);
+                        }
+
                         return Task.CompletedTask;
                     },
                     OnAuthenticationFailed = async context =>

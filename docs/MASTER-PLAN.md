@@ -26,7 +26,7 @@ Success: [00-product/SUCCESS-CRITERIA.md](00-product/SUCCESS-CRITERIA.md)
 
 ## 3. Architecture summary
 
-Modular monolith: ASP.NET Core 10 host, React/Vite SPA, SQL Server, Hangfire, SignalR, Entra ID/AD SSO (BFF cookies), file blob abstraction, MeshCentral adapter for remote transport.
+Modular monolith: ASP.NET Core 10 host, React/Vite SPA, SQL Server, Hangfire, SignalR, Google OIDC SSO (BFF cookies), file blob abstraction, MeshCentral adapter for remote transport.
 
 [01-architecture/SYSTEM-ARCHITECTURE.md](01-architecture/SYSTEM-ARCHITECTURE.md)
 

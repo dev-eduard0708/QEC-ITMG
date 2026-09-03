@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
+using Qec.Itmg.BuildingBlocks.Email;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Contracts.Audit;
@@ -17,6 +19,13 @@ public sealed class PlatformModule : IModule
     public void Register(IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<IClock, SystemClock>();
+
+        SmtpEmailOptions smtpOptions = configuration
+            .GetSection(SmtpEmailOptions.SectionName)
+            .Get<SmtpEmailOptions>()
+            ?? new SmtpEmailOptions();
+        services.AddSingleton(Options.Create(smtpOptions));
+        services.AddSingleton<IEmailSender, NullEmailSender>();
 
         string? connectionString = configuration.GetConnectionString(QecEfConventions.ConnectionStringName);
         if (string.IsNullOrWhiteSpace(connectionString))

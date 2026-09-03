@@ -15,7 +15,7 @@ This glossary is authoritative. Module documents must use these names. Database 
 
 | Term | Meaning |
 |------|---------|
-| User | Authenticated platform identity (usually an Entra ID / AD account) |
+| User | Authenticated platform identity (usually a Google Workspace account via OIDC) |
 | Employee | QEC worker using the employee experience; not a separate login type |
 | Technician | User with IT operational permissions |
 | Privileged user | User with high-impact permissions (unattended remote, role admin, evidence export, etc.) |
