@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Qec.Itmg.BuildingBlocks\Qec.Itmg.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\..\Qec.Itmg.Contracts\Qec.Itmg.Contracts.csproj" />
   </ItemGroup>
 </Project>

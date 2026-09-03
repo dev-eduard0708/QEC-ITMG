@@ -1,8 +1,16 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Qec.Itmg.Contracts.Modules;
+
 namespace Qec.Itmg.Identity;
 
 /// <summary>
-/// Assembly marker for the Identity module. Domain types are added in Phase 1.
+/// Identity module composition. Domain types are added in Phase 1.
 /// </summary>
-public static class IdentityModule
+public sealed class IdentityModule : IModule
 {
+    public void Register(IServiceCollection services, IConfiguration configuration)
+    {
+        // Identity domain services are registered in Phase 1.
+    }
 }

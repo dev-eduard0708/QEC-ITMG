@@ -2,8 +2,12 @@
   <PropertyGroup>
     <RootNamespace>Qec.Itmg.Host</RootNamespace>
     <AssemblyName>Qec.Itmg.Host</AssemblyName>
-    <Description>ASP.NET Core composition host. Business APIs, auth, health, and logging are later packages.</Description>
+    <Description>ASP.NET Core composition host for QEC ITMG.</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Qec.Itmg.BuildingBlocks\Qec.Itmg.BuildingBlocks.csproj" />
     <ProjectReference Include="..\Qec.Itmg.Contracts\Qec.Itmg.Contracts.csproj" />

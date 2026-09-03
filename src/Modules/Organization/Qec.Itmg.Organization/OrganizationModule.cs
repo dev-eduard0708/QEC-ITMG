@@ -1,8 +1,16 @@
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Qec.Itmg.Contracts.Modules;
+
 namespace Qec.Itmg.Organization;
 
 /// <summary>
-/// Assembly marker for the Organization module. Domain types are added in Phase 1.
+/// Organization module composition. Domain types are added in Phase 1.
 /// </summary>
-public static class OrganizationModule
+public sealed class OrganizationModule : IModule
 {
+    public void Register(IServiceCollection services, IConfiguration configuration)
+    {
+        // Organization domain services are registered in Phase 1.
+    }
 }

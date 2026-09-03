@@ -2,7 +2,11 @@
   <PropertyGroup>
     <RootNamespace>Qec.Itmg.Contracts</RootNamespace>
     <AssemblyName>Qec.Itmg.Contracts</AssemblyName>
-    <Description>Published module contracts and integration events. Intentionally empty in P0-01.</Description>
+    <Description>Published module contracts and integration events.</Description>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+  </ItemGroup>
 </Project>
