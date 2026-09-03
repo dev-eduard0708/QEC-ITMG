@@ -75,6 +75,26 @@ public sealed class User
         UpdatedAtUtc = utcNow;
     }
 
+    public void BindDirectoryObjectId(string directoryObjectId, DateTimeOffset utcNow)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(directoryObjectId);
+        string normalized = directoryObjectId.Trim();
+
+        if (string.Equals(DirectoryObjectId, normalized, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(DirectoryObjectId))
+        {
+            throw new InvalidOperationException(
+                "User is already bound to a different directory object id.");
+        }
+
+        DirectoryObjectId = normalized;
+        UpdatedAtUtc = utcNow;
+    }
+
     public void Rename(string displayName, DateTimeOffset utcNow)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(displayName);

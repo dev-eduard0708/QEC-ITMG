@@ -6,6 +6,7 @@ using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Authentication;
+using Qec.Itmg.Identity.CurrentUser;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Organization.Persistence;
 using Qec.Itmg.Platform.Persistence;
@@ -61,6 +62,7 @@ try
     });
 
     app.MapIdentityAuthEndpoints();
+    app.MapCurrentUserEndpoints();
     app.MapIdentityAdminEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))
@@ -78,6 +80,28 @@ try
                     new Claim(OidcPrincipalMapper.UpnClaimType, upn),
                     new Claim(ClaimTypes.Upn, upn),
                     new Claim(ClaimTypes.Name, name),
+                ],
+                IdentityAuthenticationExtensions.CookieScheme));
+
+            await httpContext.SignInAsync(IdentityAuthenticationExtensions.CookieScheme, principal);
+            return Results.NoContent();
+        });
+
+        app.MapGet("/__test__/signin-break-glass", async (HttpContext httpContext) =>
+        {
+            string externalId = httpContext.Request.Query["externalId"].FirstOrDefault() ?? "break-glass:test";
+            string upn = httpContext.Request.Query["upn"].FirstOrDefault() ?? "breakglass@qehc.edu.sa";
+            string name = httpContext.Request.Query["name"].FirstOrDefault() ?? "Break Glass";
+
+            ClaimsPrincipal principal = new(new ClaimsIdentity(
+                [
+                    new Claim(OidcPrincipalMapper.ExternalIdClaimType, externalId),
+                    new Claim(ClaimTypes.NameIdentifier, externalId),
+                    new Claim(OidcPrincipalMapper.UpnClaimType, upn),
+                    new Claim(ClaimTypes.Upn, upn),
+                    new Claim(ClaimTypes.Name, name),
+                    new Claim(BreakGlassPrincipalFactory.AuthMethodClaimType, BreakGlassPrincipalFactory.AuthMethodBreakGlass),
+                    new Claim(ClaimTypes.AuthenticationMethod, BreakGlassPrincipalFactory.AuthMethodBreakGlass),
                 ],
                 IdentityAuthenticationExtensions.CookieScheme));
 

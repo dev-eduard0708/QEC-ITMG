@@ -105,5 +105,13 @@
   "breakGlass.error.disabled": "تسجيل الدخول الطارئ معطّل في هذه البيئة.",
   "breakGlass.error.invalidCredentials": "اسم المستخدم أو كلمة المرور غير صحيحة.",
   "breakGlass.error.userInactive": "المستخدم المرتبط في المنصة غير موجود أو غير نشط.",
-  "breakGlass.error.generic": "فشل تسجيل الدخول الطارئ."
+  "breakGlass.error.generic": "فشل تسجيل الدخول الطارئ.",
+  "login.title": "تسجيل الدخول إلى QEC ITMG",
+  "login.description": "استخدم حساب Google Workspace. يتوفر الدخول الطارئ عند تعذر تسجيل الدخول عبر Google.",
+  "login.google": "تسجيل الدخول عبر Google",
+  "login.emergency": "دخول طارئ",
+  "shell.logout": "تسجيل الخروج",
+  "unauthorized.title": "غير مصرح",
+  "unauthorized.description": "ليست لديك صلاحية لفتح هذه الصفحة.",
+  "unauthorized.back": "العودة إلى مساحة تقنية المعلومات"
 }

@@ -14,6 +14,7 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Audit;
 using Qec.Itmg.Identity.Authorization;
+using Qec.Itmg.Identity.CurrentUser;
 
 namespace Qec.Itmg.Identity.Authentication;
 
@@ -177,6 +178,7 @@ public static class IdentityAuthenticationExtensions
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
         services.AddAuthorization();
         services.AddIdentityAdminServices();
+        services.AddCurrentUserServices();
         return services;
     }
 

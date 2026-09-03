@@ -105,5 +105,13 @@
   "breakGlass.error.disabled": "Break-glass sign-in is disabled in this environment.",
   "breakGlass.error.invalidCredentials": "Invalid username or password.",
   "breakGlass.error.userInactive": "Mapped ITMG user is missing or inactive.",
-  "breakGlass.error.generic": "Break-glass sign-in failed."
+  "breakGlass.error.generic": "Break-glass sign-in failed.",
+  "login.title": "Sign in to QEC ITMG",
+  "login.description": "Use your Google Workspace account. Emergency break-glass access is available if Google sign-in is unavailable.",
+  "login.google": "Sign in with Google",
+  "login.emergency": "Emergency access",
+  "shell.logout": "Sign out",
+  "unauthorized.title": "Unauthorized",
+  "unauthorized.description": "You do not have permission to open this page.",
+  "unauthorized.back": "Back to IT workspace"
 }

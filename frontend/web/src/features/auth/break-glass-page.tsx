@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Languages } from 'lucide-react'
 import { ApiError, apiFetch } from '@/api/client'
+import { meKeys } from '@/auth/api'
 import { isAppLanguage, type AppLanguage } from '@/i18n'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,6 +19,7 @@ type BreakGlassResponse = {
 export function BreakGlassPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -33,6 +36,7 @@ export function BreakGlassPage() {
         method: 'POST',
         body: JSON.stringify({ username, password }),
       })
+      await queryClient.invalidateQueries({ queryKey: meKeys.session() })
       navigate('/it', { replace: true })
     } catch (caught) {
       if (caught instanceof ApiError) {

@@ -33,7 +33,7 @@ Google Workspace / IdP MFA for IT and admin accounts. Application additionally c
 
 ## JIT provisioning
 
-On first login: create User from `sub` + email UPN. Assign Employee. IT roles assigned in Administration (not from Google groups).
+On first Google login via `GET /api/v1/me`: create User from `sub` + email UPN when missing; assign Employee role if seeded. Pre-provisioned users matched by UPN get Google `sub` bound to `DirectoryObjectId`. Break-glass never JIT-creates users. IT roles assigned in Administration (not from Google groups).
 
 ## Break-glass
 

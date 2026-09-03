@@ -1,6 +1,21 @@
-/**
- * Session and permission helpers will live here after Phase 1 identity work.
- */
+export type CurrentUserRole = {
+  id: string
+  name: string
+}
+
+export type CurrentUser = {
+  id: string
+  upn: string
+  displayName: string
+  userType: string
+  timeZone: string | null
+  authMethod: string
+  roles: CurrentUserRole[]
+  permissions: string[]
+}
+
 export type AuthSession = {
+  user: CurrentUser | null
   isAuthenticated: boolean
+  isLoading: boolean
 }

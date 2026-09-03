@@ -1,8 +1,9 @@
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   Building2,
   Languages,
   LayoutDashboard,
+  LogOut,
   Menu,
   Monitor,
   Moon,
@@ -11,8 +12,9 @@ import {
   Sun,
   Users,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useAuth } from '@/auth/auth-provider'
 import { isAppLanguage, type AppLanguage } from '@/i18n'
 import { useTheme } from '@/app/theme-provider'
 import type { ThemeOption } from '@/app/theme'
@@ -22,41 +24,61 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 
-const workspaces = [
-  { to: '/', labelKey: 'nav.foundation', icon: LayoutDashboard, end: true },
-  { to: '/employee', labelKey: 'nav.employee', icon: Users, end: false },
-  { to: '/it', labelKey: 'nav.it', icon: Building2, end: true },
-  { to: '/it/admin', labelKey: 'nav.admin', icon: Settings2, end: false },
-  { to: '/governance', labelKey: 'nav.governance', icon: Shield, end: false },
-] as const
+type WorkspaceItem = {
+  to: string
+  labelKey: string
+  icon: typeof LayoutDashboard
+  end: boolean
+  visible: boolean
+}
 
 function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation()
+  const { can } = useAuth()
+
+  const workspaces = useMemo<WorkspaceItem[]>(
+    () => [
+      { to: '/', labelKey: 'nav.foundation', icon: LayoutDashboard, end: true, visible: true },
+      { to: '/employee', labelKey: 'nav.employee', icon: Users, end: false, visible: true },
+      { to: '/it', labelKey: 'nav.it', icon: Building2, end: true, visible: true },
+      {
+        to: '/it/admin',
+        labelKey: 'nav.admin',
+        icon: Settings2,
+        end: false,
+        visible: can('admin.users') || can('admin.roles'),
+      },
+      { to: '/governance', labelKey: 'nav.governance', icon: Shield, end: false, visible: true },
+    ],
+    [can],
+  )
 
   return (
     <nav className="flex flex-1 flex-col gap-1 p-3" aria-label={t('nav.workspaces')}>
-      {workspaces.map((item) => {
-        const Icon = item.icon
-        return (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-sidebar-accent text-white'
-                  : 'text-sidebar-muted hover:bg-white/10 hover:text-sidebar-foreground',
-              )
-            }
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            <span>{t(item.labelKey)}</span>
-          </NavLink>
-        )
-      })}
+      {workspaces
+        .filter((item) => item.visible)
+        .map((item) => {
+          const Icon = item.icon
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-sidebar-accent text-white'
+                    : 'text-sidebar-muted hover:bg-white/10 hover:text-sidebar-foreground',
+                )
+              }
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span>{t(item.labelKey)}</span>
+            </NavLink>
+          )
+        })}
     </nav>
   )
 }
@@ -144,6 +166,40 @@ function PreferenceControls() {
   )
 }
 
+function UserSessionControls() {
+  const { t } = useTranslation()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
+  const [busy, setBusy] = useState(false)
+
+  if (!user) {
+    return null
+  }
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <div className="hidden min-w-0 text-end md:block">
+        <div className="truncate text-sm font-medium">{user.displayName}</div>
+        <div className="truncate text-xs text-muted-foreground">{user.upn}</div>
+      </div>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true)
+          void logout()
+            .then(() => navigate('/login', { replace: true }))
+            .finally(() => setBusy(false))
+        }}
+      >
+        <LogOut className="h-4 w-4" />
+        <span className="ms-1 hidden sm:inline">{t('shell.logout')}</span>
+      </Button>
+    </div>
+  )
+}
+
 function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/admin')) return t('nav.admin')
   if (pathname.startsWith('/employee')) return t('nav.employee')
@@ -187,6 +243,7 @@ export function AppShell() {
             <div className="hidden sm:block">
               <PreferenceControls />
             </div>
+            <UserSessionControls />
             <Badge variant="secondary">{t('status.foundation')}</Badge>
           </div>
           <div className="border-t border-border px-4 py-2 sm:hidden">
