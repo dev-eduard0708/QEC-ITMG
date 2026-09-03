@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Identity;
 using Qec.Itmg.Organization;
@@ -10,11 +11,20 @@ namespace Qec.Itmg.UnitTests.Host;
 
 public sealed class ModuleRegistrationTests
 {
+    private static IConfiguration CreateConfiguration() =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                [$"ConnectionStrings:{QecEfConventions.ConnectionStringName}"] =
+                    DesignTimeConnectionString.DevelopmentDefault,
+            })
+            .Build();
+
     [Fact]
     public void PlatformModule_RegistersSystemClock()
     {
         ServiceCollection services = new();
-        IConfiguration configuration = new ConfigurationBuilder().Build();
+        IConfiguration configuration = CreateConfiguration();
 
         new PlatformModule().Register(services, configuration);
 
@@ -29,7 +39,7 @@ public sealed class ModuleRegistrationTests
     public void FoundationalModules_RegisterWithoutThrowing()
     {
         ServiceCollection services = new();
-        IConfiguration configuration = new ConfigurationBuilder().Build();
+        IConfiguration configuration = CreateConfiguration();
 
         new IdentityModule().Register(services, configuration);
         new OrganizationModule().Register(services, configuration);
