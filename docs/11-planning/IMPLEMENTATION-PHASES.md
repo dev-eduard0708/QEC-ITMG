@@ -94,7 +94,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 |----|------|
 | P2-01 | NumberSequence concurrency (Done) |
 | P2-02 | Attachment metadata + disk storage (Done) |
-| P2-03 | Malware scan state machine |
+| P2-03 | Malware scan state machine (Done) |
 | P2-04 | Comments visibility |
 | P2-05 | Workflow engine (data-driven states) |
 | P2-06 | Notification entity + in-app |
@@ -376,4 +376,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phase 0 is complete. Phase 1 (Identity) is complete.** Next: **P2-03 Malware scan state machine** — keep SonicWall Capture Client separate from the generic malware scanner.
+**Phase 0 is complete. Phase 1 (Identity) is complete.** Next: **P2-04 Comments visibility** — do not implement workflow engine yet.
