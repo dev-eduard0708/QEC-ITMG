@@ -12,6 +12,8 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ## Phase 0 — Architecture, repository foundation, engineering standards
 
+**Status:** Complete (P0-07 Docker Compose for SQL optionally deferred; local SQL Express in use).
+
 **Objective:** Empty repo becomes a buildable modular-monolith skeleton with CI hooks and no business features.
 
 **Prerequisites:** Documentation accepted (this set).
@@ -30,8 +32,8 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 | P0-04 | EF conventions, SQL connection, migrate empty |
 | P0-05 | CI pipeline (build/test) |
 | P0-06 | Architecture tests skeleton |
-| P0-07 | Docker compose optional SQL for dev |
-| P0-08 | Docs pointer in README status still architecture+foundation |
+| P0-07 | Docker compose optional SQL for dev (**deferred** — SQL Express already works locally) |
+| P0-08 | Phase 0 closeout: README / status pointers reflect foundation complete |
 
 **Backend:** Host, BuildingBlocks empty types (`IClock`).
 **Frontend:** App shell, design tokens.
@@ -367,6 +369,6 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ---
 
-## Suggested first coding task after docs review
+## Suggested next coding task
 
-**P0-01 Repository and solution foundation** — create `src` layout, Host, BuildingBlocks, test projects, frontend shell, gitignore, build. Do not implement service desk in that task.
+**Phase 0 is complete.** Next: **P1-01 User, Role, Permission domain** — do not implement service desk, assets, or MeshCentral in that task.

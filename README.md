@@ -2,11 +2,11 @@
 
 **Short name:** QEC ITMG
 **Organization:** Quality Education Company (QEC)
-**Status:** DOCUMENTATION / ARCHITECTURE PHASE
+**Status:** FOUNDATION COMPLETE / ACTIVE DEVELOPMENT
 
-QEC ITMG is the planned internal enterprise platform for IT service management, operations, remote support, asset/CMDB, cybersecurity, governance, compliance, evidence, and audit. Operational work is designed to produce structured history and reusable audit evidence rather than living in disconnected tools.
+QEC ITMG is the internal enterprise platform for IT service management, operations, remote support, asset/CMDB, cybersecurity, governance, compliance, evidence, and audit. Operational work is designed to produce structured history and reusable audit evidence rather than living in disconnected tools.
 
-This repository does **not** yet contain application code. Features listed below are **planned**, not implemented.
+**Phase 0 (repository foundation) is complete.** Application source exists for the modular-monolith skeleton, frontend shell, persistence foundation, CI, and architecture tests. **No production business modules** (tickets, assets, change, GRC, remote support, and so on) are implemented yet. Production deployment has not started.
 
 ## Current project status
 
@@ -17,12 +17,20 @@ This repository does **not** yet contain application code. Features listed below
 | Domain and data model | Documented (conceptual/logical) |
 | Security and compliance design | Documented |
 | Implementation roadmap | Documented |
-| Application source (ASP.NET Core / React) | **Not started** |
-| Database migrations | **Not started** |
-| APIs | **Not started** |
+| Phase 0 foundation | **Complete** |
+| ASP.NET Core 10 modular monolith | Host + BuildingBlocks + Contracts + Identity / Organization / Platform stubs |
+| Frontend shell (React 19 + TypeScript + Vite) | Present (routing stub; theme + en/ar + RTL) |
+| EF Core 10 + SQL Server foundation | Present (`QecItmg_Dev` foundation migrations; schemas `id` / `org` / `plt`) |
+| Health / readiness + Serilog | Present |
+| CI build/test pipeline | Present |
+| Architecture boundary tests | Present |
+| Business domain (users, tickets, assets, GRC, …) | **Not started** |
+| Production APIs / authz product features | **Not started** |
 | Production deployment | **Not started** |
 
-**Next step after documentation review:** Phase 0 — repository foundation and engineering standards. See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) and [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md).
+**Next step:** Phase 1 — Identity, organization, users, roles, permissions, and audit foundation (package **P1-01**). See [docs/MASTER-PLAN.md](docs/MASTER-PLAN.md) and [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md).
+
+P0-07 (optional Docker Compose for SQL) is **deferred**: local SQL Express development already works.
 
 ## Purpose
 
@@ -55,11 +63,11 @@ This repository does **not** yet contain application code. Features listed below
 
 Rationale is recorded in [docs/12-decisions/ADR-INDEX.md](docs/12-decisions/ADR-INDEX.md).
 
-## Architecture (planned)
+## Architecture
 
-Modular monolith: one deployable ASP.NET Core host, module boundaries by domain, shared kernel for identity, numbering, attachments, audit history, notifications, and workflow. React SPA talks to REST APIs; SignalR is used for live operational updates. SQL Server is the system of record.
+Modular monolith: one deployable ASP.NET Core host, module boundaries by domain, shared kernel for identity, numbering, attachments, audit history, notifications, and workflow. React SPA will talk to REST APIs; SignalR is planned for live operational updates. SQL Server is the system of record.
 
-See [docs/01-architecture/SYSTEM-ARCHITECTURE.md](docs/01-architecture/SYSTEM-ARCHITECTURE.md).
+Foundation code follows [docs/01-architecture/SYSTEM-ARCHITECTURE.md](docs/01-architecture/SYSTEM-ARCHITECTURE.md). Most business modules remain documentation-only until their phase.
 
 ## Documentation
 
@@ -83,6 +91,14 @@ See [docs/01-architecture/SYSTEM-ARCHITECTURE.md](docs/01-architecture/SYSTEM-AR
 
 ## Implementation status
 
-No production backend, frontend, APIs, or database schema have been implemented. Do not treat module names in documentation as existing code packages.
+**Phase 0 complete.** The repository contains:
 
-When implementation begins, follow Phase 0 in [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md). The first coding package is **P0-01 Repository and solution foundation**.
+- ASP.NET Core 10 modular monolith (`Host`, `BuildingBlocks`, `Contracts`, Identity / Organization / Platform foundations)
+- React 19 + TypeScript + Vite frontend shell with light/dark/system theme and English/Arabic + RTL
+- EF Core 10 + SQL Server foundation and `QecItmg_Dev` foundation migrations (no business entities yet)
+- `/health/live` and SQL-aware `/health/ready`, Serilog
+- GitHub Actions CI (build/test) and NetArchTest module-boundary tests
+
+Do **not** treat planned module catalogs (service desk, CMDB, GRC, and so on) as implemented packages. Production deployment has not started.
+
+**Next coding phase:** Phase 1 — Identity / RBAC (first package **P1-01** User / Role / Permission domain). See [docs/11-planning/IMPLEMENTATION-PHASES.md](docs/11-planning/IMPLEMENTATION-PHASES.md).

@@ -1,8 +1,8 @@
 # QEC ITMG master plan
 
-**Status:** DOCUMENTATION / ARCHITECTURE PHASE — no application features implemented.
+**Status:** FOUNDATION COMPLETE / ACTIVE DEVELOPMENT — Phase 0 complete; no production business modules yet.
 **Organization:** Quality Education Company (QEC)
-**Date:** 2026-09-02
+**Date:** 2026-09-03
 
 This is the entry point for the program. Detailed design lives in linked documents.
 
@@ -143,11 +143,13 @@ Authz + history + tests + docs for every package. [11-planning/DEFINITION-OF-DON
 | Planning | [11-planning/](11-planning/) |
 | ADRs | [12-decisions/](12-decisions/) |
 
-## 15. Recommended first coding phase
+## 15. Recommended next coding phase
 
-**Phase 0 / package P0-01 — Repository and solution foundation.**
+**Phase 0 is complete** (including P0-08 closeout). Optional P0-07 Docker Compose for SQL remains deferred while local SQL Express works.
 
-Do not start with tickets or MeshCentral. Next after P0: Phase 1 identity and audit (security is not deferred).
+**Next:** Phase 1 / package **P1-01 — User, Role, Permission domain.**
+
+Do not start with tickets or MeshCentral. Security and audit foundations are not deferred past Phase 1.
 
 ---
 
