@@ -49,6 +49,7 @@ try
     builder.AddQecModules();
     builder.Services.AddIdentityAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddIdentitySeed(builder.Configuration);
+    builder.Services.AddCmdbSeed();
     builder.Services.AddScoped<ISharedDbTransaction, SharedSqlTransaction>();
 
     bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
@@ -89,6 +90,7 @@ try
     var app = builder.Build();
 
     await app.RunIdentitySeedAsync();
+    await app.RunCmdbSeedAsync();
 
     app.UseSerilogRequestLogging();
     app.UseAuthentication();

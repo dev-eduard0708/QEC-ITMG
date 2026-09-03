@@ -123,12 +123,14 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 | P3-02 | Relationships (Done) |
 | P3-03 | Asset + assignment + custody (Done) |
 | P3-04 | BusinessService stub (Done) |
-| P3-05 | APIs + authz classification |
-| P3-06 | IT UI list/detail |
-| P3-07 | Employee My Equipment |
-| P3-08 | History on assignment |
-| P3-09 | Tests |
-| P3-10 | Seed types (laptop, server, application) |
+| P3-05 | APIs + authz classification (Done) |
+| P3-06 | IT UI list/detail (Done) |
+| P3-07 | Employee My Equipment (Done) |
+| P3-08 | History on assignment (Done) |
+| P3-09 | Tests (Done) |
+| P3-10 | Seed types (laptop, server, application) (Done) |
+
+**Phase 3 is complete.**
 
 ---
 
@@ -378,4 +380,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete.** Next: **P3-05 APIs + authz classification.**
+**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete.** Next: **P4-01 Service Desk / Ticket domain.**
