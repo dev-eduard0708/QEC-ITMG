@@ -77,6 +77,10 @@ public sealed class ChangeRequest
     public string? PirNotes { get; private set; }
     public bool IsRetrospective { get; private set; }
     public bool IsPreAuthorizedStandard { get; private set; }
+    public Guid? CatalogItemId { get; private set; }
+    public string? RetrospectiveReason { get; private set; }
+    public DateTimeOffset? ActualImplementationAtUtc { get; private set; }
+    public DateTimeOffset? RetrospectiveRecordedAtUtc { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
     public DateTimeOffset? ClosedAtUtc { get; private set; }
@@ -92,7 +96,10 @@ public sealed class ChangeRequest
         ChangeRiskRating riskRating = ChangeRiskRating.Medium,
         Guid? ownerUserId = null,
         bool isRetrospective = false,
-        bool isPreAuthorizedStandard = false)
+        bool isPreAuthorizedStandard = false,
+        string? retrospectiveReason = null,
+        DateTimeOffset? actualImplementationAtUtc = null,
+        Guid? catalogItemId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(changeNumber);
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
@@ -100,9 +107,14 @@ public sealed class ChangeRequest
         if (!Enum.IsDefined(type)) throw new ArgumentOutOfRangeException(nameof(type));
         if (!Enum.IsDefined(riskRating)) throw new ArgumentOutOfRangeException(nameof(riskRating));
         if (requesterUserId == Guid.Empty) throw new ArgumentException("Requester is required.", nameof(requesterUserId));
-        if (isPreAuthorizedStandard && type != ChangeType.Standard)
+        if (isRetrospective && string.IsNullOrWhiteSpace(retrospectiveReason))
         {
-            throw new InvalidOperationException("Only Standard changes may be pre-authorized.");
+            throw new InvalidOperationException("Retrospective changes require a reason.");
+        }
+
+        if (isPreAuthorizedStandard && (type != ChangeType.Standard || isRetrospective))
+        {
+            throw new InvalidOperationException("Only non-retrospective Standard changes may be pre-authorized.");
         }
 
         return new ChangeRequest
@@ -118,7 +130,11 @@ public sealed class ChangeRequest
             OwnerUserId = NormalizeGuid(ownerUserId),
             Result = ChangeResult.Pending,
             IsRetrospective = isRetrospective,
-            IsPreAuthorizedStandard = isPreAuthorizedStandard && type == ChangeType.Standard,
+            IsPreAuthorizedStandard = isPreAuthorizedStandard && type == ChangeType.Standard && !isRetrospective,
+            CatalogItemId = NormalizeGuid(catalogItemId),
+            RetrospectiveReason = isRetrospective ? NormalizeOptional(retrospectiveReason) : null,
+            ActualImplementationAtUtc = isRetrospective ? actualImplementationAtUtc : null,
+            RetrospectiveRecordedAtUtc = isRetrospective ? utcNow : null,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow,
         };
@@ -152,9 +168,9 @@ public sealed class ChangeRequest
         ArgumentException.ThrowIfNullOrWhiteSpace(description);
         if (!Enum.IsDefined(type)) throw new ArgumentOutOfRangeException(nameof(type));
         if (!Enum.IsDefined(riskRating)) throw new ArgumentOutOfRangeException(nameof(riskRating));
-        if (isPreAuthorizedStandard && type != ChangeType.Standard)
+        if (isPreAuthorizedStandard && (type != ChangeType.Standard || IsRetrospective))
         {
-            throw new InvalidOperationException("Only Standard changes may be pre-authorized.");
+            throw new InvalidOperationException("Only non-retrospective Standard changes may be pre-authorized.");
         }
 
         Title = title.Trim();
@@ -170,8 +186,47 @@ public sealed class ChangeRequest
         RollbackPlan = NormalizeOptional(rollbackPlan);
         ScheduledStartUtc = scheduledStartUtc;
         ScheduledEndUtc = scheduledEndUtc;
-        IsPreAuthorizedStandard = isPreAuthorizedStandard && type == ChangeType.Standard;
+        IsPreAuthorizedStandard = isPreAuthorizedStandard && type == ChangeType.Standard && !IsRetrospective;
         UpdatedAtUtc = utcNow;
+    }
+
+    public void MarkRetrospective(
+        string reason,
+        DateTimeOffset? actualImplementationAtUtc,
+        string rowVersion,
+        DateTimeOffset utcNow,
+        Guid recordedByUserId)
+    {
+        _ = recordedByUserId;
+        if (Status is ChangeStatus.Closed or ChangeStatus.Cancelled)
+        {
+            throw new InvalidOperationException("Closed or cancelled changes cannot be marked retrospective.");
+        }
+
+        EnsureRowVersion(rowVersion);
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new InvalidOperationException("Retrospective reason is required.");
+        }
+
+        IsRetrospective = true;
+        IsPreAuthorizedStandard = false;
+        RetrospectiveReason = reason.Trim();
+        ActualImplementationAtUtc = actualImplementationAtUtc;
+        RetrospectiveRecordedAtUtc = utcNow;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void ApplyCatalogSnapshot(
+        ChangeRiskRating riskRating,
+        string? implementationPlan,
+        string? testPlan,
+        string? rollbackPlan)
+    {
+        RiskRating = riskRating;
+        ImplementationPlan = NormalizeOptional(implementationPlan);
+        TestPlan = NormalizeOptional(testPlan);
+        RollbackPlan = NormalizeOptional(rollbackPlan);
     }
 
     public void TransitionTo(
@@ -184,7 +239,7 @@ public sealed class ChangeRequest
     {
         EnsureRowVersion(rowVersion);
         if (!Enum.IsDefined(target)) throw new ArgumentOutOfRangeException(nameof(target));
-        if (!IsTransitionAllowed(Status, target))
+        if (!CanTransitionTo(target))
         {
             throw new InvalidOperationException($"Cannot transition change from {Status} to {target}.");
         }
@@ -243,9 +298,22 @@ public sealed class ChangeRequest
 
     public bool RequiresPirBeforeClose()
     {
+        if (IsRetrospective) return true;
         if (Type == ChangeType.Emergency) return true;
         if (Type == ChangeType.Normal && RiskRating is ChangeRiskRating.High or ChangeRiskRating.Critical) return true;
         return false;
+    }
+
+    public bool CanTransitionTo(ChangeStatus target)
+    {
+        if (IsRetrospective
+            && Status == ChangeStatus.Approval
+            && target is ChangeStatus.Validation or ChangeStatus.PostImplementationReview)
+        {
+            return true;
+        }
+
+        return IsTransitionAllowed(Status, target);
     }
 
     public bool HasAssessmentContent() =>

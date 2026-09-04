@@ -56,6 +56,8 @@ try
     builder.Services.AddServiceDeskSeed();
     builder.Services.AddScoped<ISharedDbTransaction, SharedSqlTransaction>();
     builder.Services.AddScoped<TicketNotificationService>();
+    builder.Services.AddScoped<ChangeNotificationService>();
+    builder.Services.AddScoped<ChangeHistoryService>();
 
     bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
     string? hangfireConnection = builder.Configuration.GetConnectionString(QecEfConventions.ConnectionStringName);
