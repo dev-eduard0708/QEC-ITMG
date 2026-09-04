@@ -1009,6 +1009,199 @@ export const eventsApi = {
     apiFetch<OperationalEvent>(`/api/v1/events/${id}/close`, { method: 'POST' }),
 }
 
+export type OpsPaged<T> = {
+  items: T[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type BackupJob = {
+  id: string
+  name: string
+  provider: string
+  externalJobId: string | null
+  configurationItemId: string | null
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type BackupRun = {
+  id: string
+  backupJobId: string
+  startedAtUtc: string
+  completedAtUtc: string | null
+  status: string
+  summary: string | null
+  externalReference: string | null
+}
+
+export type RestoreTest = {
+  id: string
+  backupJobId: string | null
+  configurationItemId: string | null
+  scheduledAtUtc: string | null
+  performedAtUtc: string | null
+  result: string
+  performedByUserId: string | null
+  notes: string | null
+  createdAtUtc: string
+}
+
+export type CertificateRecord = {
+  id: string
+  name: string
+  configurationItemId: string | null
+  subject: string | null
+  issuer: string | null
+  thumbprint: string | null
+  expiresAtUtc: string
+  ownerUserId: string | null
+  isActive: boolean
+  daysToExpiry: number
+  expired: boolean
+  expiringSoon: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type PatchBaseline = {
+  id: string
+  name: string
+  description: string | null
+  version: string | null
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type PatchDeployment = {
+  id: string
+  patchBaselineId: string | null
+  configurationItemId: string
+  externalReference: string | null
+  status: string
+  scheduledAtUtc: string | null
+  startedAtUtc: string | null
+  completedAtUtc: string | null
+  summary: string | null
+  createdAtUtc: string
+}
+
+export type ScheduledJob = {
+  id: string
+  name: string
+  provider: string | null
+  externalJobId: string | null
+  configurationItemId: string | null
+  scheduleDescription: string | null
+  isActive: boolean
+  lastRunAtUtc: string | null
+  lastResult: string
+  nextRunAtUtc: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+function opsQuery(params?: Record<string, string | number | undefined | null>) {
+  const query = new URLSearchParams()
+  if (!params) return ''
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === '') continue
+    query.set(key, String(value))
+  }
+  const qs = query.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export const opsApi = {
+  listBackupJobs: (params?: { page?: number; pageSize?: number; search?: string }) =>
+    apiFetch<OpsPaged<BackupJob>>(`/api/v1/ops/backup-jobs${opsQuery(params)}`),
+  createBackupJob: (payload: {
+    name: string
+    provider: string
+    externalJobId?: string | null
+    configurationItemId?: string | null
+  }) =>
+    apiFetch<BackupJob>('/api/v1/ops/backup-jobs', { method: 'POST', body: JSON.stringify(payload) }),
+  listBackupRuns: (params?: { page?: number; pageSize?: number; backupJobId?: string; status?: string }) =>
+    apiFetch<OpsPaged<BackupRun>>(`/api/v1/ops/backup-runs${opsQuery(params)}`),
+  createBackupRun: (payload: {
+    backupJobId: string
+    startedAtUtc?: string
+    status?: string
+    summary?: string | null
+    externalReference?: string | null
+  }) =>
+    apiFetch<BackupRun>('/api/v1/ops/backup-runs', { method: 'POST', body: JSON.stringify(payload) }),
+  listRestoreTests: (params?: { page?: number; pageSize?: number; result?: string }) =>
+    apiFetch<OpsPaged<RestoreTest>>(`/api/v1/ops/restore-tests${opsQuery(params)}`),
+  createRestoreTest: (payload: {
+    backupJobId?: string | null
+    configurationItemId?: string | null
+    scheduledAtUtc?: string | null
+    notes?: string | null
+  }) =>
+    apiFetch<RestoreTest>('/api/v1/ops/restore-tests', { method: 'POST', body: JSON.stringify(payload) }),
+  listCertificates: (params?: { page?: number; pageSize?: number; search?: string; activeOnly?: boolean }) =>
+    apiFetch<OpsPaged<CertificateRecord>>(
+      `/api/v1/ops/certificates${opsQuery({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        search: params?.search,
+        activeOnly: params?.activeOnly === undefined ? undefined : String(params.activeOnly),
+      })}`,
+    ),
+  createCertificate: (payload: {
+    name: string
+    expiresAtUtc: string
+    configurationItemId?: string | null
+    subject?: string | null
+    issuer?: string | null
+    thumbprint?: string | null
+    ownerUserId?: string | null
+  }) =>
+    apiFetch<CertificateRecord>('/api/v1/ops/certificates', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listPatchBaselines: (params?: { page?: number; pageSize?: number; search?: string }) =>
+    apiFetch<OpsPaged<PatchBaseline>>(`/api/v1/ops/patch-baselines${opsQuery(params)}`),
+  createPatchBaseline: (payload: { name: string; description?: string | null; version?: string | null }) =>
+    apiFetch<PatchBaseline>('/api/v1/ops/patch-baselines', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listPatchDeployments: (params?: {
+    page?: number
+    pageSize?: number
+    configurationItemId?: string
+    status?: string
+  }) => apiFetch<OpsPaged<PatchDeployment>>(`/api/v1/ops/patch-deployments${opsQuery(params)}`),
+  createPatchDeployment: (payload: {
+    configurationItemId: string
+    patchBaselineId?: string | null
+    externalReference?: string | null
+    scheduledAtUtc?: string | null
+    summary?: string | null
+  }) =>
+    apiFetch<PatchDeployment>('/api/v1/ops/patch-deployments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listJobs: (params?: { page?: number; pageSize?: number; search?: string }) =>
+    apiFetch<OpsPaged<ScheduledJob>>(`/api/v1/ops/jobs${opsQuery(params)}`),
+  createJob: (payload: {
+    name: string
+    provider?: string | null
+    externalJobId?: string | null
+    configurationItemId?: string | null
+    scheduleDescription?: string | null
+    nextRunAtUtc?: string | null
+  }) => apiFetch<ScheduledJob>('/api/v1/ops/jobs', { method: 'POST', body: JSON.stringify(payload) }),
+}
+
 export type TicketDashboard = {
   openTickets: number
   unassigned: number

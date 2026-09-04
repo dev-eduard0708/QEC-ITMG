@@ -130,6 +130,11 @@ export function ItHomePage() {
                 <Link to="/it/events">{t('nav.events')}</Link>
               </Button>
             ) : null}
+            {can('ops.read') ? (
+              <Button asChild variant="secondary">
+                <Link to="/it/operations">{t('nav.operations')}</Link>
+              </Button>
+            ) : null}
             {can('change.read') ? (
               <Button asChild variant="secondary">
                 <Link to="/it/changes">{t('nav.changes')}</Link>

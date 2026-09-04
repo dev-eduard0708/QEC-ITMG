@@ -17,6 +17,7 @@ import {
   Sun,
   Ticket,
   Users,
+  Wrench,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -96,6 +97,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         icon: Radio,
         end: false,
         visible: can('event.read'),
+      },
+      {
+        to: '/it/operations',
+        labelKey: 'nav.operations',
+        icon: Wrench,
+        end: false,
+        visible: can('ops.read'),
       },
       {
         to: '/it/knowledge',
@@ -284,6 +292,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/problems')) return t('nav.problems')
   if (pathname.startsWith('/it/changes')) return t('nav.changes')
   if (pathname.startsWith('/it/events')) return t('nav.events')
+  if (pathname.startsWith('/it/operations')) return t('nav.operations')
   if (pathname.startsWith('/it/knowledge')) return t('nav.knowledgeAdmin')
   if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
   if (pathname.startsWith('/employee/knowledge')) return t('nav.knowledge')
