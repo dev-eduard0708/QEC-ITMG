@@ -257,7 +257,20 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ### Packages
 
-P8-01 Event ingest/dedup; P8-02 Acknowledge/promote; P8-03 Backup/restore test records; P8-04 Certificates expiry notify; P8-05 Patch metadata; P8-06 Jobs metadata; P8-07 Retention; P8-08 UI; P8-09 Permissions; P8-10 Tests.
+| ID | Work | Status |
+|----|------|--------|
+| P8-01 | Event ingest/dedup | Done |
+| P8-02 | Acknowledge/promote | Done |
+| P8-03 | Backup/restore test records | |
+| P8-04 | Certificates expiry notify | |
+| P8-05 | Patch metadata | |
+| P8-06 | Jobs metadata | |
+| P8-07 | Retention | |
+| P8-08 | UI | Done |
+| P8-09 | Permissions | Done |
+| P8-10 | Tests | |
+
+**NEXT:** P8-03?07 (ops records + retention). Phase 8 is not complete until those packages land. P8-10 tests deferred.
 
 **Out of scope:** SIEM replacement, raw syslog.
 
