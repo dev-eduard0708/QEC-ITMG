@@ -19,6 +19,7 @@ import {
   Users,
   Wrench,
   KeyRound,
+  FileText,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -70,6 +71,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         end: false,
         visible: true,
       },
+      {
+        to: '/employee/policies',
+        labelKey: 'nav.myPolicies',
+        icon: FileText,
+        end: false,
+        visible: true,
+      },
       { to: '/it', labelKey: 'nav.it', icon: Building2, end: true, visible: true },
       {
         to: '/it/tickets',
@@ -112,6 +120,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         icon: KeyRound,
         end: false,
         visible: can('access.request'),
+      },
+      {
+        to: '/it/documents',
+        labelKey: 'nav.documents',
+        icon: FileText,
+        end: false,
+        visible: can('doc.read') || can('policy.read'),
       },
       {
         to: '/it/knowledge',
@@ -302,8 +317,10 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/events')) return t('nav.events')
   if (pathname.startsWith('/it/operations')) return t('nav.operations')
   if (pathname.startsWith('/it/access')) return t('nav.access')
+  if (pathname.startsWith('/it/documents') || pathname.startsWith('/it/policies')) return t('nav.documents')
   if (pathname.startsWith('/it/knowledge')) return t('nav.knowledgeAdmin')
   if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
+  if (pathname.startsWith('/employee/policies')) return t('docs.myPoliciesTitle')
   if (pathname.startsWith('/employee/knowledge')) return t('nav.knowledge')
   if (pathname.startsWith('/employee/requests')) return t('nav.requests')
   if (pathname.startsWith('/employee/equipment')) return t('nav.equipment')

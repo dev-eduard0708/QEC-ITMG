@@ -34,6 +34,11 @@ import { AccessDetailPage } from '@/features/it/access-detail-page'
 import { AccessReviewsPage } from '@/features/it/access-reviews-page'
 import { AccessAccountsPage } from '@/features/it/access-accounts-page'
 import { AccessSodPage } from '@/features/it/access-sod-page'
+import { DocumentsPage } from '@/features/it/documents-page'
+import { DocumentDetailPage } from '@/features/it/document-detail-page'
+import { PoliciesPage } from '@/features/it/policies-page'
+import { PolicyDetailPage } from '@/features/it/policy-detail-page'
+import { MyPoliciesPage } from '@/features/employee/my-policies-page'
 import { ChangeNewPage } from '@/features/it/change-new-page'
 import { ChangeCatalogPage } from '@/features/it/change-catalog-page'
 import { ChangeDetailPage } from '@/features/it/change-detail-page'
@@ -57,6 +62,7 @@ export function AppRouter() {
           <Route path="employee/requests/:id" element={<RequestDetailPage />} />
           <Route path="employee/knowledge" element={<KnowledgePage />} />
           <Route path="employee/knowledge/:slug" element={<KnowledgeArticlePage />} />
+          <Route path="employee/policies" element={<MyPoliciesPage />} />
           <Route path="it" element={<ItHomePage />} />
           <Route element={<RequirePermission permission="assets.read" />}>
             <Route path="it/assets" element={<AssetsPage />} />
@@ -99,6 +105,14 @@ export function AppRouter() {
             <Route path="it/access" element={<AccessPage />} />
             <Route path="it/access/new" element={<AccessNewPage />} />
             <Route path="it/access/:id" element={<AccessDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="doc.read" />}>
+            <Route path="it/documents" element={<DocumentsPage />} />
+            <Route path="it/documents/:id" element={<DocumentDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="policy.read" />}>
+            <Route path="it/policies" element={<PoliciesPage />} />
+            <Route path="it/policies/:id" element={<PolicyDetailPage />} />
           </Route>
           <Route element={<RequirePermission permission="kb.read" />}>
             <Route path="it/knowledge" element={<ItKnowledgePage />} />

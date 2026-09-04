@@ -1454,6 +1454,162 @@ export const accessApi = {
     apiFetch<SodRule>('/api/v1/access/sod', { method: 'POST', body: JSON.stringify(payload) }),
 }
 
+export type ManagedDocument = {
+  id: string
+  documentNumber: string
+  title: string
+  documentType: string
+  ownerUserId: string
+  designatedApproverUserId: string | null
+  classification: string
+  status: string
+  currentVersionId: string | null
+  effectiveDate: string | null
+  reviewDate: string | null
+  requiresAcknowledgement: boolean
+  retirementReason: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  daysToReview: number | null
+  reviewDueSoon: boolean
+  reviewOverdue: boolean
+  currentVersionNumber: number | null
+  currentAttachmentId: string | null
+  currentApprovedByUserId: string | null
+  currentApprovedAtUtc: string | null
+  currentPublishedAtUtc: string | null
+}
+
+export type DocumentListResult = OpsPaged<ManagedDocument> & {
+  reviewOverdueCount: number
+  reviewDueSoonCount: number
+}
+
+export type DocumentVersion = {
+  id: string
+  managedDocumentId: string
+  versionNumber: number
+  createdByUserId: string
+  createdAtUtc: string
+  changeSummary: string | null
+  attachmentId: string | null
+  approvedByUserId: string | null
+  approvedAtUtc: string | null
+  publishedAtUtc: string | null
+  supersedesVersionId: string | null
+}
+
+export type AcknowledgementSummary = {
+  outstandingForUser: number
+  totalOutstandingVersions: number
+}
+
+export const documentsApi = {
+  list: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    type?: string
+    status?: string
+    reviewOverdueOnly?: boolean
+  }) =>
+    apiFetch<DocumentListResult>(
+      `/api/v1/documents${opsQuery({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        search: params?.search,
+        type: params?.type,
+        status: params?.status,
+        reviewOverdueOnly:
+          params?.reviewOverdueOnly === undefined ? undefined : String(params.reviewOverdueOnly),
+      })}`,
+    ),
+  get: (id: string) => apiFetch<ManagedDocument>(`/api/v1/documents/${id}`),
+  create: (payload: {
+    title: string
+    documentType: string
+    classification?: string
+    ownerUserId?: string | null
+    designatedApproverUserId?: string | null
+    effectiveDate?: string | null
+    reviewDate?: string | null
+    requiresAcknowledgement?: boolean
+    changeSummary?: string | null
+  }) =>
+    apiFetch<ManagedDocument>('/api/v1/documents', { method: 'POST', body: JSON.stringify(payload) }),
+  listVersions: (id: string) => apiFetch<DocumentVersion[]>(`/api/v1/documents/${id}/versions`),
+  submit: (id: string) => apiFetch<ManagedDocument>(`/api/v1/documents/${id}/submit`, { method: 'POST' }),
+  approve: (id: string) => apiFetch<ManagedDocument>(`/api/v1/documents/${id}/approve`, { method: 'POST' }),
+  returnToDraft: (id: string, reason?: string) =>
+    apiFetch<ManagedDocument>(`/api/v1/documents/${id}/return`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  publish: (id: string) => apiFetch<ManagedDocument>(`/api/v1/documents/${id}/publish`, { method: 'POST' }),
+  retire: (id: string, reason: string) =>
+    apiFetch<ManagedDocument>(`/api/v1/documents/${id}/retire`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  createRevision: (id: string, changeSummary?: string) =>
+    apiFetch<DocumentVersion>(`/api/v1/documents/${id}/revisions`, {
+      method: 'POST',
+      body: JSON.stringify({ changeSummary }),
+    }),
+  uploadAttachment: async (id: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiFetch<{ attachmentId: string; fileName: string }>(`/api/v1/documents/${id}/attachments`, {
+      method: 'POST',
+      body: form,
+    })
+  },
+}
+
+export const policiesApi = {
+  list: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    status?: string
+    reviewOverdueOnly?: boolean
+  }) =>
+    apiFetch<DocumentListResult>(
+      `/api/v1/policies${opsQuery({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        search: params?.search,
+        status: params?.status,
+        reviewOverdueOnly:
+          params?.reviewOverdueOnly === undefined ? undefined : String(params.reviewOverdueOnly),
+      })}`,
+    ),
+  get: (id: string) => apiFetch<ManagedDocument>(`/api/v1/policies/${id}`),
+  create: (payload: {
+    title: string
+    classification?: string
+    designatedApproverUserId?: string | null
+    reviewDate?: string | null
+    requiresAcknowledgement?: boolean
+  }) =>
+    apiFetch<ManagedDocument>('/api/v1/policies', { method: 'POST', body: JSON.stringify(payload) }),
+  seedCatalog: () => apiFetch<{ seeded: boolean }>('/api/v1/policies/seed-catalog', { method: 'POST' }),
+  listVersions: (id: string) => apiFetch<DocumentVersion[]>(`/api/v1/policies/${id}/versions`),
+  submit: (id: string) => apiFetch<ManagedDocument>(`/api/v1/policies/${id}/submit`, { method: 'POST' }),
+  approve: (id: string) => apiFetch<ManagedDocument>(`/api/v1/policies/${id}/approve`, { method: 'POST' }),
+  returnToDraft: (id: string, reason?: string) =>
+    apiFetch<ManagedDocument>(`/api/v1/policies/${id}/return`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  publish: (id: string) => apiFetch<ManagedDocument>(`/api/v1/policies/${id}/publish`, { method: 'POST' }),
+  acknowledge: (id: string) =>
+    apiFetch(`/api/v1/policies/${id}/acknowledge`, { method: 'POST' }),
+  outstanding: () => apiFetch<ManagedDocument[]>('/api/v1/me/policies/outstanding'),
+  summary: () => apiFetch<AcknowledgementSummary>('/api/v1/me/policies/summary'),
+}
+
 export type TicketDashboard = {
   openTickets: number
   unassigned: number
