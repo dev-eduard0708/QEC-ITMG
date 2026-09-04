@@ -3,9 +3,10 @@ using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.Contracts.Modules;
 using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Identity;
-using Qec.Itmg.ChangeManagement;
 using Qec.Itmg.AccessManagement;
+using Qec.Itmg.ChangeManagement;
 using Qec.Itmg.Cmdb;
+using Qec.Itmg.DocumentManagement;
 using Qec.Itmg.Operations;
 using Qec.Itmg.Organization;
 using Qec.Itmg.Platform;
@@ -30,6 +31,7 @@ internal static class ModuleRegistration
             new ChangeManagementModule(),
             new OperationsModule(),
             new AccessManagementModule(),
+            new DocumentManagementModule(),
         ];
 
         foreach (IModule module in modules)

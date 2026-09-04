@@ -14,6 +14,7 @@ using Qec.Itmg.Host.Notifications;
 using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Host.ChangeManagement;
 using Qec.Itmg.Host.AccessManagement;
+using Qec.Itmg.Host.DocumentManagement;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -61,6 +62,7 @@ try
     builder.Services.AddScoped<ChangeNotificationService>();
     builder.Services.AddScoped<ChangeHistoryService>();
     builder.Services.AddScoped<AccessNotificationService>();
+    builder.Services.AddScoped<DocumentNotificationService>();
 
     bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
     string? hangfireConnection = builder.Configuration.GetConnectionString(QecEfConventions.ConnectionStringName);
@@ -88,6 +90,7 @@ try
         builder.Services.AddTransient<SlaBreachDetectionJob>();
         builder.Services.AddTransient<CertificateExpiryNotificationJob>();
         builder.Services.AddTransient<EventRetentionJob>();
+        builder.Services.AddTransient<DocumentReviewReminderJob>();
         builder.Services.RemoveAll<IEmailQueue>();
         builder.Services.AddSingleton<IEmailQueue, HangfireEmailQueue>();
     }
@@ -122,6 +125,10 @@ try
             "ops-event-retention",
             job => job.ExecuteAsync(CancellationToken.None),
             "15 2 * * *");
+        recurringJobs.AddOrUpdate<DocumentReviewReminderJob>(
+            "document-review-reminders",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "0 7 * * *");
     }
 
     app.UseSerilogRequestLogging();
@@ -162,6 +169,7 @@ try
     app.MapEventEndpoints();
     app.MapOpsRecordsEndpoints();
     app.MapAccessEndpoints();
+    app.MapDocumentEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

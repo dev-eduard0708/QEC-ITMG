@@ -27,5 +27,6 @@
     <ProjectReference Include="..\Modules\ChangeManagement\Qec.Itmg.ChangeManagement\Qec.Itmg.ChangeManagement.csproj" />
     <ProjectReference Include="..\Modules\Operations\Qec.Itmg.Operations\Qec.Itmg.Operations.csproj" />
     <ProjectReference Include="..\Modules\AccessManagement\Qec.Itmg.AccessManagement\Qec.Itmg.AccessManagement.csproj" />
+    <ProjectReference Include="..\Modules\DocumentManagement\Qec.Itmg.DocumentManagement\Qec.Itmg.DocumentManagement.csproj" />
   </ItemGroup>
 </Project>

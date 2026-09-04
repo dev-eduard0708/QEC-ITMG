@@ -4,6 +4,7 @@ using Qec.Itmg.AccessManagement.Persistence;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.ChangeManagement.Persistence;
 using Qec.Itmg.Cmdb.Persistence;
+using Qec.Itmg.DocumentManagement.Persistence;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Operations.Persistence;
 using Qec.Itmg.Organization.Persistence;
@@ -95,5 +96,17 @@ public sealed class AccessManagementDbContextFactory : IDesignTimeDbContextFacto
             DesignTimeConnectionString.Resolve(),
             sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", AccessManagementDbContext.SchemaName));
         return new AccessManagementDbContext(optionsBuilder.Options);
+    }
+}
+
+public sealed class DocumentManagementDbContextFactory : IDesignTimeDbContextFactory<DocumentManagementDbContext>
+{
+    public DocumentManagementDbContext CreateDbContext(string[] args)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<DocumentManagementDbContext>();
+        optionsBuilder.UseSqlServer(
+            DesignTimeConnectionString.Resolve(),
+            sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", DocumentManagementDbContext.SchemaName));
+        return new DocumentManagementDbContext(optionsBuilder.Options);
     }
 }

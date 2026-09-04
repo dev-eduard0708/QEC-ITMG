@@ -60,6 +60,13 @@ public static class IdentitySeedCatalog
         ("access.review", "Manage access review campaigns and decisions"),
         ("access.privileged.manage", "Manage privileged and service account metadata"),
         ("sod.manage", "Manage segregation of duties rules and exceptions"),
+        ("doc.read", "View managed documents"),
+        ("doc.manage", "Create and manage managed documents and versions"),
+        ("doc.approve", "Approve managed documents"),
+        ("policy.read", "View policies"),
+        ("policy.manage", "Create and manage policies"),
+        ("policy.approve", "Approve policies"),
+        ("policy.acknowledge", "Acknowledge published policies"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
     ];

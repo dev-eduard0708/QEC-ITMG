@@ -9,6 +9,7 @@ public enum AuditAggregateType
     Change = 5,
     Event = 6,
     Access = 7,
+    Document = 8,
 }
 
 public enum AuditActorType
