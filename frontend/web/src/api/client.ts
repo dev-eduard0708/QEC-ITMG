@@ -1966,8 +1966,9 @@ export type FrameworkCoverage = {
     notApplicable: number
     notTested: number
   }
-  evidenceMissingStatus: string
-  evidenceExpiredStatus: string
+  evidenceAvailable: number
+  evidenceMissing: number
+  evidenceExpired: number
   notes: string
 }
 
@@ -2086,11 +2087,156 @@ export const complianceApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  setCalendarStatus: (id: string, status: string) =>
+    setCalendarStatus: (id: string, status: string) =>
     apiFetch<CalendarItem>(`/api/v1/compliance/calendar/${id}/status`, {
       method: 'POST',
       body: JSON.stringify({ status }),
     }),
+}
+
+export type EvidenceItem = {
+  id: string
+  evidenceNumber: string
+  title: string
+  description: string | null
+  ownerUserId: string
+  sourceType: string
+  sourceRecordId: string | null
+  evidenceType: string
+  classification: string
+  validFrom: string | null
+  validTo: string | null
+  capturedAtUtc: string
+  status: string
+  currentVersionId: string | null
+  acceptedByUserId: string | null
+  acceptedAtUtc: string | null
+  withdrawalReason: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  daysToExpiry: number | null
+  isExpired: boolean
+  isExpiringSoon: boolean
+  currentAttachmentId: string | null
+  currentVersionNumber: number | null
+}
+
+export type EvidenceListResult = {
+  items: EvidenceItem[]
+  totalCount: number
+  page: number
+  pageSize: number
+  expiredCount: number
+  expiringSoonCount: number
+}
+
+export type EvidenceVersion = {
+  id: string
+  evidenceId: string
+  versionNumber: number
+  attachmentId: string
+  createdByUserId: string
+  createdAtUtc: string
+  changeSummary: string | null
+  supersedesVersionId: string | null
+}
+
+export type EvidenceLink = {
+  id: string
+  evidenceId: string
+  targetType: string
+  targetId: string
+  createdByUserId: string
+  createdAtUtc: string
+}
+
+export const evidenceApi = {
+  list: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    status?: string
+    type?: string
+    source?: string
+    classification?: string
+    ownerUserId?: string
+    expiredOnly?: boolean
+    expiringSoonOnly?: boolean
+  }) =>
+    apiFetch<EvidenceListResult>(
+      `/api/v1/evidence${opsQuery({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        search: params?.search,
+        status: params?.status,
+        type: params?.type,
+        source: params?.source,
+        classification: params?.classification,
+        ownerUserId: params?.ownerUserId,
+        expiredOnly: params?.expiredOnly === undefined ? undefined : String(params.expiredOnly),
+        expiringSoonOnly:
+          params?.expiringSoonOnly === undefined ? undefined : String(params.expiringSoonOnly),
+      })}`,
+    ),
+  get: (id: string) => apiFetch<EvidenceItem>(`/api/v1/evidence/${id}`),
+  create: (payload: {
+    title: string
+    description?: string | null
+    sourceType?: string
+    evidenceType: string
+    classification?: string
+    validFrom?: string | null
+    validTo?: string | null
+  }) => apiFetch<EvidenceItem>('/api/v1/evidence', { method: 'POST', body: JSON.stringify(payload) }),
+  listVersions: (id: string) => apiFetch<EvidenceVersion[]>(`/api/v1/evidence/${id}/versions`),
+  listLinks: (id: string) => apiFetch<EvidenceLink[]>(`/api/v1/evidence/${id}/links`),
+  listLinkedTo: (targetType: string, targetId: string) =>
+    apiFetch<EvidenceItem[]>(`/api/v1/evidence/linked/${targetType}/${targetId}`),
+  submit: (id: string) => apiFetch<EvidenceItem>(`/api/v1/evidence/${id}/submit`, { method: 'POST' }),
+  accept: (id: string) => apiFetch<EvidenceItem>(`/api/v1/evidence/${id}/accept`, { method: 'POST' }),
+  returnToDraft: (id: string) => apiFetch<EvidenceItem>(`/api/v1/evidence/${id}/return`, { method: 'POST' }),
+  withdraw: (id: string, reason: string) =>
+    apiFetch<EvidenceItem>(`/api/v1/evidence/${id}/withdraw`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  link: (id: string, targetType: string, targetId: string) =>
+    apiFetch<void>(`/api/v1/evidence/${id}/links`, {
+      method: 'POST',
+      body: JSON.stringify({ targetType, targetId }),
+    }),
+  promote: (payload: {
+    title: string
+    sourceType: string
+    sourceRecordId: string
+    evidenceType?: string
+    classification?: string
+    description?: string | null
+  }) =>
+    apiFetch<EvidenceItem>('/api/v1/evidence/promote', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  upload: async (id: string, file: File, supersede = false) => {
+    const form = new FormData()
+    form.append('file', file)
+    if (supersede) form.append('supersede', 'true')
+    return apiFetch<{ attachmentId: string; fileName: string }>(`/api/v1/evidence/${id}/attachments`, {
+      method: 'POST',
+      body: form,
+    })
+  },
+  exportZip: async (evidenceIds: string[]) => {
+    const res = await fetch('/api/v1/evidence/export', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ evidenceIds }),
+    })
+    if (!res.ok) throw new Error('Export failed')
+    return res.blob()
+  },
 }
 
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */

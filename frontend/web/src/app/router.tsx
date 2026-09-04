@@ -26,6 +26,8 @@ import { FrameworksPage, FrameworkDetailPage } from '@/features/compliance/frame
 import { MappingsPage } from '@/features/compliance/mappings-page'
 import { AssessmentsPage } from '@/features/compliance/assessments-page'
 import { CalendarPage } from '@/features/compliance/calendar-page'
+import { EvidencePage, EvidenceNewPage } from '@/features/it/evidence-page'
+import { EvidenceDetailPage } from '@/features/it/evidence-detail-page'
 import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
@@ -160,6 +162,13 @@ export function AppRouter() {
             <Route path="it/compliance/mappings" element={<MappingsPage />} />
             <Route path="it/compliance/assessments" element={<AssessmentsPage />} />
             <Route path="it/compliance/calendar" element={<CalendarPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="evidence.read" />}>
+            <Route path="it/evidence" element={<EvidencePage />} />
+            <Route path="it/evidence/:id" element={<EvidenceDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="evidence.upload" />}>
+            <Route path="it/evidence/new" element={<EvidenceNewPage />} />
           </Route>
           <Route path="unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

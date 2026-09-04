@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
   opsApi,
+  evidenceApi,
   type BackupJob,
   type BackupRun,
   type CertificateRecord,
@@ -211,6 +212,7 @@ function BackupsPanel({ canManage }: { canManage: boolean }) {
 
 function RestorePanel({ canManage }: { canManage: boolean }) {
   const { t } = useTranslation()
+  const { can } = useAuth()
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [notes, setNotes] = useState('')
@@ -251,8 +253,32 @@ function RestorePanel({ canManage }: { canManage: boolean }) {
         cell: ({ row }) => new Date(row.original.createdAtUtc).toLocaleString(),
       },
       { accessorKey: 'notes', header: t('ops.columns.notes') },
+      {
+        id: 'promote',
+        header: '',
+        cell: ({ row }) =>
+          can('evidence.upload') ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={async () => {
+                const created = await evidenceApi.promote({
+                  title: `Restore test ${row.original.id.slice(0, 8)}`,
+                  sourceType: 'BackupRestore',
+                  sourceRecordId: row.original.id,
+                  evidenceType: 'TestResult',
+                  description: row.original.notes,
+                })
+                window.location.href = `/it/evidence/${created.id}`
+              }}
+            >
+              {t('evidence.promote')}
+            </Button>
+          ) : null,
+      },
     ],
-    [t],
+    [t, can],
   )
 
   return (

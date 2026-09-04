@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import type { ColumnDef } from '@tanstack/react-table'
-import { ApiError, accessApi, type AccessReviewCampaign } from '@/api/client'
+import { ApiError, accessApi, evidenceApi, type AccessReviewCampaign } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { DataTable } from '@/components/shared/data-table'
@@ -182,6 +182,24 @@ export function AccessReviewsPage() {
             >
               {t('access.actions.prepareEvidence')}
             </Button>
+            {can('evidence.upload') && selectedId ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={async () => {
+                  const created = await evidenceApi.promote({
+                    title: `Access review ${selectedId.slice(0, 8)}`,
+                    sourceType: 'AccessReview',
+                    sourceRecordId: selectedId,
+                    evidenceType: 'Report',
+                  })
+                  window.location.href = `/it/evidence/${created.id}`
+                }}
+              >
+                {t('evidence.promote')}
+              </Button>
+            ) : null}
           </div>
           <ul className="space-y-2 text-sm">
             {(itemsQuery.data ?? []).map((item) => (

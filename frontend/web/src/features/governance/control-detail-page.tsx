@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { controlsApi, complianceApi } from '@/api/client'
+import { controlsApi, complianceApi, evidenceApi } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +35,12 @@ export function ControlDetailPage() {
     queryKey: ['compliance', 'mappings', 'control', id],
     queryFn: () => complianceApi.listMappings({ internalControlId: id }),
     enabled: !!id && can('compliance.read'),
+  })
+
+  const evidenceQuery = useQuery({
+    queryKey: ['evidence', 'linked', 'InternalControl', id],
+    queryFn: () => evidenceApi.listLinkedTo('InternalControl', id),
+    enabled: !!id && can('evidence.read'),
   })
 
   const invalidate = async () => {
@@ -214,6 +220,31 @@ export function ControlDetailPage() {
             )}
             <Button asChild variant="secondary" size="sm">
               <Link to="/it/compliance/mappings">{t('controls.openMappings')}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {can('evidence.read') ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('controls.sections.linkedEvidence')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {(evidenceQuery.data ?? []).length === 0 ? (
+              <p className="text-muted-foreground">{t('controls.noEvidence')}</p>
+            ) : (
+              evidenceQuery.data!.map((e) => (
+                <div key={e.id} className="rounded border p-2">
+                  <Link className="text-primary underline" to={`/it/evidence/${e.id}`}>
+                    {e.evidenceNumber}
+                  </Link>{' '}
+                  · {e.title} · {e.status}
+                </div>
+              ))
+            )}
+            <Button asChild variant="secondary" size="sm">
+              <Link to="/it/evidence">{t('controls.openEvidence')}</Link>
             </Button>
           </CardContent>
         </Card>

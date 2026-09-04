@@ -69,7 +69,9 @@ export function ComplianceHomePage() {
                 {cov.resultDistribution.notApplicable} · NotTested {cov.resultDistribution.notTested}
               </div>
               <div className="sm:col-span-2 lg:col-span-4 text-muted-foreground">
-                {t('compliance.coverage.evidence')}: {cov.evidenceMissingStatus}
+                {t('compliance.coverage.evidenceAvailable')}: {cov.evidenceAvailable} ·{' '}
+                {t('compliance.coverage.evidenceMissing')}: {cov.evidenceMissing} ·{' '}
+                {t('compliance.coverage.evidenceExpired')}: {cov.evidenceExpired}
               </div>
             </>
           ) : (

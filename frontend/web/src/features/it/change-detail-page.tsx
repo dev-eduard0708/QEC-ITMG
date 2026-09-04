@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ApiError, changesApi, cmdbApi } from '@/api/client'
+import { ApiError, changesApi, cmdbApi, evidenceApi } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Timeline } from '@/components/shared/timeline'
@@ -241,9 +241,29 @@ export function ChangeDetailPage() {
         title={change.changeNumber}
         description={change.title}
         actions={
-          <Button asChild variant="outline">
-            <Link to="/it/changes">{t('changes.back')}</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link to="/it/changes">{t('changes.back')}</Link>
+            </Button>
+            {can('evidence.upload') ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={async () => {
+                  const created = await evidenceApi.promote({
+                    title: `Change ${change.changeNumber}`,
+                    sourceType: 'Change',
+                    sourceRecordId: change.id,
+                    evidenceType: 'Approval',
+                    description: change.title,
+                  })
+                  window.location.href = `/it/evidence/${created.id}`
+                }}
+              >
+                {t('evidence.promote')}
+              </Button>
+            ) : null}
+          </div>
         }
       />
 

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type ChangeEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { adminApi, ApiError, ticketsApi } from '@/api/client'
+import { adminApi, ApiError, ticketsApi, evidenceApi } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Timeline, type TimelineItem } from '@/components/shared/timeline'
@@ -194,9 +194,29 @@ export function TicketDetailPage() {
         title={ticket.ticketNumber}
         description={`${ticket.type} · ${ticket.title}`}
         actions={
-          <Button asChild variant="outline">
-            <Link to="/it/tickets">{t('tickets.back')}</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline">
+              <Link to="/it/tickets">{t('tickets.back')}</Link>
+            </Button>
+            {can('evidence.upload') ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={async () => {
+                  const created = await evidenceApi.promote({
+                    title: `Ticket ${ticket.ticketNumber}`,
+                    sourceType: 'Ticket',
+                    sourceRecordId: ticket.id,
+                    evidenceType: 'Document',
+                    description: ticket.title,
+                  })
+                  window.location.href = `/it/evidence/${created.id}`
+                }}
+              >
+                {t('evidence.promote')}
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
