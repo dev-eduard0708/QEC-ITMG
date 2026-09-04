@@ -35,12 +35,20 @@ public sealed class IdentitySeedRunner(
                 IdentitySeedCatalog.PlatformAdministratorRoleName,
                 "System administrator role. Authorization is via assigned admin.* permissions only.",
                 ct);
+            Role auditor = await EnsureRoleAsync(
+                IdentitySeedCatalog.AuditorRoleName,
+                "Read-oriented auditor role. No control/framework/admin manage and no evidence.accept/export by default.",
+                ct);
 
             await EnsureRolePermissionsAsync(platformAdmin, permissions.Values, ct);
+            IEnumerable<Permission> auditorPerms = IdentitySeedCatalog.AuditorPermissionKeys
+                .Where(permissions.ContainsKey)
+                .Select(key => permissions[key]);
+            await EnsureRolePermissionsAsync(auditor, auditorPerms, ct);
             await EnsurePlatformAdministratorBootstrapAsync(platformAdmin, ct);
 
             logger.LogInformation(
-                "Identity seed completed. Permissions={PermissionCount} Roles=Employee,PlatformAdministrator",
+                "Identity seed completed. Permissions={PermissionCount} Roles=Employee,PlatformAdministrator,Auditor",
                 permissions.Count);
         }, cancellationToken);
     }

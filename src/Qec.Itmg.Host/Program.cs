@@ -18,6 +18,7 @@ using Qec.Itmg.Host.DocumentManagement;
 using Qec.Itmg.Host.Governance;
 using Qec.Itmg.Host.Compliance;
 using Qec.Itmg.Host.Evidence;
+using Qec.Itmg.Host.Audit;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -66,6 +67,7 @@ try
     builder.Services.AddScoped<ChangeHistoryService>();
     builder.Services.AddScoped<AccessNotificationService>();
     builder.Services.AddScoped<DocumentNotificationService>();
+    builder.Services.AddScoped<AuditNotificationService>();
 
     bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
     string? hangfireConnection = builder.Configuration.GetConnectionString(QecEfConventions.ConnectionStringName);
@@ -137,6 +139,10 @@ try
             "evidence-expiry",
             job => job.ExecuteAsync(CancellationToken.None),
             "30 7 * * *");
+        recurringJobs.AddOrUpdate<AuditEvidenceRequestReminderJob>(
+            "audit-evidence-request-reminders",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "0 8 * * *");
     }
 
     app.UseSerilogRequestLogging();
@@ -181,6 +187,7 @@ try
     app.MapGovernanceEndpoints();
     app.MapComplianceEndpoints();
     app.MapEvidenceEndpoints();
+    app.MapAuditEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

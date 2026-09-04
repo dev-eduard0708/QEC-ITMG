@@ -20,6 +20,7 @@ public static class IdentitySeedCatalog
 {
     public const string EmployeeRoleName = "Employee";
     public const string PlatformAdministratorRoleName = "Platform Administrator";
+    public const string AuditorRoleName = "Auditor";
 
     public static readonly (string Key, string Description)[] SystemPermissions =
     [
@@ -78,7 +79,19 @@ public static class IdentitySeedCatalog
         ("evidence.upload", "Create and upload evidence drafts and versions"),
         ("evidence.accept", "Accept, return, or withdraw evidence"),
         ("evidence.export", "Privileged audited evidence export"),
+        ("audit.read", "View audit engagements, questions, findings, and CAPA"),
+        ("audit.manage", "Create and manage audit engagements, questions, and evidence requests"),
+        ("finding.manage", "Manage findings, management responses, and corrective actions"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
+    ];
+
+    /// <summary>Read-oriented auditor role. Does not include manage/export/admin permissions.</summary>
+    public static readonly string[] AuditorPermissionKeys =
+    [
+        "audit.read",
+        "evidence.read",
+        "control.read",
+        "compliance.read",
     ];
 }

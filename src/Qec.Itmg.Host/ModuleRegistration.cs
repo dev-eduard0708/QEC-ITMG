@@ -10,6 +10,7 @@ using Qec.Itmg.DocumentManagement;
 using Qec.Itmg.Governance;
 using Qec.Itmg.Compliance;
 using Qec.Itmg.Evidence;
+using Qec.Itmg.Audit;
 using Qec.Itmg.Operations;
 using Qec.Itmg.Organization;
 using Qec.Itmg.Platform;
@@ -38,6 +39,7 @@ internal static class ModuleRegistration
             new GovernanceModule(),
             new ComplianceModule(),
             new EvidenceModule(),
+            new AuditModule(),
         ];
 
         foreach (IModule module in modules)
