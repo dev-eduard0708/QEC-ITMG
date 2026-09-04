@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Contracts.Numbering;
 using Qec.Itmg.ServiceDesk.Domain;
 using Qec.Itmg.ServiceDesk.Persistence;
@@ -29,7 +30,10 @@ public sealed record TicketDto(
     DateTimeOffset UpdatedAtUtc,
     DateTimeOffset? ResolvedAtUtc,
     DateTimeOffset? ClosedAtUtc,
-    string RowVersion);
+    string RowVersion,
+    bool IsMajorIncident,
+    string? SecurityClassification,
+    Guid? SourceEventId);
 
 public sealed record SupportQueueDto(
     Guid Id,
@@ -82,12 +86,15 @@ public sealed record TicketDashboardDto(
 public sealed class TicketService(
     ServiceDeskDbContext db,
     INumberSequenceService numbers,
-    IClock clock)
+    IClock clock,
+    IBusinessAuditWriter businessAudit,
+    ISharedDbTransaction sharedDbTransaction)
 {
     public const string IncidentSequenceKey = "tickets-incident";
     public const string ServiceRequestSequenceKey = "tickets-service-request";
     public const string IncidentPrefix = "INC";
     public const string ServiceRequestPrefix = "SR";
+    public const string IncidentsSecurityPermission = "incidents.security";
 
     private static readonly TicketStatus[] ActiveStatuses =
     [
@@ -136,6 +143,7 @@ public sealed class TicketService(
         TicketType? type = null,
         TicketPriority? priority = null,
         Guid? requesterUserId = null,
+        bool includeSecurityClassification = false,
         CancellationToken cancellationToken = default)
     {
         page = Math.Max(1, page);
@@ -178,14 +186,21 @@ public sealed class TicketService(
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        return new TicketListResult(items.Select(Map).ToList(), total, page, pageSize);
+        return new TicketListResult(
+            items.Select(item => Map(item, includeSecurityClassification)).ToList(),
+            total,
+            page,
+            pageSize);
     }
 
-    public async Task<TicketDto?> GetAsync(Guid id, CancellationToken cancellationToken = default)
+    public async Task<TicketDto?> GetAsync(
+        Guid id,
+        bool includeSecurityClassification = false,
+        CancellationToken cancellationToken = default)
     {
         Ticket? ticket = await db.Tickets.AsNoTracking()
             .FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
-        return ticket is null ? null : Map(ticket);
+        return ticket is null ? null : Map(ticket, includeSecurityClassification);
     }
 
     public async Task<TicketDto?> GetForRequesterAsync(
@@ -197,7 +212,8 @@ public sealed class TicketService(
             .FirstOrDefaultAsync(
                 item => item.Id == id && item.RequesterUserId == requesterUserId,
                 cancellationToken);
-        return ticket is null ? null : Map(ticket);
+        // Employee self-service must never receive security classification.
+        return ticket is null ? null : Map(ticket, includeSecurityClassification: false);
     }
 
     public async Task<Ticket> CreateAsync(
@@ -240,6 +256,64 @@ public sealed class TicketService(
         return ticket;
     }
 
+    /// <summary>
+    /// P5 stub only: promote a future Event into an Incident ticket.
+    /// P8 will replace/extend this with the real Event aggregate and FK/relationship.
+    /// </summary>
+    public async Task<Ticket> PromoteFromEventAsync(
+        Guid eventId,
+        string title,
+        string description,
+        Guid requesterUserId,
+        TicketPriority priority = TicketPriority.Medium,
+        Guid? configurationItemId = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (eventId == Guid.Empty)
+        {
+            throw new ArgumentException("Event id is required.", nameof(eventId));
+        }
+
+        Ticket? existing = await db.Tickets
+            .FirstOrDefaultAsync(
+                item => item.SourceEventId == eventId && item.Type == TicketType.Incident,
+                cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        Ticket ticket = await CreateAsync(
+            TicketType.Incident,
+            title,
+            description,
+            requesterUserId,
+            priority,
+            configurationItemId,
+            cancellationToken: cancellationToken);
+
+        Ticket tracked = await db.Tickets.FirstAsync(item => item.Id == ticket.Id, cancellationToken);
+        tracked.BindSourceEvent(eventId, clock.UtcNow);
+
+        await sharedDbTransaction.ExecuteAsync(
+            async ct =>
+            {
+                await businessAudit.AppendAsync(
+                    ServiceDeskAuditComposer.TicketField(
+                        tracked.Id,
+                        tracked.TicketNumber,
+                        "SourceEventId",
+                        null,
+                        eventId.ToString("D"),
+                        BusinessAuditAction.Linked),
+                    ct);
+                await db.SaveChangesAsync(ct);
+            },
+            cancellationToken);
+
+        return tracked;
+    }
+
     public async Task<Ticket> UpdateAsync(
         Guid id,
         string title,
@@ -262,6 +336,70 @@ public sealed class TicketService(
             rowVersion,
             clock.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
+        return ticket;
+    }
+
+    public async Task<Ticket> UpdateIncidentAsync(
+        Guid id,
+        bool isMajorIncident,
+        SecurityClassification? securityClassification,
+        bool updateSecurityClassification,
+        string rowVersion,
+        CancellationToken cancellationToken = default)
+    {
+        Ticket ticket = await db.Tickets.FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Ticket was not found.");
+
+        if (ticket.Type != TicketType.Incident)
+        {
+            throw new InvalidOperationException("Incident specialization applies only to Incident tickets.");
+        }
+
+        bool previousMajor = ticket.IsMajorIncident;
+        SecurityClassification previousClassification = ticket.SecurityClassification;
+
+        ticket.UpdateIncidentSpecialization(
+            isMajorIncident,
+            securityClassification,
+            updateSecurityClassification,
+            rowVersion,
+            clock.UtcNow);
+
+        List<BusinessAuditEntry> audits = [];
+        if (previousMajor != ticket.IsMajorIncident)
+        {
+            audits.Add(
+                ServiceDeskAuditComposer.TicketField(
+                    ticket.Id,
+                    ticket.TicketNumber,
+                    "IsMajorIncident",
+                    previousMajor.ToString(),
+                    ticket.IsMajorIncident.ToString()));
+        }
+
+        if (updateSecurityClassification && previousClassification != ticket.SecurityClassification)
+        {
+            audits.Add(
+                ServiceDeskAuditComposer.TicketField(
+                    ticket.Id,
+                    ticket.TicketNumber,
+                    "SecurityClassification",
+                    previousClassification.ToString(),
+                    ticket.SecurityClassification.ToString()));
+        }
+
+        await sharedDbTransaction.ExecuteAsync(
+            async ct =>
+            {
+                if (audits.Count > 0)
+                {
+                    await businessAudit.AppendManyAsync(audits, ct);
+                }
+
+                await db.SaveChangesAsync(ct);
+            },
+            cancellationToken);
+
         return ticket;
     }
 
@@ -410,7 +548,7 @@ public sealed class TicketService(
         }
     }
 
-    private static TicketDto Map(Ticket ticket) =>
+    private static TicketDto Map(Ticket ticket, bool includeSecurityClassification) =>
         new(
             ticket.Id,
             ticket.TicketNumber,
@@ -434,5 +572,10 @@ public sealed class TicketService(
             ticket.UpdatedAtUtc,
             ticket.ResolvedAtUtc,
             ticket.ClosedAtUtc,
-            Convert.ToBase64String(ticket.RowVersion));
+            Convert.ToBase64String(ticket.RowVersion),
+            ticket.Type == TicketType.Incident && ticket.IsMajorIncident,
+            includeSecurityClassification && ticket.Type == TicketType.Incident
+                ? ticket.SecurityClassification.ToString()
+                : null,
+            ticket.Type == TicketType.Incident ? ticket.SourceEventId : null);
 }

@@ -58,7 +58,18 @@ export function TicketsPage() {
 
   const columns = useMemo<ColumnDef<Ticket, unknown>[]>(
     () => [
-      { accessorKey: 'ticketNumber', header: t('tickets.columns.number') },
+      {
+        accessorKey: 'ticketNumber',
+        header: t('tickets.columns.number'),
+        cell: ({ row }) => (
+          <span className="inline-flex items-center gap-2">
+            {row.original.ticketNumber}
+            {row.original.isMajorIncident ? (
+              <Badge variant="warning">{t('tickets.incident.majorBadge')}</Badge>
+            ) : null}
+          </span>
+        ),
+      },
       { accessorKey: 'title', header: t('tickets.columns.title') },
       {
         id: 'requester',

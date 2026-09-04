@@ -25,6 +25,17 @@ public enum TicketPriority
     Critical = 3,
 }
 
+/// <summary>
+/// Security classification for Incident tickets only.
+/// Viewing/changing requires the <c>incidents.security</c> permission.
+/// </summary>
+public enum SecurityClassification
+{
+    None = 0,
+    Suspected = 1,
+    Confirmed = 2,
+}
+
 public sealed class Ticket
 {
     private Ticket()
@@ -54,6 +65,18 @@ public sealed class Ticket
     public Guid? ConfigurationItemId { get; private set; }
 
     public string? Category { get; private set; }
+
+    /// <summary>Incident-only: major incident flag. Always false for service requests.</summary>
+    public bool IsMajorIncident { get; private set; }
+
+    /// <summary>Incident-only. Default <see cref="SecurityClassification.None"/>.</summary>
+    public SecurityClassification SecurityClassification { get; private set; }
+
+    /// <summary>
+    /// Optional source operational event id (P5 stub). No FK until P8 Event aggregate exists.
+    /// Only Incident tickets may set this.
+    /// </summary>
+    public Guid? SourceEventId { get; private set; }
 
     public Guid? SlaPolicyId { get; private set; }
 
@@ -120,9 +143,65 @@ public sealed class Ticket
             ConfigurationItemId = NormalizeGuid(configurationItemId),
             Category = NormalizeOptional(category),
             QueueId = NormalizeGuid(queueId),
+            IsMajorIncident = false,
+            SecurityClassification = SecurityClassification.None,
+            SourceEventId = null,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow,
         };
+    }
+
+    public void UpdateIncidentSpecialization(
+        bool isMajorIncident,
+        SecurityClassification? securityClassification,
+        bool updateSecurityClassification,
+        string rowVersion,
+        DateTimeOffset utcNow)
+    {
+        if (Type != TicketType.Incident)
+        {
+            throw new InvalidOperationException("Incident specialization applies only to Incident tickets.");
+        }
+
+        EnsureRowVersion(rowVersion);
+
+        IsMajorIncident = isMajorIncident;
+        if (updateSecurityClassification)
+        {
+            if (securityClassification is null || !Enum.IsDefined(securityClassification.Value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(securityClassification));
+            }
+
+            SecurityClassification = securityClassification.Value;
+        }
+
+        UpdatedAtUtc = utcNow;
+    }
+
+    /// <summary>
+    /// P5 stub: bind a future Event id when promoting an event to an incident.
+    /// P8 will replace/extend this with a real Event aggregate and FK.
+    /// </summary>
+    public void BindSourceEvent(Guid sourceEventId, DateTimeOffset utcNow)
+    {
+        if (Type != TicketType.Incident)
+        {
+            throw new InvalidOperationException("SourceEventId applies only to Incident tickets.");
+        }
+
+        if (sourceEventId == Guid.Empty)
+        {
+            throw new ArgumentException("Source event id is required.", nameof(sourceEventId));
+        }
+
+        if (SourceEventId is not null)
+        {
+            throw new InvalidOperationException("Ticket is already linked to a source event.");
+        }
+
+        SourceEventId = sourceEventId;
+        UpdatedAtUtc = utcNow;
     }
 
     public void ApplySla(

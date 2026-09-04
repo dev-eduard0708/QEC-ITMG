@@ -46,6 +46,16 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         builder.Property(item => item.Category).HasMaxLength(128).HasColumnType("nvarchar(128)");
 
+        builder.Property(item => item.IsMajorIncident).IsRequired();
+
+        builder.Property(item => item.SecurityClassification)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .HasColumnType("nvarchar(32)");
+
+        builder.Property(item => item.SourceEventId);
+
         builder.Property(item => item.RequesterUserId).IsRequired();
         builder.Property(item => item.CreatedAtUtc).IsRequired();
         builder.Property(item => item.UpdatedAtUtc).IsRequired();
@@ -63,6 +73,11 @@ internal sealed class TicketConfiguration : IEntityTypeConfiguration<Ticket>
 
         builder.HasIndex(item => item.QueueId)
             .HasDatabaseName("IX_Ticket_QueueId");
+
+        builder.HasIndex(item => item.SourceEventId)
+            .IsUnique()
+            .HasFilter("[SourceEventId] IS NOT NULL")
+            .HasDatabaseName("IX_Ticket_SourceEventId");
 
         builder.HasOne<SupportQueue>()
             .WithMany()

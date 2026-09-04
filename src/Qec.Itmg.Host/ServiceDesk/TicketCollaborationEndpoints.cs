@@ -26,7 +26,7 @@ public static class TicketCollaborationEndpoints
             ICommentService comments,
             CancellationToken cancellationToken) =>
         {
-            if (await tickets.GetAsync(ticketId, cancellationToken) is null)
+            if (await tickets.GetAsync(ticketId, cancellationToken: cancellationToken) is null)
             {
                 return Results.NotFound();
             }
@@ -40,7 +40,7 @@ public static class TicketCollaborationEndpoints
             IAttachmentStorageService attachments,
             CancellationToken cancellationToken) =>
         {
-            if (await tickets.GetAsync(ticketId, cancellationToken) is null)
+            if (await tickets.GetAsync(ticketId, cancellationToken: cancellationToken) is null)
             {
                 return Results.NotFound();
             }
@@ -57,7 +57,7 @@ public static class TicketCollaborationEndpoints
             IAttachmentStorageService attachments,
             CancellationToken cancellationToken) =>
         {
-            if (await tickets.GetAsync(ticketId, cancellationToken) is null)
+            if (await tickets.GetAsync(ticketId, cancellationToken: cancellationToken) is null)
             {
                 return Results.NotFound();
             }
@@ -81,7 +81,7 @@ public static class TicketCollaborationEndpoints
             IAttachmentStorageService attachments,
             CancellationToken cancellationToken) =>
         {
-            TicketDto? ticket = await tickets.GetAsync(ticketId, cancellationToken);
+            TicketDto? ticket = await tickets.GetAsync(ticketId, cancellationToken: cancellationToken);
             if (ticket is null)
             {
                 return Results.NotFound();
@@ -115,7 +115,7 @@ public static class TicketCollaborationEndpoints
                 return SessionUnavailable();
             }
 
-            TicketDto? ticket = await tickets.GetAsync(ticketId, cancellationToken);
+            TicketDto? ticket = await tickets.GetAsync(ticketId, cancellationToken: cancellationToken);
             if (ticket is null)
             {
                 return Results.NotFound();
@@ -168,7 +168,7 @@ public static class TicketCollaborationEndpoints
                 return SessionUnavailable();
             }
 
-            if (await tickets.GetAsync(ticketId, cancellationToken) is null)
+            if (await tickets.GetAsync(ticketId, cancellationToken: cancellationToken) is null)
             {
                 return Results.NotFound();
             }

@@ -5,6 +5,7 @@ public enum AuditAggregateType
     User = 1,
     Role = 2,
     Ticket = 3,
+    Problem = 4,
 }
 
 public enum AuditActorType

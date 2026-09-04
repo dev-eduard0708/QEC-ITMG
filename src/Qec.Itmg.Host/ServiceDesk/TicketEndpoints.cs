@@ -14,6 +14,7 @@ public static class TicketEndpoints
 {
     public const string TicketsRead = "tickets.read";
     public const string TicketsManage = "tickets.manage";
+    public const string IncidentsSecurity = "incidents.security";
 
     public static IEndpointRouteBuilder MapTicketEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -27,9 +28,12 @@ public static class TicketEndpoints
             string? status,
             string? type,
             string? priority,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
             TicketService service,
             CancellationToken cancellationToken) =>
         {
+            bool includeSecurity = await HasIncidentsSecurityAsync(principal, currentUser, cancellationToken);
             TicketListResult result = await service.ListAsync(
                 page ?? 1,
                 pageSize ?? 25,
@@ -37,6 +41,7 @@ public static class TicketEndpoints
                 ParseEnum<TicketStatus>(status),
                 ParseEnum<TicketType>(type),
                 ParseEnum<TicketPriority>(priority),
+                includeSecurityClassification: includeSecurity,
                 cancellationToken: cancellationToken);
             return Results.Ok(result);
         });
@@ -64,10 +69,13 @@ public static class TicketEndpoints
 
         readGroup.MapGet("/{id:guid}", async (
             Guid id,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
             TicketService service,
             CancellationToken cancellationToken) =>
         {
-            TicketDto? ticket = await service.GetAsync(id, cancellationToken);
+            bool includeSecurity = await HasIncidentsSecurityAsync(principal, currentUser, cancellationToken);
+            TicketDto? ticket = await service.GetAsync(id, includeSecurity, cancellationToken);
             return ticket is null ? Results.NotFound() : Results.Ok(ticket);
         });
 
@@ -124,7 +132,7 @@ public static class TicketEndpoints
                     request.Category,
                     request.QueueId,
                     cancellationToken);
-                TicketDto? dto = await service.GetAsync(created.Id, cancellationToken);
+                TicketDto? dto = await service.GetAsync(created.Id, cancellationToken: cancellationToken);
                 if (dto is not null)
                 {
                     await notifications.NotifyTicketCreatedAsync(dto, cancellationToken);
@@ -171,7 +179,7 @@ public static class TicketEndpoints
                     request.Category,
                     request.RowVersion ?? string.Empty,
                     cancellationToken);
-                return Results.Ok(await service.GetAsync(id, cancellationToken));
+                return Results.Ok(await service.GetAsync(id, cancellationToken: cancellationToken));
             }
             catch (InvalidOperationException ex)
             {
@@ -204,7 +212,7 @@ public static class TicketEndpoints
                 return SessionUnavailable();
             }
 
-            TicketDto? before = await service.GetAsync(id, cancellationToken);
+            TicketDto? before = await service.GetAsync(id, cancellationToken: cancellationToken);
             if (before is null)
             {
                 return Results.NotFound();
@@ -213,7 +221,7 @@ public static class TicketEndpoints
             try
             {
                 await service.ChangeStatusAsync(id, status, session.Id, request.RowVersion, cancellationToken);
-                TicketDto? after = await service.GetAsync(id, cancellationToken);
+                TicketDto? after = await service.GetAsync(id, cancellationToken: cancellationToken);
                 if (after is not null)
                 {
                     await notifications.NotifyStatusChangedAsync(after, before.Status, cancellationToken);
@@ -242,7 +250,7 @@ public static class TicketEndpoints
                 return SessionUnavailable();
             }
 
-            TicketDto? before = await service.GetAsync(id, cancellationToken);
+            TicketDto? before = await service.GetAsync(id, cancellationToken: cancellationToken);
             if (before is null)
             {
                 return Results.NotFound();
@@ -257,7 +265,7 @@ public static class TicketEndpoints
                     request.AssignedUserId,
                     request.Notes,
                     cancellationToken);
-                TicketDto? after = await service.GetAsync(id, cancellationToken);
+                TicketDto? after = await service.GetAsync(id, cancellationToken: cancellationToken);
                 if (after is not null)
                 {
                     await notifications.NotifyAssignedAsync(after, before.AssignedUserId, cancellationToken);
@@ -272,6 +280,69 @@ public static class TicketEndpoints
             catch (InvalidOperationException ex)
             {
                 return FromDomainError(ex);
+            }
+        });
+
+        manageGroup.MapPut("/{id:guid}/incident", async (
+            Guid id,
+            UpdateIncidentRequest request,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            TicketService service,
+            CancellationToken cancellationToken) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, cancellationToken);
+            if (session is null)
+            {
+                return SessionUnavailable();
+            }
+
+            bool canSecurity = HasPermission(session, IncidentsSecurity);
+            bool updateSecurity = !string.IsNullOrWhiteSpace(request.SecurityClassification);
+            SecurityClassification? classification = null;
+            if (updateSecurity)
+            {
+                if (!canSecurity)
+                {
+                    return Results.Json(
+                        new
+                        {
+                            error = new
+                            {
+                                code = "permission_denied",
+                                message = "incidents.security is required to change security classification.",
+                            },
+                        },
+                        statusCode: StatusCodes.Status403Forbidden);
+                }
+
+                if (!Enum.TryParse(request.SecurityClassification, ignoreCase: true, out SecurityClassification parsed)
+                    || !Enum.IsDefined(parsed))
+                {
+                    return ValidationProblem("A valid securityClassification is required.");
+                }
+
+                classification = parsed;
+            }
+
+            try
+            {
+                await service.UpdateIncidentAsync(
+                    id,
+                    request.IsMajorIncident,
+                    classification,
+                    updateSecurity,
+                    request.RowVersion ?? string.Empty,
+                    cancellationToken);
+                return Results.Ok(await service.GetAsync(id, canSecurity, cancellationToken));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromDomainError(ex);
+            }
+            catch (ArgumentException ex)
+            {
+                return ValidationProblem(ex.Message);
             }
         });
 
@@ -388,6 +459,18 @@ public static class TicketEndpoints
         return endpoints;
     }
 
+    private static async Task<bool> HasIncidentsSecurityAsync(
+        ClaimsPrincipal principal,
+        ICurrentUserService currentUser,
+        CancellationToken cancellationToken)
+    {
+        CurrentUserDto? session = await currentUser.GetSessionAsync(principal, cancellationToken);
+        return session is not null && HasPermission(session, IncidentsSecurity);
+    }
+
+    private static bool HasPermission(CurrentUserDto session, string permissionKey) =>
+        session.Permissions.Any(item => string.Equals(item, permissionKey, StringComparison.OrdinalIgnoreCase));
+
     private static async Task<CurrentUserDto?> ResolveSessionAsync(
         ClaimsPrincipal principal,
         ICurrentUserService currentUser,
@@ -470,6 +553,11 @@ public sealed record UpdateTicketRequest(
     string Priority,
     Guid? ConfigurationItemId,
     string? Category,
+    string? RowVersion);
+
+public sealed record UpdateIncidentRequest(
+    bool IsMajorIncident,
+    string? SecurityClassification,
     string? RowVersion);
 
 public sealed record ChangeTicketStatusRequest(string Status, string? RowVersion);

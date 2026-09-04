@@ -34,6 +34,9 @@ public static class IdentitySeedCatalog
         ("assets.manage", "Manage assets"),
         ("tickets.read", "View service desk tickets"),
         ("tickets.manage", "Manage service desk tickets, queues, and assignment"),
+        ("incidents.security", "View and change incident security classification"),
+        ("problems.read", "View problems"),
+        ("problems.manage", "Manage problems and incident links"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
     ];

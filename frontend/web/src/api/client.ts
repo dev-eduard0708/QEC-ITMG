@@ -433,6 +433,9 @@ export type Ticket = {
   resolvedAtUtc: string | null
   closedAtUtc: string | null
   rowVersion: string
+  isMajorIncident: boolean
+  securityClassification: string | null
+  sourceEventId: string | null
 }
 
 export type TicketListResult = {
@@ -544,6 +547,127 @@ export const ticketsApi = {
   attachmentContentUrl: (ticketId: string, attachmentId: string) =>
     `/api/v1/tickets/${ticketId}/attachments/${attachmentId}/content`,
   dashboard: () => apiFetch<TicketDashboard>('/api/v1/tickets/dashboard'),
+  updateIncident: (
+    id: string,
+    payload: {
+      isMajorIncident: boolean
+      securityClassification?: string | null
+      rowVersion?: string | null
+    },
+  ) =>
+    apiFetch<Ticket>(`/api/v1/tickets/${id}/incident`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  listRelatedProblems: (id: string) =>
+    apiFetch<RelatedProblem[]>(`/api/v1/tickets/${id}/problems`),
+}
+
+export type RelatedProblem = {
+  problemId: string
+  problemNumber: string
+  title: string
+  status: string
+  linkedAtUtc: string
+}
+
+export type Problem = {
+  id: string
+  problemNumber: string
+  title: string
+  description: string
+  status: string
+  priority: string
+  ownerUserId: string | null
+  configurationItemId: string | null
+  rootCause: string | null
+  workaround: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  resolvedAtUtc: string | null
+  closedAtUtc: string | null
+  rowVersion: string
+}
+
+export type ProblemListResult = {
+  items: Problem[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type ProblemIncidentLink = {
+  problemId: string
+  incidentTicketId: string
+  ticketNumber: string
+  title: string
+  status: string
+  priority: string
+  isMajorIncident: boolean
+  linkedAtUtc: string
+  linkedByUserId: string
+}
+
+export const problemsApi = {
+  list: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    status?: string
+    priority?: string
+  }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+    if (params?.search?.trim()) query.set('search', params.search.trim())
+    if (params?.status?.trim()) query.set('status', params.status.trim())
+    if (params?.priority?.trim()) query.set('priority', params.priority.trim())
+    const qs = query.toString()
+    return apiFetch<ProblemListResult>(`/api/v1/problems${qs ? `?${qs}` : ''}`)
+  },
+  get: (id: string) => apiFetch<Problem>(`/api/v1/problems/${id}`),
+  create: (payload: {
+    title: string
+    description: string
+    priority?: string
+    ownerUserId?: string | null
+    configurationItemId?: string | null
+  }) =>
+    apiFetch<Problem>('/api/v1/problems', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  update: (
+    id: string,
+    payload: {
+      title: string
+      description: string
+      priority: string
+      ownerUserId?: string | null
+      configurationItemId?: string | null
+      rootCause?: string | null
+      workaround?: string | null
+      rowVersion?: string | null
+    },
+  ) =>
+    apiFetch<Problem>(`/api/v1/problems/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  changeStatus: (id: string, status: string, rowVersion?: string | null) =>
+    apiFetch<Problem>(`/api/v1/problems/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, rowVersion: rowVersion ?? null }),
+    }),
+  listIncidents: (id: string) =>
+    apiFetch<ProblemIncidentLink[]>(`/api/v1/problems/${id}/incidents`),
+  linkIncident: (id: string, incidentTicketId: string) =>
+    apiFetch<ProblemIncidentLink[]>(`/api/v1/problems/${id}/incidents`, {
+      method: 'POST',
+      body: JSON.stringify({ incidentTicketId }),
+    }),
+  unlinkIncident: (id: string, ticketId: string) =>
+    apiFetch<void>(`/api/v1/problems/${id}/incidents/${ticketId}`, { method: 'DELETE' }),
 }
 
 export type TicketDashboard = {

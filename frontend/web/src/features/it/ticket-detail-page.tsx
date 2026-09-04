@@ -33,11 +33,18 @@ export function TicketDetailPage() {
   const [comment, setComment] = useState('')
   const [visibility, setVisibility] = useState<'EmployeeVisible' | 'Internal'>('EmployeeVisible')
   const [formError, setFormError] = useState<string | null>(null)
+  const [majorIncident, setMajorIncident] = useState<boolean | null>(null)
+  const [securityClassification, setSecurityClassification] = useState<string | null>(null)
 
   const ticketQuery = useQuery({
     queryKey: ticketKeys.detail(id),
     queryFn: () => ticketsApi.get(id),
     enabled: Boolean(id),
+  })
+  const relatedProblemsQuery = useQuery({
+    queryKey: ticketKeys.relatedProblems(id),
+    queryFn: () => ticketsApi.listRelatedProblems(id),
+    enabled: Boolean(id) && ticketQuery.data?.type === 'Incident',
   })
   const queuesQuery = useQuery({
     queryKey: ticketKeys.queues(),
@@ -124,6 +131,29 @@ export function TicketDetailPage() {
     },
   })
 
+  const incidentMutation = useMutation({
+    mutationFn: () => {
+      const ticketData = ticketQuery.data
+      if (!ticketData) throw new Error('missing ticket')
+      return ticketsApi.updateIncident(id, {
+        isMajorIncident: majorIncident ?? ticketData.isMajorIncident,
+        securityClassification: can('incidents.security')
+          ? (securityClassification ?? ticketData.securityClassification ?? 'None')
+          : undefined,
+        rowVersion: ticketData.rowVersion,
+      })
+    },
+    onSuccess: async () => {
+      setMajorIncident(null)
+      setSecurityClassification(null)
+      setFormError(null)
+      await refresh()
+    },
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : t('tickets.error.generic'))
+    },
+  })
+
   const timelineItems = useMemo<TimelineItem[]>(
     () =>
       (timelineQuery.data ?? []).map((item) => ({
@@ -155,6 +185,9 @@ export function TicketDetailPage() {
     }
   }
 
+  const incidentMajor = majorIncident ?? ticket.isMajorIncident
+  const incidentSecurity = securityClassification ?? ticket.securityClassification ?? 'None'
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -171,10 +204,56 @@ export function TicketDetailPage() {
         <Badge variant="secondary">{ticket.type}</Badge>
         <Badge>{ticket.status}</Badge>
         <Badge variant="outline">{ticket.priority}</Badge>
+        {ticket.isMajorIncident ? <Badge variant="warning">{t('tickets.incident.majorBadge')}</Badge> : null}
         {(ticket.responseBreached || ticket.resolutionBreached) && (
           <Badge variant="warning">{t('tickets.sla.breached')}</Badge>
         )}
       </div>
+
+      {ticket.type === 'Incident' ? (
+        <section className="space-y-3 rounded-md border border-border p-4">
+          <h2 className="text-sm font-semibold">{t('tickets.incident.title')}</h2>
+          {can('tickets.manage') ? (
+            <div className="flex flex-wrap items-end gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={incidentMajor}
+                  onChange={(event) => setMajorIncident(event.target.checked)}
+                />
+                {t('tickets.incident.major')}
+              </label>
+              {can('incidents.security') ? (
+                <div className="space-y-1">
+                  <Label>{t('tickets.incident.security')}</Label>
+                  <Select value={incidentSecurity} onValueChange={setSecurityClassification}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['None', 'Suspected', 'Confirmed'].map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+              <Button type="button" onClick={() => incidentMutation.mutate()} disabled={incidentMutation.isPending}>
+                {t('tickets.incident.save')}
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {ticket.isMajorIncident ? t('tickets.incident.majorBadge') : t('tickets.incident.notMajor')}
+              {can('incidents.security') && ticket.securityClassification
+                ? ` · ${ticket.securityClassification}`
+                : null}
+            </p>
+          )}
+        </section>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2 text-sm">
@@ -349,6 +428,29 @@ export function TicketDetailPage() {
           </div>
         ) : null}
       </section>
+
+      {ticket.type === 'Incident' ? (
+        <section className="space-y-3">
+          <h2 className="text-sm font-semibold">{t('tickets.relatedProblems')}</h2>
+          {(relatedProblemsQuery.data ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('tickets.relatedProblemsEmpty')}</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {(relatedProblemsQuery.data ?? []).map((item) => (
+                <li key={item.problemId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+                  <div>
+                    <Link className="font-medium text-primary underline-offset-2 hover:underline" to={`/it/problems/${item.problemId}`}>
+                      {item.problemNumber}
+                    </Link>
+                    <p className="text-muted-foreground">{item.title}</p>
+                  </div>
+                  <Badge variant="secondary">{item.status}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold">{t('tickets.timeline')}</h2>
