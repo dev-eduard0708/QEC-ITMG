@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { ApiError, changesApi, cmdbApi } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
+import { Timeline } from '@/components/shared/timeline'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -49,6 +50,9 @@ export function ChangeDetailPage() {
   const [isPreAuthorizedStandard, setIsPreAuthorizedStandard] = useState(false)
   const [validationNotes, setValidationNotes] = useState('')
   const [pirNotes, setPirNotes] = useState('')
+  const [approverUserId, setApproverUserId] = useState('')
+  const [retrospectiveReason, setRetrospectiveReason] = useState('')
+  const [actualImplementationAtUtc, setActualImplementationAtUtc] = useState('')
 
   const changeQuery = useQuery({
     queryKey: changeKeys.detail(id),
@@ -96,6 +100,8 @@ export function ChangeDetailPage() {
     setIsPreAuthorizedStandard(change.isPreAuthorizedStandard)
     setValidationNotes(change.validationNotes ?? '')
     setPirNotes(change.pirNotes ?? '')
+    setRetrospectiveReason(change.retrospectiveReason ?? '')
+    setActualImplementationAtUtc(toLocalInput(change.actualImplementationAtUtc))
   }, [change])
 
   const refresh = async () => {
@@ -144,6 +150,7 @@ export function ChangeDetailPage() {
       result?: string | null
       validationNotes?: string | null
       pirNotes?: string | null
+      approverUserId?: string | null
     }) =>
       changesApi.transition(id, {
         ...payload,
@@ -173,6 +180,20 @@ export function ChangeDetailPage() {
     onSuccess: async () => {
       setFormError(null)
       setComment('')
+      await refresh()
+    },
+    onError,
+  })
+
+  const retrospectiveMutation = useMutation({
+    mutationFn: () =>
+      changesApi.markRetrospective(id, {
+        reason: retrospectiveReason,
+        actualImplementationAtUtc: fromLocalInput(actualImplementationAtUtc),
+        rowVersion: change?.rowVersion,
+      }),
+    onSuccess: async () => {
+      setFormError(null)
       await refresh()
     },
     onError,
@@ -234,7 +255,34 @@ export function ChangeDetailPage() {
         {change.isPreAuthorizedStandard ? (
           <Badge variant="outline">{t('changes.preAuthorizedBadge')}</Badge>
         ) : null}
+        {change.catalogItemId ? <Badge variant="outline">{t('changes.catalogBadge')}</Badge> : null}
       </div>
+
+      {!change.isRetrospective && canEdit ? (
+        <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
+          <div className="min-w-[12rem] flex-1 space-y-1">
+            <Label>{t('changes.fields.retrospectiveReason')}</Label>
+            <Input value={retrospectiveReason} onChange={(e) => setRetrospectiveReason(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label>{t('changes.fields.actualImplementation')}</Label>
+            <Input
+              type="datetime-local"
+              value={actualImplementationAtUtc}
+              onChange={(e) => setActualImplementationAtUtc(e.target.value)}
+            />
+          </div>
+          <Button type="button" variant="outline" onClick={() => retrospectiveMutation.mutate()}>
+            {t('changes.actions.markRetrospective')}
+          </Button>
+        </div>
+      ) : null}
+
+      {change.isRetrospective && change.retrospectiveReason ? (
+        <p className="text-sm text-muted-foreground">
+          {t('changes.fields.retrospectiveReason')}: {change.retrospectiveReason}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {canEdit ? (
@@ -246,7 +294,26 @@ export function ChangeDetailPage() {
           <ActionButton label={t('changes.actions.submitAssessment')} onClick={() => transitionMutation.mutate({ targetStatus: 'Assessment' })} />
         ) : null}
         {can('change.assess') && change.status === 'Assessment' ? (
-          <ActionButton label={t('changes.actions.submitApproval')} onClick={() => transitionMutation.mutate({ targetStatus: 'Approval' })} />
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label>{t('changes.fields.approver')}</Label>
+              <Input
+                className="w-[16rem]"
+                value={approverUserId}
+                onChange={(e) => setApproverUserId(e.target.value)}
+                placeholder={t('changes.fields.approverPlaceholder')}
+              />
+            </div>
+            <ActionButton
+              label={t('changes.actions.submitApproval')}
+              onClick={() =>
+                transitionMutation.mutate({
+                  targetStatus: 'Approval',
+                  approverUserId: approverUserId || null,
+                })
+              }
+            />
+          </div>
         ) : null}
         {can('change.approve') && change.status === 'Approval' && !isRequester ? (
           <>
@@ -254,8 +321,20 @@ export function ChangeDetailPage() {
             <ActionButton label={t('changes.actions.reject')} onClick={() => rejectMutation.mutate()} />
           </>
         ) : null}
-        {can('change.schedule') && change.status === 'Approval' ? (
+        {can('change.schedule') && change.status === 'Approval' && !change.isRetrospective ? (
           <ActionButton label={t('changes.actions.schedule')} onClick={() => transitionMutation.mutate({ targetStatus: 'Scheduled' })} />
+        ) : null}
+        {can('change.implement') && change.status === 'Approval' && change.isRetrospective ? (
+          <ActionButton
+            label={t('changes.actions.retrospectiveValidate')}
+            onClick={() =>
+              transitionMutation.mutate({
+                targetStatus: 'Validation',
+                result: 'Successful',
+                validationNotes: validationNotes || null,
+              })
+            }
+          />
         ) : null}
         {can('change.implement') && change.status === 'Scheduled' ? (
           <ActionButton label={t('changes.actions.startImpl')} onClick={() => transitionMutation.mutate({ targetStatus: 'Implementation' })} />
@@ -543,22 +622,17 @@ export function ChangeDetailPage() {
       ) : null}
 
       {tab === 'history' ? (
-        <ul className="space-y-2 text-sm">
-          {(historyQuery.data ?? []).map((item) => (
-            <li key={item.id} className="rounded-md border border-border px-3 py-2">
-              <span className="font-medium">
-                {item.fromStatus} → {item.toStatus}
-              </span>
-              <span className="ms-2 text-muted-foreground">
-                {new Date(item.changedAtUtc).toLocaleString()}
-              </span>
-              {item.comment ? <p className="text-muted-foreground">{item.comment}</p> : null}
-            </li>
-          ))}
-          {(historyQuery.data ?? []).length === 0 ? (
-            <li className="text-muted-foreground">{t('changes.history.empty')}</li>
-          ) : null}
-        </ul>
+        <Timeline
+          items={(historyQuery.data ?? []).map((item) => ({
+            id: item.id,
+            timestamp: item.occurredAtUtc,
+            title: item.summary,
+            description: item.details,
+            actor: item.actorUserId?.slice(0, 8) ?? null,
+            type: item.event,
+          }))}
+          emptyMessage={t('changes.history.empty')}
+        />
       ) : null}
     </div>
   )

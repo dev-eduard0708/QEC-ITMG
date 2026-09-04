@@ -24,6 +24,7 @@ export function ChangeNewPage() {
   const [type, setType] = useState('Normal')
   const [riskRating, setRiskRating] = useState('Medium')
   const [isRetrospective, setIsRetrospective] = useState(false)
+  const [retrospectiveReason, setRetrospectiveReason] = useState('')
   const [isPreAuthorizedStandard, setIsPreAuthorizedStandard] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -35,7 +36,8 @@ export function ChangeNewPage() {
         type,
         riskRating,
         isRetrospective,
-        isPreAuthorizedStandard: type === 'Standard' && isPreAuthorizedStandard,
+        isPreAuthorizedStandard: type === 'Standard' && isPreAuthorizedStandard && !isRetrospective,
+        retrospectiveReason: isRetrospective ? retrospectiveReason : null,
       }),
     onSuccess: (created) => navigate(`/it/changes/${created.id}`),
     onError: (error) => {
@@ -116,7 +118,18 @@ export function ChangeNewPage() {
           />
           {t('changes.fields.retrospective')}
         </label>
-        {type === 'Standard' ? (
+        {isRetrospective ? (
+          <div className="space-y-2">
+            <Label htmlFor="retro-reason">{t('changes.fields.retrospectiveReason')}</Label>
+            <Input
+              id="retro-reason"
+              value={retrospectiveReason}
+              onChange={(e) => setRetrospectiveReason(e.target.value)}
+              required
+            />
+          </div>
+        ) : null}
+        {type === 'Standard' && !isRetrospective ? (
           <label className="flex items-center gap-2 text-sm">
             <Checkbox
               checked={isPreAuthorizedStandard}
