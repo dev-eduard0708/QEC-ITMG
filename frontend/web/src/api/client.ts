@@ -1894,5 +1894,204 @@ export const controlsApi = {
     }),
 }
 
+export type ComplianceFramework = {
+  id: string
+  code: string
+  name: string
+  publisher: string
+  description: string | null
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type FrameworkVersion = {
+  id: string
+  frameworkId: string
+  versionCode: string
+  title: string | null
+  publishedDate: string | null
+  effectiveDate: string | null
+  isCurrent: boolean
+  createdAtUtc: string
+}
+
+export type FrameworkDetail = {
+  framework: ComplianceFramework
+  versions: FrameworkVersion[]
+}
+
+export type FrameworkRequirement = {
+  id: string
+  frameworkVersionId: string
+  parentRequirementId: string | null
+  code: string
+  title: string
+  text: string | null
+  requirementType: string
+  sortOrder: number | null
+  isActive: boolean
+}
+
+export type ControlMapping = {
+  id: string
+  internalControlId: string
+  frameworkRequirementId: string
+  relationship: string
+  notes: string | null
+  createdByUserId: string
+  createdAtUtc: string
+  requirementCode: string | null
+  requirementTitle: string | null
+  frameworkVersionId: string | null
+  frameworkCode: string | null
+}
+
+export type FrameworkCoverage = {
+  frameworkVersionId: string
+  frameworkCode: string
+  versionCode: string
+  asOfUtc: string
+  totalRequirements: number
+  mappedRequirements: number
+  unmappedRequirements: number
+  mappedControls: number
+  assessedControls: number
+  unassessedControls: number
+  resultDistribution: {
+    compliant: number
+    partiallyCompliant: number
+    nonCompliant: number
+    notApplicable: number
+    notTested: number
+  }
+  evidenceMissingStatus: string
+  evidenceExpiredStatus: string
+  notes: string
+}
+
+export type ControlAssessment = {
+  id: string
+  internalControlId: string
+  frameworkVersionId: string | null
+  periodStart: string | null
+  periodEnd: string | null
+  status: string
+  result: string
+  assessorUserId: string | null
+  assessmentDateUtc: string | null
+  notes: string | null
+  testProcedureId: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type CalendarItem = {
+  id: string
+  title: string
+  itemType: string
+  internalControlId: string | null
+  frameworkVersionId: string | null
+  dueAtUtc: string
+  ownerUserId: string | null
+  status: string
+  completedAtUtc: string | null
+  notes: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  isOverdue: boolean
+}
+
+export const complianceApi = {
+  overview: (frameworkVersionId?: string) =>
+    apiFetch<{
+      coverage: FrameworkCoverage | null
+      upcomingCount: number
+      overdueCount: number
+      notes: string
+    }>(`/api/v1/compliance/overview${opsQuery({ frameworkVersionId })}`),
+  listFrameworks: () => apiFetch<ComplianceFramework[]>('/api/v1/compliance/frameworks'),
+  getFramework: (id: string) => apiFetch<FrameworkDetail>(`/api/v1/compliance/frameworks/${id}`),
+  listRequirements: (versionId: string) =>
+    apiFetch<FrameworkRequirement[]>(`/api/v1/compliance/frameworks/versions/${versionId}/requirements`),
+  getRequirement: (id: string) =>
+    apiFetch<{ requirement: FrameworkRequirement; mappedControls: ControlMapping[] }>(
+      `/api/v1/compliance/frameworks/requirements/${id}`,
+    ),
+  seedStructure: () =>
+    apiFetch<{ frameworksEnsured: number }>('/api/v1/compliance/frameworks/seed-structure', { method: 'POST' }),
+  listMappings: (params?: {
+    internalControlId?: string
+    frameworkRequirementId?: string
+    frameworkVersionId?: string
+  }) =>
+    apiFetch<ControlMapping[]>(
+      `/api/v1/compliance/mappings${opsQuery({
+        internalControlId: params?.internalControlId,
+        frameworkRequirementId: params?.frameworkRequirementId,
+        frameworkVersionId: params?.frameworkVersionId,
+      })}`,
+    ),
+  createMapping: (payload: {
+    internalControlId: string
+    frameworkRequirementId: string
+    relationship?: string
+    notes?: string | null
+  }) =>
+    apiFetch<ControlMapping>('/api/v1/compliance/mappings', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  deleteMapping: (id: string) =>
+    apiFetch<void>(`/api/v1/compliance/mappings/${id}`, { method: 'DELETE' }),
+  coverage: (frameworkVersionId: string) =>
+    apiFetch<FrameworkCoverage>(`/api/v1/compliance/coverage/${frameworkVersionId}`),
+  listAssessments: (params?: { page?: number; pageSize?: number; internalControlId?: string; status?: string }) =>
+    apiFetch<{ items: ControlAssessment[]; totalCount: number; page: number; pageSize: number }>(
+      `/api/v1/compliance/assessments${opsQuery({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        internalControlId: params?.internalControlId,
+        status: params?.status,
+      })}`,
+    ),
+  createAssessment: (payload: {
+    internalControlId: string
+    frameworkVersionId?: string | null
+    notes?: string | null
+  }) =>
+    apiFetch<ControlAssessment>('/api/v1/compliance/assessments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  startAssessment: (id: string) =>
+    apiFetch<ControlAssessment>(`/api/v1/compliance/assessments/${id}/start`, { method: 'POST' }),
+  completeAssessment: (id: string, result: string, notes?: string) =>
+    apiFetch<ControlAssessment>(`/api/v1/compliance/assessments/${id}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ result, notes }),
+    }),
+  listCalendar: (bucket?: string) =>
+    apiFetch<CalendarItem[]>(`/api/v1/compliance/calendar${opsQuery({ bucket })}`),
+  createCalendarItem: (payload: {
+    title: string
+    itemType: string
+    dueAtUtc: string
+    internalControlId?: string | null
+    notes?: string | null
+  }) =>
+    apiFetch<CalendarItem>('/api/v1/compliance/calendar', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  setCalendarStatus: (id: string, status: string) =>
+    apiFetch<CalendarItem>(`/api/v1/compliance/calendar/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+}
+
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''

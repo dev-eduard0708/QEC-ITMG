@@ -21,6 +21,11 @@ import { OrganizationPage } from '@/features/governance/organization-page'
 import { RegistersPage } from '@/features/governance/registers-page'
 import { ControlsPage, ControlNewPage } from '@/features/governance/controls-page'
 import { ControlDetailPage } from '@/features/governance/control-detail-page'
+import { ComplianceHomePage } from '@/features/compliance/compliance-home-page'
+import { FrameworksPage, FrameworkDetailPage } from '@/features/compliance/frameworks-page'
+import { MappingsPage } from '@/features/compliance/mappings-page'
+import { AssessmentsPage } from '@/features/compliance/assessments-page'
+import { CalendarPage } from '@/features/compliance/calendar-page'
 import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
@@ -147,6 +152,14 @@ export function AppRouter() {
           </Route>
           <Route element={<RequirePermission permission="control.manage" />}>
             <Route path="it/controls/new" element={<ControlNewPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="compliance.read" />}>
+            <Route path="it/compliance" element={<ComplianceHomePage />} />
+            <Route path="it/compliance/frameworks" element={<FrameworksPage />} />
+            <Route path="it/compliance/frameworks/:id" element={<FrameworkDetailPage />} />
+            <Route path="it/compliance/mappings" element={<MappingsPage />} />
+            <Route path="it/compliance/assessments" element={<AssessmentsPage />} />
+            <Route path="it/compliance/calendar" element={<CalendarPage />} />
           </Route>
           <Route path="unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

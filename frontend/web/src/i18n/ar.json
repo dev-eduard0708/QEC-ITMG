@@ -1,4 +1,4 @@
-﻿{
+{
   "brand.organization": "Ø´Ø±ÙƒØ© Ø¬ÙˆØ¯Ø© Ø§Ù„ØªØ¹Ù„ÙŠÙ…",
   "brand.name": "QEC ITMG",
   "brand.product": "Ù…Ù†ØµØ© Ø¥Ø¯Ø§Ø±Ø© ÙˆØ­ÙˆÙƒÙ…Ø© ØªÙ‚Ù†ÙŠØ© Ø§Ù„Ù…Ø¹Ù„ÙˆÙ…Ø§Øª",
@@ -11,6 +11,7 @@
   "nav.cmdb": "Ù‚Ø§Ø¹Ø¯Ø© Ø§Ù„ØªÙƒÙˆÙŠÙ†",
   "nav.governance": "الحوكمة",
   "nav.controls": "الضوابط",
+  "nav.compliance": "الامتثال",
   "nav.admin": "Ø§Ù„Ø¥Ø¯Ø§Ø±Ø©",
   "status.development": "Ø¨ÙŠØ¦Ø© Ø§Ù„ØªØ·ÙˆÙŠØ±",
   "status.foundation": "Ù…Ø±Ø­Ù„Ø© Ø§Ù„Ø£Ø³Ø§Ø³",

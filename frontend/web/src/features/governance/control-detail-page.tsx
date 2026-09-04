@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { controlsApi } from '@/api/client'
+import { controlsApi, complianceApi } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -29,6 +29,12 @@ export function ControlDetailPage() {
     queryKey: ['controls', id],
     queryFn: () => controlsApi.get(id),
     enabled: !!id,
+  })
+
+  const mappingsQuery = useQuery({
+    queryKey: ['compliance', 'mappings', 'control', id],
+    queryFn: () => complianceApi.listMappings({ internalControlId: id }),
+    enabled: !!id && can('compliance.read'),
   })
 
   const invalidate = async () => {
@@ -190,6 +196,28 @@ export function ControlDetailPage() {
           ) : null}
         </CardContent>
       </Card>
+
+      {can('compliance.read') ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('controls.sections.frameworkMappings')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {(mappingsQuery.data ?? []).length === 0 ? (
+              <p className="text-muted-foreground">{t('controls.noMappings')}</p>
+            ) : (
+              mappingsQuery.data!.map((m) => (
+                <div key={m.id} className="rounded border p-2">
+                  {m.frameworkCode} · {m.requirementCode} · {m.requirementTitle} ({m.relationship})
+                </div>
+              ))
+            )}
+            <Button asChild variant="secondary" size="sm">
+              <Link to="/it/compliance/mappings">{t('controls.openMappings')}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
