@@ -48,3 +48,9 @@ export const changeKeys = {
   history: (id: string) => [...changeKeys.all, 'history', id] as const,
   catalog: () => [...changeKeys.all, 'catalog'] as const,
 }
+
+export const eventKeys = {
+  all: ['events'] as const,
+  list: (filters: string) => [...eventKeys.all, 'list', filters] as const,
+  detail: (id: string) => [...eventKeys.all, 'detail', id] as const,
+}

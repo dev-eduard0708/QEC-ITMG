@@ -125,6 +125,16 @@ export function ItHomePage() {
                 <Link to="/it/cmdb">{t('nav.cmdb')}</Link>
               </Button>
             ) : null}
+            {can('event.read') ? (
+              <Button asChild variant="secondary">
+                <Link to="/it/events">{t('nav.events')}</Link>
+              </Button>
+            ) : null}
+            {can('change.read') ? (
+              <Button asChild variant="secondary">
+                <Link to="/it/changes">{t('nav.changes')}</Link>
+              </Button>
+            ) : null}
           </CardContent>
         </Card>
         {(can('admin.users') || can('admin.roles') || can('admin.lookups')) ? (

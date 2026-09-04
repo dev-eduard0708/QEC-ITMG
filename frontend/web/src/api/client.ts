@@ -927,6 +927,88 @@ export const changesApi = {
     }),
 }
 
+export type OperationalEvent = {
+  id: string
+  eventNumber: string
+  source: string
+  sourceEventKey: string
+  severity: string
+  title: string
+  summary: string
+  configurationItemId: string | null
+  status: string
+  occurrenceCount: number
+  firstSeenAtUtc: string
+  lastSeenAtUtc: string
+  acknowledgedAtUtc: string | null
+  acknowledgedByUserId: string | null
+  linkedTicketId: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type EventListResult = {
+  items: OperationalEvent[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type IngestEventResult = {
+  event: OperationalEvent
+  created: boolean
+}
+
+export type PromoteEventResult = {
+  event: OperationalEvent
+  ticketId: string
+  ticketNumber: string
+}
+
+export const eventsApi = {
+  list: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    status?: string
+    severity?: string
+    source?: string
+  }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+    if (params?.search?.trim()) query.set('search', params.search.trim())
+    if (params?.status?.trim()) query.set('status', params.status.trim())
+    if (params?.severity?.trim()) query.set('severity', params.severity.trim())
+    if (params?.source?.trim()) query.set('source', params.source.trim())
+    const qs = query.toString()
+    return apiFetch<EventListResult>(`/api/v1/events${qs ? `?${qs}` : ''}`)
+  },
+  get: (id: string) => apiFetch<OperationalEvent>(`/api/v1/events/${id}`),
+  ingest: (payload: {
+    source: string
+    sourceEventKey: string
+    severity: string
+    title: string
+    summary: string
+    configurationItemId?: string | null
+  }) =>
+    apiFetch<IngestEventResult>('/api/v1/events/ingest', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  acknowledge: (id: string) =>
+    apiFetch<OperationalEvent>(`/api/v1/events/${id}/acknowledge`, { method: 'POST' }),
+  promote: (id: string, payload?: { title?: string; description?: string; priority?: string }) =>
+    apiFetch<PromoteEventResult>(`/api/v1/events/${id}/promote`, {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {}),
+    }),
+  close: (id: string) =>
+    apiFetch<OperationalEvent>(`/api/v1/events/${id}/close`, { method: 'POST' }),
+}
+
 export type TicketDashboard = {
   openTickets: number
   unassigned: number

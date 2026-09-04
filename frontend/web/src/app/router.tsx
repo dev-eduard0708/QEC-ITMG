@@ -25,6 +25,8 @@ import { ItKnowledgePage } from '@/features/it/knowledge-page'
 import { ProblemDetailPage } from '@/features/it/problem-detail-page'
 import { ProblemsPage } from '@/features/it/problems-page'
 import { ChangesPage } from '@/features/it/changes-page'
+import { EventsPage } from '@/features/it/events-page'
+import { EventDetailPage } from '@/features/it/event-detail-page'
 import { ChangeNewPage } from '@/features/it/change-new-page'
 import { ChangeCatalogPage } from '@/features/it/change-catalog-page'
 import { ChangeDetailPage } from '@/features/it/change-detail-page'
@@ -69,6 +71,10 @@ export function AppRouter() {
             <Route path="it/changes/catalog" element={<ChangeCatalogPage />} />
             <Route path="it/changes/new" element={<ChangeNewPage />} />
             <Route path="it/changes/:id" element={<ChangeDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="event.read" />}>
+            <Route path="it/events" element={<EventsPage />} />
+            <Route path="it/events/:id" element={<EventDetailPage />} />
           </Route>
           <Route element={<RequirePermission permission="kb.read" />}>
             <Route path="it/knowledge" element={<ItKnowledgePage />} />
