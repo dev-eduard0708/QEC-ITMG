@@ -40,6 +40,7 @@ internal sealed class ProblemConfiguration : IEntityTypeConfiguration<Problem>
 
         builder.Property(item => item.RootCause).HasMaxLength(4000).HasColumnType("nvarchar(4000)");
         builder.Property(item => item.Workaround).HasMaxLength(4000).HasColumnType("nvarchar(4000)");
+        builder.Property(item => item.IsKnownError).IsRequired();
         builder.Property(item => item.CreatedAtUtc).IsRequired();
         builder.Property(item => item.UpdatedAtUtc).IsRequired();
         builder.Property(item => item.RowVersion).IsRowVersion().IsConcurrencyToken();
@@ -50,6 +51,9 @@ internal sealed class ProblemConfiguration : IEntityTypeConfiguration<Problem>
 
         builder.HasIndex(item => new { item.Status, item.UpdatedAtUtc })
             .HasDatabaseName("IX_Problem_Status_UpdatedAtUtc");
+
+        builder.HasIndex(item => item.IsKnownError)
+            .HasDatabaseName("IX_Problem_IsKnownError");
     }
 }
 

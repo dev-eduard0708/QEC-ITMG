@@ -38,6 +38,13 @@ public static class ProblemEndpoints
             return Results.Ok(result);
         });
 
+        // Static paths before {id}
+        readGroup.MapGet("/recurring-groups", async (
+            int? take,
+            ProblemService service,
+            CancellationToken cancellationToken) =>
+            Results.Ok(await service.ListTopRecurringGroupsAsync(take ?? 10, cancellationToken)));
+
         readGroup.MapGet("/{id:guid}", async (
             Guid id,
             ProblemService service,
@@ -45,6 +52,19 @@ public static class ProblemEndpoints
         {
             ProblemDto? problem = await service.GetAsync(id, cancellationToken);
             return problem is null ? Results.NotFound() : Results.Ok(problem);
+        });
+
+        readGroup.MapGet("/{id:guid}/metrics", async (
+            Guid id,
+            int? recentDays,
+            ProblemService service,
+            CancellationToken cancellationToken) =>
+        {
+            ProblemRecurringMetricsDto? metrics = await service.GetRecurringMetricsAsync(
+                id,
+                recentDays ?? 30,
+                cancellationToken);
+            return metrics is null ? Results.NotFound() : Results.Ok(metrics);
         });
 
         readGroup.MapGet("/{id:guid}/incidents", async (
@@ -167,6 +187,40 @@ public static class ProblemEndpoints
             catch (InvalidOperationException ex)
             {
                 return FromDomainError(ex);
+            }
+        });
+
+        manageGroup.MapPost("/{id:guid}/known-error", async (
+            Guid id,
+            SetKnownErrorRequest request,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            ProblemService service,
+            CancellationToken cancellationToken) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, cancellationToken);
+            if (session is null)
+            {
+                return SessionUnavailable();
+            }
+
+            try
+            {
+                await service.SetKnownErrorAsync(
+                    id,
+                    request.IsKnownError,
+                    session.Id,
+                    request.RowVersion ?? string.Empty,
+                    cancellationToken);
+                return Results.Ok(await service.GetAsync(id, cancellationToken));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromDomainError(ex);
+            }
+            catch (ArgumentException ex)
+            {
+                return ValidationProblem(ex.Message);
             }
         });
 
@@ -296,5 +350,7 @@ public sealed record UpdateProblemRequest(
     string? RowVersion);
 
 public sealed record ChangeProblemStatusRequest(string Status, string? RowVersion);
+
+public sealed record SetKnownErrorRequest(bool IsKnownError, string? RowVersion);
 
 public sealed record LinkProblemIncidentRequest(Guid IncidentTicketId);

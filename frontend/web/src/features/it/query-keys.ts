@@ -35,4 +35,6 @@ export const problemKeys = {
   list: (filters: string) => [...problemKeys.all, 'list', filters] as const,
   detail: (id: string) => [...problemKeys.all, 'detail', id] as const,
   incidents: (id: string) => [...problemKeys.all, 'incidents', id] as const,
+  metrics: (id: string) => [...problemKeys.all, 'metrics', id] as const,
+  recurringGroups: () => [...problemKeys.all, 'recurring-groups'] as const,
 }

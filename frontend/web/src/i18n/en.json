@@ -397,4 +397,18 @@
   "problems.searchIncidents": "Search incidents",
   "problems.link": "Link",
   "problems.unlink": "Unlink"
+,
+  "problems.knownError.badge": "Known Error",
+  "problems.knownError.title": "Known error",
+  "problems.knownError.mark": "Mark as Known Error",
+  "problems.knownError.clear": "Clear Known Error",
+  "problems.metrics.title": "Recurring incident metrics",
+  "problems.metrics.linked": "Linked incidents",
+  "problems.metrics.open": "Open linked",
+  "problems.metrics.major": "Major linked",
+  "problems.metrics.first": "First occurrence",
+  "problems.metrics.latest": "Latest occurrence",
+  "problems.metrics.recent": "Last {{days}} days",
+  "problems.recurring.title": "Top recurring groups",
+  "problems.recurring.incidents": "incidents"
 }

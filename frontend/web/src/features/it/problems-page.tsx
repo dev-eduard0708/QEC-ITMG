@@ -54,6 +54,10 @@ export function ProblemsPage() {
         priority: priority === 'all' ? undefined : priority,
       }),
   })
+  const recurringQuery = useQuery({
+    queryKey: problemKeys.recurringGroups(),
+    queryFn: () => problemsApi.recurringGroups(8),
+  })
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -78,7 +82,18 @@ export function ProblemsPage() {
   const columns = useMemo<ColumnDef<Problem, unknown>[]>(
     () => [
       { accessorKey: 'problemNumber', header: t('problems.columns.number') },
-      { accessorKey: 'title', header: t('problems.columns.title') },
+      {
+        accessorKey: 'title',
+        header: t('problems.columns.title'),
+        cell: ({ row }) => (
+          <span className="inline-flex items-center gap-2">
+            {row.original.title}
+            {row.original.isKnownError ? (
+              <Badge variant="warning">{t('problems.knownError.badge')}</Badge>
+            ) : null}
+          </span>
+        ),
+      },
       {
         accessorKey: 'status',
         header: t('problems.columns.status'),
@@ -117,6 +132,23 @@ export function ProblemsPage() {
           ) : undefined
         }
       />
+
+      {(recurringQuery.data ?? []).length > 0 ? (
+        <section className="space-y-2 rounded-md border border-border p-4 text-sm">
+          <h2 className="font-semibold">{t('problems.recurring.title')}</h2>
+          <ul className="grid gap-1 sm:grid-cols-2">
+            {(recurringQuery.data ?? []).map((item) => (
+              <li key={`${item.groupType}:${item.groupKey}`} className="text-muted-foreground">
+                <span className="font-medium text-foreground">{item.groupType}</span>
+                {' · '}
+                {item.groupKey.slice(0, 24)}
+                {' · '}
+                {item.incidentCount} {t('problems.recurring.incidents')}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex min-w-[220px] flex-1 gap-2">

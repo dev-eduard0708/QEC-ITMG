@@ -582,11 +582,31 @@ export type Problem = {
   configurationItemId: string | null
   rootCause: string | null
   workaround: string | null
+  isKnownError: boolean
+  knownErrorAtUtc: string | null
+  knownErrorByUserId: string | null
   createdAtUtc: string
   updatedAtUtc: string
   resolvedAtUtc: string | null
   closedAtUtc: string | null
   rowVersion: string
+}
+
+export type ProblemRecurringMetrics = {
+  linkedIncidentCount: number
+  openLinkedIncidents: number
+  majorLinkedIncidents: number
+  firstOccurrenceUtc: string | null
+  latestOccurrenceUtc: string | null
+  recentOccurrenceCount: number
+  recentWindowDays: number
+}
+
+export type RecurringIncidentGroup = {
+  groupType: string
+  groupKey: string
+  incidentCount: number
+  linkedProblemCount: number
 }
 
 export type ProblemListResult = {
@@ -626,6 +646,10 @@ export const problemsApi = {
     return apiFetch<ProblemListResult>(`/api/v1/problems${qs ? `?${qs}` : ''}`)
   },
   get: (id: string) => apiFetch<Problem>(`/api/v1/problems/${id}`),
+  metrics: (id: string, recentDays = 30) =>
+    apiFetch<ProblemRecurringMetrics>(`/api/v1/problems/${id}/metrics?recentDays=${recentDays}`),
+  recurringGroups: (take = 10) =>
+    apiFetch<RecurringIncidentGroup[]>(`/api/v1/problems/recurring-groups?take=${take}`),
   create: (payload: {
     title: string
     description: string
@@ -658,6 +682,11 @@ export const problemsApi = {
     apiFetch<Problem>(`/api/v1/problems/${id}/status`, {
       method: 'POST',
       body: JSON.stringify({ status, rowVersion: rowVersion ?? null }),
+    }),
+  setKnownError: (id: string, isKnownError: boolean, rowVersion?: string | null) =>
+    apiFetch<Problem>(`/api/v1/problems/${id}/known-error`, {
+      method: 'POST',
+      body: JSON.stringify({ isKnownError, rowVersion: rowVersion ?? null }),
     }),
   listIncidents: (id: string) =>
     apiFetch<ProblemIncidentLink[]>(`/api/v1/problems/${id}/incidents`),

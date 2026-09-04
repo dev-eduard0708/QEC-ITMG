@@ -18,6 +18,9 @@ public sealed record ProblemDto(
     Guid? ConfigurationItemId,
     string? RootCause,
     string? Workaround,
+    bool IsKnownError,
+    DateTimeOffset? KnownErrorAtUtc,
+    Guid? KnownErrorByUserId,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
     DateTimeOffset? ResolvedAtUtc,
@@ -29,6 +32,21 @@ public sealed record ProblemListResult(
     int TotalCount,
     int Page,
     int PageSize);
+
+public sealed record ProblemRecurringMetricsDto(
+    int LinkedIncidentCount,
+    int OpenLinkedIncidents,
+    int MajorLinkedIncidents,
+    DateTimeOffset? FirstOccurrenceUtc,
+    DateTimeOffset? LatestOccurrenceUtc,
+    int RecentOccurrenceCount,
+    int RecentWindowDays);
+
+public sealed record RecurringIncidentGroupDto(
+    string GroupType,
+    string GroupKey,
+    int IncidentCount,
+    int LinkedProblemCount);
 
 public sealed record ProblemIncidentDto(
     Guid ProblemId,
@@ -236,6 +254,126 @@ public sealed class ProblemService(
         return problem;
     }
 
+    public async Task<Problem> SetKnownErrorAsync(
+        Guid id,
+        bool isKnownError,
+        Guid byUserId,
+        string rowVersion,
+        CancellationToken cancellationToken = default)
+    {
+        Problem problem = await db.Problems.FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Problem was not found.");
+
+        bool previous = problem.IsKnownError;
+        problem.SetKnownError(isKnownError, byUserId, rowVersion, clock.UtcNow);
+
+        await sharedDbTransaction.ExecuteAsync(
+            async ct =>
+            {
+                if (previous != problem.IsKnownError)
+                {
+                    await businessAudit.AppendAsync(
+                        ServiceDeskAuditComposer.ProblemField(
+                            problem.Id,
+                            problem.ProblemNumber,
+                            "IsKnownError",
+                            previous.ToString(),
+                            problem.IsKnownError.ToString()),
+                        ct);
+                }
+
+                await db.SaveChangesAsync(ct);
+            },
+            cancellationToken);
+
+        return problem;
+    }
+
+    public async Task<ProblemRecurringMetricsDto?> GetRecurringMetricsAsync(
+        Guid problemId,
+        int recentWindowDays = 30,
+        CancellationToken cancellationToken = default)
+    {
+        recentWindowDays = Math.Clamp(recentWindowDays, 1, 365);
+        bool exists = await db.Problems.AsNoTracking().AnyAsync(item => item.Id == problemId, cancellationToken);
+        if (!exists)
+        {
+            return null;
+        }
+
+        DateTimeOffset recentFrom = clock.UtcNow.AddDays(-recentWindowDays);
+        TicketStatus[] closed =
+        [
+            TicketStatus.Resolved,
+            TicketStatus.Closed,
+            TicketStatus.Cancelled,
+        ];
+
+        var tickets = await (
+            from link in db.ProblemIncidents.AsNoTracking()
+            join ticket in db.Tickets.AsNoTracking() on link.IncidentTicketId equals ticket.Id
+            where link.ProblemId == problemId && ticket.Type == TicketType.Incident
+            select ticket).ToListAsync(cancellationToken);
+
+        if (tickets.Count == 0)
+        {
+            return new ProblemRecurringMetricsDto(0, 0, 0, null, null, 0, recentWindowDays);
+        }
+
+        return new ProblemRecurringMetricsDto(
+            LinkedIncidentCount: tickets.Count,
+            OpenLinkedIncidents: tickets.Count(item => !closed.Contains(item.Status)),
+            MajorLinkedIncidents: tickets.Count(item => item.IsMajorIncident),
+            FirstOccurrenceUtc: tickets.Min(item => item.CreatedAtUtc),
+            LatestOccurrenceUtc: tickets.Max(item => item.CreatedAtUtc),
+            RecentOccurrenceCount: tickets.Count(item => item.CreatedAtUtc >= recentFrom),
+            RecentWindowDays: recentWindowDays);
+    }
+
+    public async Task<IReadOnlyList<RecurringIncidentGroupDto>> ListTopRecurringGroupsAsync(
+        int take = 10,
+        CancellationToken cancellationToken = default)
+    {
+        take = Math.Clamp(take, 1, 25);
+
+        var linked = await (
+            from link in db.ProblemIncidents.AsNoTracking()
+            join ticket in db.Tickets.AsNoTracking() on link.IncidentTicketId equals ticket.Id
+            where ticket.Type == TicketType.Incident
+            select new { ticket.ConfigurationItemId, ticket.Category, link.ProblemId }).ToListAsync(cancellationToken);
+
+        List<RecurringIncidentGroupDto> groups = [];
+
+        groups.AddRange(
+            linked
+                .Where(item => item.ConfigurationItemId is not null)
+                .GroupBy(item => item.ConfigurationItemId!.Value)
+                .Select(group => new RecurringIncidentGroupDto(
+                    "ConfigurationItem",
+                    group.Key.ToString("D"),
+                    group.Select(item => item).Count(),
+                    group.Select(item => item.ProblemId).Distinct().Count()))
+                .OrderByDescending(item => item.IncidentCount)
+                .Take(take));
+
+        groups.AddRange(
+            linked
+                .Where(item => !string.IsNullOrWhiteSpace(item.Category))
+                .GroupBy(item => item.Category!)
+                .Select(group => new RecurringIncidentGroupDto(
+                    "Category",
+                    group.Key,
+                    group.Count(),
+                    group.Select(item => item.ProblemId).Distinct().Count()))
+                .OrderByDescending(item => item.IncidentCount)
+                .Take(take));
+
+        return groups
+            .OrderByDescending(item => item.IncidentCount)
+            .Take(take)
+            .ToList();
+    }
+
     public async Task<IReadOnlyList<ProblemIncidentDto>> ListIncidentsAsync(
         Guid problemId,
         CancellationToken cancellationToken = default)
@@ -401,6 +539,9 @@ public sealed class ProblemService(
             problem.ConfigurationItemId,
             problem.RootCause,
             problem.Workaround,
+            problem.IsKnownError,
+            problem.KnownErrorAtUtc,
+            problem.KnownErrorByUserId,
             problem.CreatedAtUtc,
             problem.UpdatedAtUtc,
             problem.ResolvedAtUtc,

@@ -397,4 +397,18 @@
   "problems.searchIncidents": "بحث الحوادث",
   "problems.link": "ربط",
   "problems.unlink": "إلغاء الربط"
+,
+  "problems.knownError.badge": "خطأ معروف",
+  "problems.knownError.title": "خطأ معروف",
+  "problems.knownError.mark": "تعيين كخطأ معروف",
+  "problems.knownError.clear": "إزالة الخطأ المعروف",
+  "problems.metrics.title": "مقاييس الحوادث المتكررة",
+  "problems.metrics.linked": "حوادث مرتبطة",
+  "problems.metrics.open": "مفتوحة",
+  "problems.metrics.major": "كبرى",
+  "problems.metrics.first": "أول ظهور",
+  "problems.metrics.latest": "آخر ظهور",
+  "problems.metrics.recent": "آخر {{days}} يوماً",
+  "problems.recurring.title": "أكثر المجموعات تكراراً",
+  "problems.recurring.incidents": "حوادث"
 }

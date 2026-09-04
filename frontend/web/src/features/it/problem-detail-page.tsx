@@ -56,6 +56,11 @@ export function ProblemDetailPage() {
     queryFn: () => problemsApi.listIncidents(id),
     enabled: Boolean(id),
   })
+  const metricsQuery = useQuery({
+    queryKey: problemKeys.metrics(id),
+    queryFn: () => problemsApi.metrics(id),
+    enabled: Boolean(id),
+  })
   const incidentSearchQuery = useQuery({
     queryKey: [...ticketKeys.all, 'link-search', incidentSearch],
     queryFn: () =>
@@ -84,6 +89,7 @@ export function ProblemDetailPage() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: problemKeys.detail(id) }),
       queryClient.invalidateQueries({ queryKey: problemKeys.incidents(id) }),
+      queryClient.invalidateQueries({ queryKey: problemKeys.metrics(id) }),
       queryClient.invalidateQueries({ queryKey: problemKeys.all }),
     ])
   }
@@ -144,6 +150,18 @@ export function ProblemDetailPage() {
     },
   })
 
+  const knownErrorMutation = useMutation({
+    mutationFn: (isKnownError: boolean) =>
+      problemsApi.setKnownError(id, isKnownError, problemQuery.data?.rowVersion),
+    onSuccess: async () => {
+      setFormError(null)
+      await refresh()
+    },
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : t('problems.error.generic'))
+    },
+  })
+
   if (problemQuery.isLoading) {
     return <Skeleton className="h-40 w-full" />
   }
@@ -167,7 +185,44 @@ export function ProblemDetailPage() {
       <div className="flex flex-wrap gap-2">
         <Badge>{problem.status}</Badge>
         <Badge variant="outline">{problem.priority}</Badge>
+        {problem.isKnownError ? <Badge variant="warning">{t('problems.knownError.badge')}</Badge> : null}
       </div>
+
+      {metricsQuery.data ? (
+        <section className="grid gap-2 rounded-md border border-border p-4 text-sm sm:grid-cols-3">
+          <h2 className="sm:col-span-3 text-sm font-semibold">{t('problems.metrics.title')}</h2>
+          <p>
+            <span className="text-muted-foreground">{t('problems.metrics.linked')}: </span>
+            {metricsQuery.data.linkedIncidentCount}
+          </p>
+          <p>
+            <span className="text-muted-foreground">{t('problems.metrics.open')}: </span>
+            {metricsQuery.data.openLinkedIncidents}
+          </p>
+          <p>
+            <span className="text-muted-foreground">{t('problems.metrics.major')}: </span>
+            {metricsQuery.data.majorLinkedIncidents}
+          </p>
+          <p>
+            <span className="text-muted-foreground">{t('problems.metrics.first')}: </span>
+            {metricsQuery.data.firstOccurrenceUtc
+              ? new Date(metricsQuery.data.firstOccurrenceUtc).toLocaleString()
+              : '—'}
+          </p>
+          <p>
+            <span className="text-muted-foreground">{t('problems.metrics.latest')}: </span>
+            {metricsQuery.data.latestOccurrenceUtc
+              ? new Date(metricsQuery.data.latestOccurrenceUtc).toLocaleString()
+              : '—'}
+          </p>
+          <p>
+            <span className="text-muted-foreground">
+              {t('problems.metrics.recent', { days: metricsQuery.data.recentWindowDays })}:{' '}
+            </span>
+            {metricsQuery.data.recentOccurrenceCount}
+          </p>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2">
         <div className="space-y-3 text-sm">
@@ -211,6 +266,18 @@ export function ProblemDetailPage() {
                   {t('problems.actions.applyStatus')}
                 </Button>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t('problems.knownError.title')}</Label>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={knownErrorMutation.isPending}
+                onClick={() => knownErrorMutation.mutate(!problem.isKnownError)}
+              >
+                {problem.isKnownError ? t('problems.knownError.clear') : t('problems.knownError.mark')}
+              </Button>
             </div>
 
             <div className="space-y-2">

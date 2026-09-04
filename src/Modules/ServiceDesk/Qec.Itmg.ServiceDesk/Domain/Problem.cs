@@ -34,6 +34,12 @@ public sealed class Problem
 
     public string? Workaround { get; private set; }
 
+    public bool IsKnownError { get; private set; }
+
+    public DateTimeOffset? KnownErrorAtUtc { get; private set; }
+
+    public Guid? KnownErrorByUserId { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public DateTimeOffset UpdatedAtUtc { get; private set; }
@@ -71,9 +77,35 @@ public sealed class Problem
             Priority = priority,
             OwnerUserId = NormalizeGuid(ownerUserId),
             ConfigurationItemId = NormalizeGuid(configurationItemId),
+            IsKnownError = false,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow,
         };
+    }
+
+    public void SetKnownError(bool isKnownError, Guid byUserId, string rowVersion, DateTimeOffset utcNow)
+    {
+        if (byUserId == Guid.Empty)
+        {
+            throw new ArgumentException("User is required.", nameof(byUserId));
+        }
+
+        EnsureRowVersion(rowVersion);
+
+        if (isKnownError)
+        {
+            IsKnownError = true;
+            KnownErrorAtUtc ??= utcNow;
+            KnownErrorByUserId ??= byUserId;
+        }
+        else
+        {
+            IsKnownError = false;
+            KnownErrorAtUtc = null;
+            KnownErrorByUserId = null;
+        }
+
+        UpdatedAtUtc = utcNow;
     }
 
     public void UpdateDetails(
