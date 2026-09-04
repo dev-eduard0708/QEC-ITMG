@@ -54,6 +54,12 @@ public static class IdentitySeedCatalog
         ("backup.manage", "Manage backup jobs, runs, and restore tests"),
         ("cert.manage", "Manage certificate records (no private keys)"),
         ("patch.manage", "Manage patch baselines and deployment tracking"),
+        ("access.request", "Create and view access cases (JML / access requests)"),
+        ("access.approve", "Approve or reject access cases"),
+        ("access.fulfill", "Fulfill and verify access case checklist items"),
+        ("access.review", "Manage access review campaigns and decisions"),
+        ("access.privileged.manage", "Manage privileged and service account metadata"),
+        ("sod.manage", "Manage segregation of duties rules and exceptions"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
     ];

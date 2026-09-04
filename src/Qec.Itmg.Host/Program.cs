@@ -13,6 +13,7 @@ using Qec.Itmg.Host.Lookups;
 using Qec.Itmg.Host.Notifications;
 using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Host.ChangeManagement;
+using Qec.Itmg.Host.AccessManagement;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -59,6 +60,7 @@ try
     builder.Services.AddScoped<TicketNotificationService>();
     builder.Services.AddScoped<ChangeNotificationService>();
     builder.Services.AddScoped<ChangeHistoryService>();
+    builder.Services.AddScoped<AccessNotificationService>();
 
     bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
     string? hangfireConnection = builder.Configuration.GetConnectionString(QecEfConventions.ConnectionStringName);
@@ -159,6 +161,7 @@ try
     app.MapChangeEndpoints();
     app.MapEventEndpoints();
     app.MapOpsRecordsEndpoints();
+    app.MapAccessEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

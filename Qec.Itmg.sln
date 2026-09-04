@@ -49,6 +49,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Operations", "Operations", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Qec.Itmg.Operations", "src\Modules\Operations\Qec.Itmg.Operations\Qec.Itmg.Operations.csproj", "{38FC613D-8E54-4A99-BDD3-65182ED44958}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "AccessManagement", "AccessManagement", "{3B2357C8-7355-722C-FF7C-FF01344AF37A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Qec.Itmg.AccessManagement", "src\Modules\AccessManagement\Qec.Itmg.AccessManagement\Qec.Itmg.AccessManagement.csproj", "{8F178E91-C0D2-4AC5-AE95-05452E601C7F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -215,6 +219,18 @@ Global
 		{38FC613D-8E54-4A99-BDD3-65182ED44958}.Release|x64.Build.0 = Release|Any CPU
 		{38FC613D-8E54-4A99-BDD3-65182ED44958}.Release|x86.ActiveCfg = Release|Any CPU
 		{38FC613D-8E54-4A99-BDD3-65182ED44958}.Release|x86.Build.0 = Release|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Debug|x64.Build.0 = Debug|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Debug|x86.Build.0 = Debug|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Release|x64.ActiveCfg = Release|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Release|x64.Build.0 = Release|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Release|x86.ActiveCfg = Release|Any CPU
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -240,6 +256,8 @@ Global
 		{01D76E38-469E-4344-985B-3D99368C06E0} = {5D290246-4DFC-C19D-601B-4B2417029AB0}
 		{9BA233D0-7A7A-1820-642C-6490D92789ED} = {A1000001-0000-4000-8000-000000000005}
 		{38FC613D-8E54-4A99-BDD3-65182ED44958} = {9BA233D0-7A7A-1820-642C-6490D92789ED}
+		{3B2357C8-7355-722C-FF7C-FF01344AF37A} = {A1000001-0000-4000-8000-000000000005}
+		{8F178E91-C0D2-4AC5-AE95-05452E601C7F} = {3B2357C8-7355-722C-FF7C-FF01344AF37A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {C1000001-0000-4000-8000-000000000001}
