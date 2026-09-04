@@ -138,6 +138,7 @@ try
     app.MapCmdbEndpoints();
     app.MapAssetEndpoints();
     app.MapTicketEndpoints();
+    app.MapIncidentEndpoints();
     app.MapKnowledgeBaseEndpoints();
     app.MapIntegrationReadinessEndpoints();
 

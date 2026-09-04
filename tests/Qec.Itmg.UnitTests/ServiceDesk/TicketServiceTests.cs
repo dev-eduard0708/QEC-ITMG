@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Contracts.Numbering;
 using Qec.Itmg.Platform.NumberSequence;
 using Qec.Itmg.Platform.Persistence;
@@ -100,6 +101,8 @@ public sealed class TicketServiceTests
         services.AddDbContext<PlatformDbContext>(options => options.UseInMemoryDatabase($"plt-sd-{dbName}"));
         services.AddDbContext<ServiceDeskDbContext>(options => options.UseInMemoryDatabase($"sd-{dbName}"));
         services.AddScoped<INumberSequenceService, NumberSequenceService>();
+        services.AddScoped<IBusinessAuditWriter, NoOpBusinessAuditWriter>();
+        services.AddScoped<ISharedDbTransaction, ImmediateSharedDbTransaction>();
         services.AddScoped<TicketService>();
         services.AddScoped<SlaEvaluationService>();
         return services.BuildServiceProvider();
@@ -108,5 +111,22 @@ public sealed class TicketServiceTests
     private sealed class FixedClock(DateTimeOffset utcNow) : IClock
     {
         public DateTimeOffset UtcNow { get; } = utcNow;
+    }
+
+    private sealed class NoOpBusinessAuditWriter : IBusinessAuditWriter
+    {
+        public ValueTask AppendAsync(BusinessAuditEntry entry, CancellationToken cancellationToken = default) =>
+            ValueTask.CompletedTask;
+
+        public ValueTask AppendManyAsync(
+            IEnumerable<BusinessAuditEntry> entries,
+            CancellationToken cancellationToken = default) =>
+            ValueTask.CompletedTask;
+    }
+
+    private sealed class ImmediateSharedDbTransaction : ISharedDbTransaction
+    {
+        public Task ExecuteAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default) =>
+            work(cancellationToken);
     }
 }
