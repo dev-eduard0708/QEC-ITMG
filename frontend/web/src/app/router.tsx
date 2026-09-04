@@ -24,6 +24,9 @@ import { ItHomePage } from '@/features/it/it-home-page'
 import { ItKnowledgePage } from '@/features/it/knowledge-page'
 import { ProblemDetailPage } from '@/features/it/problem-detail-page'
 import { ProblemsPage } from '@/features/it/problems-page'
+import { ChangesPage } from '@/features/it/changes-page'
+import { ChangeNewPage } from '@/features/it/change-new-page'
+import { ChangeDetailPage } from '@/features/it/change-detail-page'
 import { TicketDetailPage } from '@/features/it/ticket-detail-page'
 import { TicketsPage } from '@/features/it/tickets-page'
 import { FoundationHomePage } from '@/features/foundation/foundation-home-page'
@@ -59,6 +62,11 @@ export function AppRouter() {
           <Route element={<RequirePermission permission="problems.read" />}>
             <Route path="it/problems" element={<ProblemsPage />} />
             <Route path="it/problems/:id" element={<ProblemDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="change.read" />}>
+            <Route path="it/changes" element={<ChangesPage />} />
+            <Route path="it/changes/new" element={<ChangeNewPage />} />
+            <Route path="it/changes/:id" element={<ChangeDetailPage />} />
           </Route>
           <Route element={<RequirePermission permission="kb.read" />}>
             <Route path="it/knowledge" element={<ItKnowledgePage />} />

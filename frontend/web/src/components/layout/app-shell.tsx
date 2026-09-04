@@ -10,6 +10,7 @@ import {
   Monitor,
   Moon,
   Network,
+  RefreshCw,
   Settings2,
   Shield,
   Sun,
@@ -80,6 +81,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         icon: Shield,
         end: false,
         visible: can('problems.read'),
+      },
+      {
+        to: '/it/changes',
+        labelKey: 'nav.changes',
+        icon: RefreshCw,
+        end: false,
+        visible: can('change.read'),
       },
       {
         to: '/it/knowledge',
@@ -266,6 +274,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/assets')) return t('nav.assets')
   if (pathname.startsWith('/it/tickets')) return t('nav.tickets')
   if (pathname.startsWith('/it/problems')) return t('nav.problems')
+  if (pathname.startsWith('/it/changes')) return t('nav.changes')
   if (pathname.startsWith('/it/knowledge')) return t('nav.knowledgeAdmin')
   if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
   if (pathname.startsWith('/employee/knowledge')) return t('nav.knowledge')

@@ -38,3 +38,12 @@ export const problemKeys = {
   metrics: (id: string) => [...problemKeys.all, 'metrics', id] as const,
   recurringGroups: () => [...problemKeys.all, 'recurring-groups'] as const,
 }
+
+export const changeKeys = {
+  all: ['changes'] as const,
+  list: (filters: string) => [...changeKeys.all, 'list', filters] as const,
+  detail: (id: string) => [...changeKeys.all, 'detail', id] as const,
+  cis: (id: string) => [...changeKeys.all, 'cis', id] as const,
+  approvals: (id: string) => [...changeKeys.all, 'approvals', id] as const,
+  history: (id: string) => [...changeKeys.all, 'history', id] as const,
+}

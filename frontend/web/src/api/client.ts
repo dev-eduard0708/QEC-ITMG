@@ -695,8 +695,169 @@ export const problemsApi = {
       method: 'POST',
       body: JSON.stringify({ incidentTicketId }),
     }),
-  unlinkIncident: (id: string, ticketId: string) =>
+    unlinkIncident: (id: string, ticketId: string) =>
     apiFetch<void>(`/api/v1/problems/${id}/incidents/${ticketId}`, { method: 'DELETE' }),
+}
+
+export type ChangeRequest = {
+  id: string
+  changeNumber: string
+  title: string
+  description: string
+  type: string
+  status: string
+  riskRating: string
+  requesterUserId: string
+  ownerUserId: string | null
+  businessImpact: string | null
+  technicalImpact: string | null
+  securityImpact: string | null
+  implementationPlan: string | null
+  testPlan: string | null
+  rollbackPlan: string | null
+  scheduledStartUtc: string | null
+  scheduledEndUtc: string | null
+  implementationStartedAtUtc: string | null
+  implementationCompletedAtUtc: string | null
+  result: string
+  validationNotes: string | null
+  pirNotes: string | null
+  isRetrospective: boolean
+  isPreAuthorizedStandard: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  closedAtUtc: string | null
+  rowVersion: string
+  affectedCiCount: number
+}
+
+export type ChangeListResult = {
+  items: ChangeRequest[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type ChangeCiLink = {
+  changeRequestId: string
+  configurationItemId: string
+  linkedAtUtc: string
+  linkedByUserId: string
+}
+
+export type ChangeApproval = {
+  id: string
+  changeRequestId: string
+  approverUserId: string
+  decision: string
+  comment: string | null
+  decidedAtUtc: string | null
+  createdAtUtc: string
+}
+
+export type ChangeHistoryEntry = {
+  id: string
+  fromStatus: string
+  toStatus: string
+  changedByUserId: string
+  comment: string | null
+  changedAtUtc: string
+}
+
+export const changesApi = {
+  list: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    type?: string
+    status?: string
+    risk?: string
+    ownerUserId?: string
+  }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+    if (params?.search?.trim()) query.set('search', params.search.trim())
+    if (params?.type?.trim()) query.set('type', params.type.trim())
+    if (params?.status?.trim()) query.set('status', params.status.trim())
+    if (params?.risk?.trim()) query.set('risk', params.risk.trim())
+    if (params?.ownerUserId?.trim()) query.set('ownerUserId', params.ownerUserId.trim())
+    const qs = query.toString()
+    return apiFetch<ChangeListResult>(`/api/v1/changes${qs ? `?${qs}` : ''}`)
+  },
+  get: (id: string) => apiFetch<ChangeRequest>(`/api/v1/changes/${id}`),
+  create: (payload: {
+    title: string
+    description: string
+    type: string
+    riskRating?: string
+    ownerUserId?: string | null
+    isRetrospective?: boolean
+    isPreAuthorizedStandard?: boolean
+  }) =>
+    apiFetch<ChangeRequest>('/api/v1/changes', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  update: (
+    id: string,
+    payload: {
+      title: string
+      description: string
+      type: string
+      riskRating: string
+      ownerUserId?: string | null
+      businessImpact?: string | null
+      technicalImpact?: string | null
+      securityImpact?: string | null
+      implementationPlan?: string | null
+      testPlan?: string | null
+      rollbackPlan?: string | null
+      scheduledStartUtc?: string | null
+      scheduledEndUtc?: string | null
+      isPreAuthorizedStandard?: boolean
+      rowVersion?: string | null
+    },
+  ) =>
+    apiFetch<ChangeRequest>(`/api/v1/changes/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  listCis: (id: string) => apiFetch<ChangeCiLink[]>(`/api/v1/changes/${id}/configuration-items`),
+  linkCi: (id: string, configurationItemId: string) =>
+    apiFetch<ChangeCiLink[]>(`/api/v1/changes/${id}/configuration-items`, {
+      method: 'POST',
+      body: JSON.stringify({ configurationItemId }),
+    }),
+  unlinkCi: (id: string, ciId: string) =>
+    apiFetch<void>(`/api/v1/changes/${id}/configuration-items/${ciId}`, { method: 'DELETE' }),
+  listApprovals: (id: string) => apiFetch<ChangeApproval[]>(`/api/v1/changes/${id}/approvals`),
+  approve: (id: string, comment?: string | null) =>
+    apiFetch<ChangeApproval[]>(`/api/v1/changes/${id}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ comment: comment ?? null }),
+    }),
+  reject: (id: string, comment?: string | null) =>
+    apiFetch<ChangeApproval[]>(`/api/v1/changes/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ comment: comment ?? null }),
+    }),
+  listHistory: (id: string) => apiFetch<ChangeHistoryEntry[]>(`/api/v1/changes/${id}/history`),
+  transition: (
+    id: string,
+    payload: {
+      targetStatus: string
+      comment?: string | null
+      validationNotes?: string | null
+      pirNotes?: string | null
+      result?: string | null
+      rowVersion?: string | null
+    },
+  ) =>
+    apiFetch<ChangeRequest>(`/api/v1/changes/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 }
 
 export type TicketDashboard = {
