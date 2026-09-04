@@ -75,6 +75,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         visible: can('tickets.read'),
       },
       {
+        to: '/it/problems',
+        labelKey: 'nav.problems',
+        icon: Shield,
+        end: false,
+        visible: can('problems.read'),
+      },
+      {
         to: '/it/knowledge',
         labelKey: 'nav.knowledgeAdmin',
         icon: BookOpen,
@@ -258,6 +265,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/admin')) return t('nav.admin')
   if (pathname.startsWith('/it/assets')) return t('nav.assets')
   if (pathname.startsWith('/it/tickets')) return t('nav.tickets')
+  if (pathname.startsWith('/it/problems')) return t('nav.problems')
   if (pathname.startsWith('/it/knowledge')) return t('nav.knowledgeAdmin')
   if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
   if (pathname.startsWith('/employee/knowledge')) return t('nav.knowledge')

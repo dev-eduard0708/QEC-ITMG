@@ -27,4 +27,12 @@ export const ticketKeys = {
   attachments: (id: string, scope: 'me' | 'it') =>
     [...ticketKeys.all, scope, id, 'attachments'] as const,
   timeline: (id: string, scope: 'me' | 'it') => [...ticketKeys.all, scope, id, 'timeline'] as const,
+  relatedProblems: (id: string) => [...ticketKeys.all, 'related-problems', id] as const,
+}
+
+export const problemKeys = {
+  all: ['problems'] as const,
+  list: (filters: string) => [...problemKeys.all, 'list', filters] as const,
+  detail: (id: string) => [...problemKeys.all, 'detail', id] as const,
+  incidents: (id: string) => [...problemKeys.all, 'incidents', id] as const,
 }

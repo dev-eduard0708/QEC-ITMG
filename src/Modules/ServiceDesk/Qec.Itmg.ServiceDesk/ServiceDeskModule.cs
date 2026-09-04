@@ -24,5 +24,6 @@ public sealed class ServiceDeskModule : IModule
         services.AddScoped<TicketService>();
         services.AddScoped<SlaEvaluationService>();
         services.AddScoped<KnowledgeArticleService>();
+        services.AddScoped<ProblemService>();
     }
 }

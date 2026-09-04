@@ -139,6 +139,8 @@ try
     app.MapAssetEndpoints();
     app.MapTicketEndpoints();
     app.MapIncidentEndpoints();
+    app.MapProblemEndpoints();
+    app.MapTicketRelatedProblemEndpoints();
     app.MapKnowledgeBaseEndpoints();
     app.MapIntegrationReadinessEndpoints();
 

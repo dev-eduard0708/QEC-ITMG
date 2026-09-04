@@ -22,6 +22,8 @@ import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
 import { ItHomePage } from '@/features/it/it-home-page'
 import { ItKnowledgePage } from '@/features/it/knowledge-page'
+import { ProblemDetailPage } from '@/features/it/problem-detail-page'
+import { ProblemsPage } from '@/features/it/problems-page'
 import { TicketDetailPage } from '@/features/it/ticket-detail-page'
 import { TicketsPage } from '@/features/it/tickets-page'
 import { FoundationHomePage } from '@/features/foundation/foundation-home-page'
@@ -53,6 +55,10 @@ export function AppRouter() {
           <Route element={<RequirePermission permission="tickets.read" />}>
             <Route path="it/tickets" element={<TicketsPage />} />
             <Route path="it/tickets/:id" element={<TicketDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="problems.read" />}>
+            <Route path="it/problems" element={<ProblemsPage />} />
+            <Route path="it/problems/:id" element={<ProblemDetailPage />} />
           </Route>
           <Route element={<RequirePermission permission="kb.read" />}>
             <Route path="it/knowledge" element={<ItKnowledgePage />} />

@@ -20,6 +20,10 @@ public sealed class ServiceDeskDbContext(DbContextOptions<ServiceDeskDbContext> 
 
     public DbSet<KnowledgeArticle> KnowledgeArticles => Set<KnowledgeArticle>();
 
+    public DbSet<Problem> Problems => Set<Problem>();
+
+    public DbSet<ProblemIncident> ProblemIncidents => Set<ProblemIncident>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
