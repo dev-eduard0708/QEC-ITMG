@@ -358,7 +358,20 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ### Packages
 
-P12-01 Framework version requirement import model; P12-02 Mapping UI; P12-03 Coverage APIs (honest); P12-04 Assessment; P12-05 Calendar; P12-06 Seed **structure** not full COBIT text (licensing!); P12-07 Tests; P12-08 No vanity %.
+| Package | Scope | Status |
+|---|---|---|
+| P12-01 | Framework version/requirement model | Done |
+| P12-02 | Control mapping UI | Done |
+| P12-03 | Honest coverage APIs | Done |
+| P12-04 | Control assessments | Done |
+| P12-05 | Compliance calendar | Done |
+| P12-06 | Framework structure seed/import | Done |
+| P12-07 | Tests | Deferred ? dedicated project testing phase |
+| P12-08 | No vanity % | Done |
+
+**Phase 12:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P12-07).
+
+**NEXT:** P13 Evidence library.
 
 Content packs: load licensed/public text as **data files**, not code.
 
