@@ -1673,5 +1673,226 @@ export const kbApi = {
     apiFetch<KnowledgeArticle>(`/api/v1/kb/admin/${id}/archive`, { method: 'POST' }),
 }
 
+export type OrganizationalUnit = {
+  id: string
+  name: string
+  code: string | null
+  parentId: string | null
+  managerUserId: string | null
+  description: string | null
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  memberUserIds: string[]
+}
+
+export type OrganizationProfile = {
+  id: string
+  legalName: string
+  timezone: string
+  classificationScheme: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type RegisterCiRow = {
+  id: string
+  ciNumber: string
+  name: string
+  ciTypeKey: string
+  ciTypeName: string
+  status: string
+  criticality: string | null
+  ownerUserId: string | null
+  updatedAtUtc: string
+  linkedBusinessServiceIds: string[]
+  relationships: Array<{
+    id: string
+    sourceCiId: string
+    targetCiId: string
+    relationshipType: string
+  }>
+}
+
+export type RegisterServiceRow = {
+  id: string
+  name: string
+  description: string | null
+  ownerUserId: string | null
+  criticality: string
+  rtoMinutes: number | null
+  rpoMinutes: number | null
+  isActive: boolean
+  updatedAtUtc: string
+  linkedConfigurationItemIds: string[]
+}
+
+export type ControlDomainOption = { code: string; label: string }
+
+export type ControlListItem = {
+  id: string
+  controlNumber: string
+  title: string
+  domain: string
+  domainLabel: string
+  primaryOwnerUserId: string | null
+  frequency: string
+  automationType: string
+  status: string
+  updatedAtUtc: string
+}
+
+export type ControlListResult = {
+  items: ControlListItem[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type ControlTestProcedure = {
+  id: string
+  internalControlId: string
+  title: string
+  purpose: string | null
+  procedureSteps: string
+  expectedResult: string
+  sampleGuidance: string | null
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type EvidenceRequirement = {
+  id: string
+  internalControlId: string
+  description: string
+  frequency: string | null
+  retentionNotes: string | null
+  isRequired: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type ControlDetail = {
+  id: string
+  controlNumber: string
+  title: string
+  objective: string
+  description: string
+  domain: string
+  domainLabel: string
+  frequency: string
+  automationType: string
+  status: string
+  primaryOwnerUserId: string | null
+  primaryOwnerRoleId: string | null
+  secondaryOwnerUserIds: string[]
+  linkedConfigurationItemIds: string[]
+  linkedBusinessServiceIds: string[]
+  linkedManagedDocumentIds: string[]
+  testProcedures: ControlTestProcedure[]
+  evidenceRequirements: EvidenceRequirement[]
+  createdAtUtc: string
+  updatedAtUtc: string
+  retiredAtUtc: string | null
+  rowVersion: string
+}
+
+export const governanceApi = {
+  getProfile: () => apiFetch<OrganizationProfile | null>('/api/v1/governance/profile'),
+  upsertProfile: (payload: { legalName: string; timezone: string; classificationScheme?: string | null }) =>
+    apiFetch<OrganizationProfile>('/api/v1/governance/profile', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  listUnits: () => apiFetch<OrganizationalUnit[]>('/api/v1/governance/organization/units'),
+  createUnit: (payload: {
+    name: string
+    code?: string | null
+    parentId?: string | null
+    managerUserId?: string | null
+    description?: string | null
+  }) =>
+    apiFetch<OrganizationalUnit>('/api/v1/governance/organization/units', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  ciRegister: (kind: 'applications' | 'infrastructure' | 'interfaces', search?: string) =>
+    apiFetch<RegisterCiRow[]>(
+      `/api/v1/governance/registers/${kind}${opsQuery({ search })}`,
+    ),
+  businessServicesRegister: (search?: string) =>
+    apiFetch<RegisterServiceRow[]>(
+      `/api/v1/governance/registers/business-services${opsQuery({ search })}`,
+    ),
+}
+
+export const controlsApi = {
+  listDomains: () => apiFetch<ControlDomainOption[]>('/api/v1/controls/domains'),
+  list: (params?: { page?: number; pageSize?: number; search?: string; domain?: string; status?: string }) =>
+    apiFetch<ControlListResult>(
+      `/api/v1/controls${opsQuery({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        search: params?.search,
+        domain: params?.domain,
+        status: params?.status,
+      })}`,
+    ),
+  get: (id: string) => apiFetch<ControlDetail>(`/api/v1/controls/${id}`),
+  create: (payload: {
+    title: string
+    objective: string
+    description: string
+    domain: string
+    frequency: string
+    automationType: string
+    primaryOwnerUserId?: string | null
+    primaryOwnerRoleId?: string | null
+  }) => apiFetch<ControlDetail>('/api/v1/controls', { method: 'POST', body: JSON.stringify(payload) }),
+  activate: (id: string) => apiFetch<ControlDetail>(`/api/v1/controls/${id}/activate`, { method: 'POST' }),
+  retire: (id: string) => apiFetch<ControlDetail>(`/api/v1/controls/${id}/retire`, { method: 'POST' }),
+  linkConfigurationItem: (id: string, configurationItemId: string) =>
+    apiFetch<void>(`/api/v1/controls/${id}/links/configuration-items`, {
+      method: 'POST',
+      body: JSON.stringify({ id: configurationItemId }),
+    }),
+  linkBusinessService: (id: string, businessServiceId: string) =>
+    apiFetch<void>(`/api/v1/controls/${id}/links/business-services`, {
+      method: 'POST',
+      body: JSON.stringify({ id: businessServiceId }),
+    }),
+  linkDocument: (id: string, managedDocumentId: string) =>
+    apiFetch<void>(`/api/v1/controls/${id}/links/documents`, {
+      method: 'POST',
+      body: JSON.stringify({ id: managedDocumentId }),
+    }),
+  addTestProcedure: (
+    id: string,
+    payload: {
+      title: string
+      procedureSteps: string
+      expectedResult: string
+      purpose?: string | null
+      sampleGuidance?: string | null
+    },
+  ) =>
+    apiFetch<ControlTestProcedure>(`/api/v1/controls/${id}/test-procedures`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  addEvidenceRequirement: (
+    id: string,
+    payload: { description: string; frequency?: string | null; retentionNotes?: string | null; isRequired?: boolean },
+  ) =>
+    apiFetch<EvidenceRequirement>(`/api/v1/controls/${id}/evidence-requirements`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+}
+
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''

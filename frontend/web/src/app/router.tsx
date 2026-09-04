@@ -17,6 +17,10 @@ import { MyRequestsPage } from '@/features/employee/my-requests-page'
 import { NewRequestPage } from '@/features/employee/new-request-page'
 import { RequestDetailPage } from '@/features/employee/request-detail-page'
 import { GovernanceHomePage } from '@/features/governance/governance-home-page'
+import { OrganizationPage } from '@/features/governance/organization-page'
+import { RegistersPage } from '@/features/governance/registers-page'
+import { ControlsPage, ControlNewPage } from '@/features/governance/controls-page'
+import { ControlDetailPage } from '@/features/governance/control-detail-page'
 import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
@@ -131,7 +135,19 @@ export function AppRouter() {
               </Route>
             </Route>
           </Route>
-          <Route path="governance" element={<GovernanceHomePage />} />
+          <Route element={<RequirePermission permission="gov.read" />}>
+            <Route path="it/governance" element={<GovernanceHomePage />} />
+            <Route path="it/governance/organization" element={<OrganizationPage />} />
+            <Route path="it/governance/registers" element={<RegistersPage />} />
+            <Route path="governance" element={<GovernanceHomePage />} />
+          </Route>
+          <Route element={<RequirePermission permission="control.read" />}>
+            <Route path="it/controls" element={<ControlsPage />} />
+            <Route path="it/controls/:id" element={<ControlDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="control.manage" />}>
+            <Route path="it/controls/new" element={<ControlNewPage />} />
+          </Route>
           <Route path="unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

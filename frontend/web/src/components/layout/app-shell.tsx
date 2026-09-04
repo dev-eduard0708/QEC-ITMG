@@ -156,7 +156,20 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         end: false,
         visible: can('admin.users') || can('admin.roles') || can('admin.lookups'),
       },
-      { to: '/governance', labelKey: 'nav.governance', icon: Shield, end: false, visible: true },
+      {
+        to: '/it/governance',
+        labelKey: 'nav.governance',
+        icon: Shield,
+        end: false,
+        visible: can('gov.read') || can('control.read'),
+      },
+      {
+        to: '/it/controls',
+        labelKey: 'nav.controls',
+        icon: Shield,
+        end: false,
+        visible: can('control.read'),
+      },
     ],
     [can],
   )
@@ -326,7 +339,8 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/employee/equipment')) return t('nav.equipment')
   if (pathname.startsWith('/employee')) return t('nav.employee')
   if (pathname.startsWith('/it')) return t('nav.it')
-  if (pathname.startsWith('/governance')) return t('nav.governance')
+  if (pathname.startsWith('/it/controls')) return t('nav.controls')
+  if (pathname.startsWith('/it/governance') || pathname.startsWith('/governance')) return t('nav.governance')
   return t('nav.foundation')
 }
 
