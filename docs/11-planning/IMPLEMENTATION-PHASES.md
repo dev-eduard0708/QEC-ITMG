@@ -284,7 +284,22 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ### Packages
 
-P9-01 AccessCase; P9-02 Joiner; P9-03 Mover; P9-04 Leaver checklist; P9-05 Access request; P9-06 Reviews; P9-07 Privileged/service accounts; P9-08 SoD rules; P9-09 Evidence promote hook (manual); P9-10 Tests.
+| ID | Work | Status |
+|----|------|--------|
+| P9-01 | AccessCase | Done |
+| P9-02 | Joiner | Done |
+| P9-03 | Mover | Done |
+| P9-04 | Leaver checklist | Done |
+| P9-05 | Access request | Done |
+| P9-06 | Reviews | Done |
+| P9-07 | Privileged/service accounts | Done |
+| P9-08 | SoD rules | Done |
+| P9-09 | Evidence promote hook (manual) | Done |
+| P9-10 | Tests | Deferred ? dedicated project testing phase |
+
+**Phase 9:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P9-10).
+
+**NEXT:** P10 Policy and document management.
 
 **Out of scope:** Full AD automation (interface only / checklist).
 
