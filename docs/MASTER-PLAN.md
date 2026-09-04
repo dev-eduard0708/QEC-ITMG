@@ -71,7 +71,7 @@ Least privilege, permission keys (not role name checks), resource-level authz, M
 
 ## 8. Compliance strategy
 
-Internal-control-first. Frameworks are versioned data. Mapping ≠ assessment ≠ certification. COBIT, ISO/IEC 27001, COSO, NIST CSF, CIS, checklists, auditor questions are **different purposes**. Evidence reused across mappings.
+Internal-control-first. Frameworks are versioned data. Mapping ≠ assessment ≠ certification. **COBIT** is the primary IT governance/control mapping surface. **ISA 315–oriented** IT audit profiles support auditor understanding of IT (see [05-compliance/ISA-315-AUDIT-PROFILE.md](05-compliance/ISA-315-AUDIT-PROFILE.md)). ISO/IEC 27001, COSO, NIST CSF, CIS, checklists remain distinct purposes. Evidence reused across mappings.
 
 [05-compliance/CONTROL-MODEL.md](05-compliance/CONTROL-MODEL.md)
 
@@ -96,7 +96,7 @@ Phases **0–20** (21 phases). See [11-planning/IMPLEMENTATION-PHASES.md](11-pla
 | 4 | Service desk | Yes |
 | 5 | Incident extras / problem | Partial |
 | 6 | Change | Yes |
-| 7 | Remote support | Yes (attended) |
+| 7 | Remote support | Later (retained; lower priority) |
 | 8 | Events / IT ops | No |
 | 9 | Access / JML | No |
 | 10 | Policy / documents | No |
@@ -109,11 +109,11 @@ Phases **0–20** (21 phases). See [11-planning/IMPLEMENTATION-PHASES.md](11-pla
 | 17 | Vendors | No |
 | 18 | Advanced reporting | Partial (widgets in P4) |
 | 19 | Integrations | No |
-| 20 | AI | No |
+| 20 | AI | No (last) |
 
 ## 11. Dependency order
 
-Identity → Platform → CMDB → Service desk → Change → Remote. Controls after CMDB+docs. Evidence after controls. Audit after evidence. AI last.
+Near-term priority path: **P5 → P6 → P8 → P9 → P11–P14**. Remote support (P7) retained but lower priority. Controls after CMDB+docs. Evidence after controls. Audit after evidence. **AI last.**
 
 [11-planning/DEPENDENCY-MAP.md](11-planning/DEPENDENCY-MAP.md)
 
