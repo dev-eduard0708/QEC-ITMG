@@ -406,7 +406,20 @@ Content packs: load licensed/public text as **data files**, not code.
 
 ### Packages
 
-P14-01 Engagement; P14-02 Questions; P14-03 Findings; P14-04 CAPA; P14-05 Evidence requests; P14-06 Export pack + audit log; P14-07 Auditor role; P14-08 Tests.
+| Package | Scope | Status |
+|---|---|---|
+| P14-01 | Engagement | Done |
+| P14-02 | Questions | Done |
+| P14-03 | Findings + management response | Done |
+| P14-04 | CAPA | Done |
+| P14-05 | Evidence requests | Done |
+| P14-06 | Export pack + audit log | Done |
+| P14-07 | Auditor role / permissions | Done |
+| P14-08 | Tests | Deferred ? dedicated project testing phase |
+
+**Phase 14:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P14-08).
+
+**NEXT:** P15 Security management.
 
 ---
 
