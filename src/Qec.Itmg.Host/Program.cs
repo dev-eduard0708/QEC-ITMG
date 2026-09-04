@@ -16,6 +16,7 @@ using Qec.Itmg.Host.ChangeManagement;
 using Qec.Itmg.Host.AccessManagement;
 using Qec.Itmg.Host.DocumentManagement;
 using Qec.Itmg.Host.Governance;
+using Qec.Itmg.Host.Compliance;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -172,6 +173,7 @@ try
     app.MapAccessEndpoints();
     app.MapDocumentEndpoints();
     app.MapGovernanceEndpoints();
+    app.MapComplianceEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

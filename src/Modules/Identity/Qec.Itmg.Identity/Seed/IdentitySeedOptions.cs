@@ -71,6 +71,9 @@ public static class IdentitySeedCatalog
         ("gov.manage", "Manage organization chart and governance profile"),
         ("control.read", "View internal controls and test procedures"),
         ("control.manage", "Create and manage internal controls, links, and evidence requirements"),
+        ("framework.manage", "Manage compliance frameworks, versions, and requirement content"),
+        ("compliance.read", "View frameworks, mappings, coverage, and compliance calendar"),
+        ("assessment.perform", "Perform and record control assessments"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
     ];

@@ -6,6 +6,7 @@ using Qec.Itmg.ChangeManagement.Persistence;
 using Qec.Itmg.Cmdb.Persistence;
 using Qec.Itmg.DocumentManagement.Persistence;
 using Qec.Itmg.Governance.Persistence;
+using Qec.Itmg.Compliance.Persistence;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Operations.Persistence;
 using Qec.Itmg.Organization.Persistence;
@@ -121,5 +122,17 @@ public sealed class GovernanceDbContextFactory : IDesignTimeDbContextFactory<Gov
             DesignTimeConnectionString.Resolve(),
             sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", GovernanceDbContext.SchemaName));
         return new GovernanceDbContext(optionsBuilder.Options);
+    }
+}
+
+public sealed class ComplianceDbContextFactory : IDesignTimeDbContextFactory<ComplianceDbContext>
+{
+    public ComplianceDbContext CreateDbContext(string[] args)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<ComplianceDbContext>();
+        optionsBuilder.UseSqlServer(
+            DesignTimeConnectionString.Resolve(),
+            sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", ComplianceDbContext.SchemaName));
+        return new ComplianceDbContext(optionsBuilder.Options);
     }
 }
