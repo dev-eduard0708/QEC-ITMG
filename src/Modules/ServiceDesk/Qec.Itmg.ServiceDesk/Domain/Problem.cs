@@ -83,6 +83,7 @@ public sealed class Problem
         };
     }
 
+    /// <summary>Marks or clears Known Error classification (P5-07).</summary>
     public void SetKnownError(bool isKnownError, Guid byUserId, string rowVersion, DateTimeOffset utcNow)
     {
         if (byUserId == Guid.Empty)
