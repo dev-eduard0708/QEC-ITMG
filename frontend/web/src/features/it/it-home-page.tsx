@@ -135,6 +135,11 @@ export function ItHomePage() {
                 <Link to="/it/operations">{t('nav.operations')}</Link>
               </Button>
             ) : null}
+            {can('access.request') ? (
+              <Button asChild variant="secondary">
+                <Link to="/it/access">{t('nav.access')}</Link>
+              </Button>
+            ) : null}
             {can('change.read') ? (
               <Button asChild variant="secondary">
                 <Link to="/it/changes">{t('nav.changes')}</Link>

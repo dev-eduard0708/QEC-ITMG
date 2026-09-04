@@ -28,6 +28,12 @@ import { ChangesPage } from '@/features/it/changes-page'
 import { EventsPage } from '@/features/it/events-page'
 import { EventDetailPage } from '@/features/it/event-detail-page'
 import { OperationsPage } from '@/features/it/operations-page'
+import { AccessPage } from '@/features/it/access-page'
+import { AccessNewPage } from '@/features/it/access-new-page'
+import { AccessDetailPage } from '@/features/it/access-detail-page'
+import { AccessReviewsPage } from '@/features/it/access-reviews-page'
+import { AccessAccountsPage } from '@/features/it/access-accounts-page'
+import { AccessSodPage } from '@/features/it/access-sod-page'
 import { ChangeNewPage } from '@/features/it/change-new-page'
 import { ChangeCatalogPage } from '@/features/it/change-catalog-page'
 import { ChangeDetailPage } from '@/features/it/change-detail-page'
@@ -79,6 +85,20 @@ export function AppRouter() {
           </Route>
           <Route element={<RequirePermission permission="ops.read" />}>
             <Route path="it/operations" element={<OperationsPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="access.review" />}>
+            <Route path="it/access/reviews" element={<AccessReviewsPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="access.privileged.manage" />}>
+            <Route path="it/access/accounts" element={<AccessAccountsPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="sod.manage" />}>
+            <Route path="it/access/sod" element={<AccessSodPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="access.request" />}>
+            <Route path="it/access" element={<AccessPage />} />
+            <Route path="it/access/new" element={<AccessNewPage />} />
+            <Route path="it/access/:id" element={<AccessDetailPage />} />
           </Route>
           <Route element={<RequirePermission permission="kb.read" />}>
             <Route path="it/knowledge" element={<ItKnowledgePage />} />

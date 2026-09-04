@@ -1202,6 +1202,258 @@ export const opsApi = {
   }) => apiFetch<ScheduledJob>('/api/v1/ops/jobs', { method: 'POST', body: JSON.stringify(payload) }),
 }
 
+export type AccessCase = {
+  id: string
+  caseNumber: string
+  type: string
+  status: string
+  requesterUserId: string
+  subjectUserId: string | null
+  subjectName: string | null
+  subjectEmail: string | null
+  departmentId: string | null
+  managerUserId: string | null
+  designatedApproverUserId: string | null
+  linkedTicketId: string | null
+  effectiveAtUtc: string | null
+  reason: string
+  existingAccessConfirmed: boolean
+  existingAccessConfirmedAtUtc: string | null
+  existingAccessConfirmedByUserId: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  closedAtUtc: string | null
+  rowVersion: string
+  itemCount: number
+  pendingMandatoryCount: number
+}
+
+export type AccessCaseItem = {
+  id: string
+  accessCaseId: string
+  configurationItemId: string | null
+  entitlementKey: string
+  action: string
+  isPrivileged: boolean
+  isMandatory: boolean
+  status: string
+  fulfilledByUserId: string | null
+  fulfilledAtUtc: string | null
+  notes: string | null
+  createdAtUtc: string
+}
+
+export type ExistingAccessItem = {
+  id: string
+  accessCaseId: string
+  configurationItemId: string | null
+  entitlementKey: string
+  accessSummary: string | null
+  createdAtUtc: string
+}
+
+export type AccessReviewCampaign = {
+  id: string
+  name: string
+  type: string
+  reviewerUserId: string
+  startsAtUtc: string
+  dueAtUtc: string
+  status: string
+  createdAtUtc: string
+  updatedAtUtc: string
+  itemCount: number
+  pendingCount: number
+  isOverdue: boolean
+}
+
+export type AccessReviewCampaignList = OpsPaged<AccessReviewCampaign> & {
+  overdueCount: number
+  pendingDecisionCount: number
+}
+
+export type AccessReviewItem = {
+  id: string
+  campaignId: string
+  subjectUserId: string | null
+  accountRecordId: string | null
+  configurationItemId: string | null
+  accessSummary: string
+  decision: string
+  reviewerComment: string | null
+  reviewedAtUtc: string | null
+  createdAtUtc: string
+}
+
+export type ManagedAccount = {
+  id: string
+  accountName: string
+  type: string
+  configurationItemId: string | null
+  ownerUserId: string | null
+  purpose: string
+  status: string
+  lastReviewedAtUtc: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  isPrivileged: boolean
+}
+
+export type SodRule = {
+  id: string
+  name: string
+  applicationConfigurationItemId: string | null
+  leftEntitlementKey: string
+  rightEntitlementKey: string
+  severity: string
+  isActive: boolean
+  description: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type AccessEvidenceProjection = {
+  sourceType: string
+  recordId: string
+  businessNumber: string | null
+  status: string
+  periodStartUtc: string | null
+  periodEndUtc: string | null
+  createdAtUtc: string
+  completedAtUtc: string | null
+  approvals: string[]
+  fulfillmentOrReviewDecisions: string[]
+  linkedReferences: string[]
+  actorHistorySummary: string[]
+}
+
+export const accessApi = {
+  listCases: (params?: { page?: number; pageSize?: number; search?: string; type?: string; status?: string }) =>
+    apiFetch<OpsPaged<AccessCase>>(`/api/v1/access/cases${opsQuery(params)}`),
+  getCase: (id: string) => apiFetch<AccessCase>(`/api/v1/access/cases/${id}`),
+  createCase: (payload: {
+    type: string
+    reason: string
+    subjectUserId?: string | null
+    subjectName?: string | null
+    subjectEmail?: string | null
+    designatedApproverUserId?: string | null
+    effectiveAtUtc?: string | null
+  }) =>
+    apiFetch<AccessCase>('/api/v1/access/cases', { method: 'POST', body: JSON.stringify(payload) }),
+  submit: (id: string) => apiFetch<AccessCase>(`/api/v1/access/cases/${id}/submit`, { method: 'POST' }),
+  startApproval: (id: string) =>
+    apiFetch<AccessCase>(`/api/v1/access/cases/${id}/start-approval`, { method: 'POST' }),
+  approve: (id: string) => apiFetch<AccessCase>(`/api/v1/access/cases/${id}/approve`, { method: 'POST' }),
+  reject: (id: string, reason?: string) =>
+    apiFetch<AccessCase>(`/api/v1/access/cases/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  startVerification: (id: string) =>
+    apiFetch<AccessCase>(`/api/v1/access/cases/${id}/start-verification`, { method: 'POST' }),
+  close: (id: string) => apiFetch<AccessCase>(`/api/v1/access/cases/${id}/close`, { method: 'POST' }),
+  cancel: (id: string, reason?: string) =>
+    apiFetch<AccessCase>(`/api/v1/access/cases/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  listItems: (id: string) => apiFetch<AccessCaseItem[]>(`/api/v1/access/cases/${id}/items`),
+  addItem: (
+    id: string,
+    payload: {
+      entitlementKey: string
+      action: string
+      configurationItemId?: string | null
+      isPrivileged?: boolean
+      isMandatory?: boolean
+      notes?: string | null
+    },
+  ) =>
+    apiFetch<AccessCaseItem>(`/api/v1/access/cases/${id}/items`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  completeItem: (id: string, itemId: string, reason?: string) =>
+    apiFetch<AccessCaseItem>(`/api/v1/access/cases/${id}/items/${itemId}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  listExistingAccess: (id: string) =>
+    apiFetch<ExistingAccessItem[]>(`/api/v1/access/cases/${id}/existing-access`),
+  addExistingAccess: (
+    id: string,
+    payload: { entitlementKey: string; configurationItemId?: string | null; accessSummary?: string | null },
+  ) =>
+    apiFetch<ExistingAccessItem>(`/api/v1/access/cases/${id}/existing-access`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  confirmExistingAccess: (id: string) =>
+    apiFetch<AccessCase>(`/api/v1/access/cases/${id}/confirm-existing-access`, { method: 'POST' }),
+  prepareCaseEvidence: (id: string) =>
+    apiFetch<AccessEvidenceProjection>(`/api/v1/access/cases/${id}/evidence`),
+  listReviews: (params?: { page?: number; pageSize?: number; status?: string }) =>
+    apiFetch<AccessReviewCampaignList>(`/api/v1/access/reviews${opsQuery(params)}`),
+  createReview: (payload: {
+    name: string
+    type: string
+    reviewerUserId: string
+    startsAtUtc: string
+    dueAtUtc: string
+  }) =>
+    apiFetch<AccessReviewCampaign>('/api/v1/access/reviews', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  openReview: (id: string) => apiFetch<AccessReviewCampaign>(`/api/v1/access/reviews/${id}/open`, { method: 'POST' }),
+  completeReview: (id: string) =>
+    apiFetch<AccessReviewCampaign>(`/api/v1/access/reviews/${id}/complete`, { method: 'POST' }),
+  listReviewItems: (id: string) => apiFetch<AccessReviewItem[]>(`/api/v1/access/reviews/${id}/items`),
+  addReviewItem: (id: string, payload: { accessSummary: string; subjectUserId?: string | null }) =>
+    apiFetch<AccessReviewItem>(`/api/v1/access/reviews/${id}/items`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  decideReviewItem: (id: string, itemId: string, decision: string, comment?: string) =>
+    apiFetch<AccessReviewItem>(`/api/v1/access/reviews/${id}/items/${itemId}/decide`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, comment }),
+    }),
+  prepareReviewEvidence: (id: string) =>
+    apiFetch<AccessEvidenceProjection>(`/api/v1/access/reviews/${id}/evidence`),
+  listAccounts: (params?: { page?: number; pageSize?: number; search?: string; type?: string }) =>
+    apiFetch<OpsPaged<ManagedAccount>>(`/api/v1/access/accounts${opsQuery(params)}`),
+  createAccount: (payload: {
+    accountName: string
+    type: string
+    purpose: string
+    ownerUserId?: string | null
+    configurationItemId?: string | null
+  }) =>
+    apiFetch<ManagedAccount>('/api/v1/access/accounts', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listSod: (params?: { page?: number; pageSize?: number; activeOnly?: boolean }) =>
+    apiFetch<OpsPaged<SodRule>>(
+      `/api/v1/access/sod${opsQuery({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        activeOnly: params?.activeOnly === undefined ? undefined : String(params.activeOnly),
+      })}`,
+    ),
+  createSod: (payload: {
+    name: string
+    leftEntitlementKey: string
+    rightEntitlementKey: string
+    severity: string
+    description?: string | null
+  }) =>
+    apiFetch<SodRule>('/api/v1/access/sod', { method: 'POST', body: JSON.stringify(payload) }),
+}
+
 export type TicketDashboard = {
   openTickets: number
   unassigned: number
