@@ -333,9 +333,22 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ### Packages
 
-P11-01 Org chart; P11-02 Register views; P11-03 InternalControl CRUD; P11-04 Owners/frequency; P11-05 TestProcedure; P11-06 UI; P11-07 Permissions; P11-08 Tests.
+| Package | Scope | Status |
+|---|---|---|
+| P11-01 | Org chart | Done |
+| P11-02 | Register views | Done |
+| P11-03 | InternalControl CRUD | Done |
+| P11-04 | Owners/frequency/links | Done |
+| P11-05 | TestProcedure + EvidenceRequirement | Done |
+| P11-06 | Governance / control UI | Done |
+| P11-07 | Permissions | Done |
+| P11-08 | Tests | Deferred ? dedicated project testing phase |
 
-**Out of scope:** Framework content packs (P12).
+**Phase 11:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P11-08).
+
+**NEXT:** P12 Compliance framework mapping.
+
+**Out of scope:** Framework content packs (P12), Evidence (P13), Audit engagements (P14).
 
 ---
 
