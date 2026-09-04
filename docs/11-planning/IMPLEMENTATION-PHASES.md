@@ -1,6 +1,6 @@
 # Implementation phases
 
-Related: [MASTER-ROADMAP.md](MASTER-ROADMAP.md) � [MVP-DEFINITION.md](MVP-DEFINITION.md) � [DEFINITION-OF-DONE.md](DEFINITION-OF-DONE.md)
+Related: [MASTER-ROADMAP.md](MASTER-ROADMAP.md) ? [MVP-DEFINITION.md](MVP-DEFINITION.md) ? [DEFINITION-OF-DONE.md](DEFINITION-OF-DONE.md)
 
 Phases are ordered by **dependency**, not by sidebar menus. Each package is a later Cursor implementation task.
 
@@ -183,7 +183,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 | P5-03 | Problem domain/API/UI | Done |
 | P5-04 | Link incidents | Done |
 | P5-05 | Recurring metrics | Done |
-| P5-06 | Tests security IDOR | Deferred — dedicated testing day |
+| P5-06 | Tests security IDOR | Deferred ? dedicated testing day |
 | P5-07 | Known error flag | Done |
 
 **Out of scope:** Full PIR methodology UI.
@@ -223,11 +223,11 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ---
 
-## Phase 7 — Remote support integration
+## Phase 7 ? Remote support integration
 
 **Objective:** ITMG-owned attended sessions; adapter to MeshCentral; no engine bypass.
 
-**Priority note:** Retained in roadmap but **lower near-term priority** than P6 → P8 → P9 → P11–P14.
+**Priority note:** Retained in roadmap but **lower near-term priority** than P6 ? P8 ? P9 ? P11?P14.
 
 **Prerequisites:** P1, P3, P4 (ticket). P6 recommended before unattended.
 
@@ -383,7 +383,20 @@ Content packs: load licensed/public text as **data files**, not code.
 
 ### Packages
 
-P13-01 Evidence entity; P13-02 Links; P13-03 Validity job; P13-04 Accept workflow; P13-05 Export permission (may wait P14); P13-06 UI; P13-07 Tests classification; P13-08 Promote from change/restore if those exist.
+| Package | Scope | Status |
+|---|---|---|
+| P13-01 | Evidence entity | Done |
+| P13-02 | Links / reuse | Done |
+| P13-03 | Validity job | Done |
+| P13-04 | Accept workflow | Done |
+| P13-05 | Export / download | Done |
+| P13-06 | UI | Done |
+| P13-07 | Tests | Deferred ? dedicated project testing phase |
+| P13-08 | Promote from change/restore/access review | Done |
+
+**Phase 13:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P13-07).
+
+**NEXT:** P14 Audit management.
 
 ---
 
