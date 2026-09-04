@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Qec.Itmg.Governance</RootNamespace>
+    <AssemblyName>Qec.Itmg.Governance</AssemblyName>
+    <Description>IT organization chart, registers-as-views navigation, and internal control library.</Description>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Qec.Itmg.BuildingBlocks\Qec.Itmg.BuildingBlocks.csproj" />
+    <ProjectReference Include="..\..\..\Qec.Itmg.Contracts\Qec.Itmg.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
+  </ItemGroup>
+</Project>

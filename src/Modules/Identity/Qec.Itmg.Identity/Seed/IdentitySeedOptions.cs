@@ -67,6 +67,10 @@ public static class IdentitySeedCatalog
         ("policy.manage", "Create and manage policies"),
         ("policy.approve", "Approve policies"),
         ("policy.acknowledge", "Acknowledge published policies"),
+        ("gov.read", "View governance workspace, organization chart, and registers"),
+        ("gov.manage", "Manage organization chart and governance profile"),
+        ("control.read", "View internal controls and test procedures"),
+        ("control.manage", "Create and manage internal controls, links, and evidence requirements"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
     ];

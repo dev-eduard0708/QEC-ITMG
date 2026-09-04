@@ -7,6 +7,7 @@ using Qec.Itmg.AccessManagement;
 using Qec.Itmg.ChangeManagement;
 using Qec.Itmg.Cmdb;
 using Qec.Itmg.DocumentManagement;
+using Qec.Itmg.Governance;
 using Qec.Itmg.Operations;
 using Qec.Itmg.Organization;
 using Qec.Itmg.Platform;
@@ -32,6 +33,7 @@ internal static class ModuleRegistration
             new OperationsModule(),
             new AccessManagementModule(),
             new DocumentManagementModule(),
+            new GovernanceModule(),
         ];
 
         foreach (IModule module in modules)
