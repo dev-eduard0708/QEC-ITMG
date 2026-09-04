@@ -184,6 +184,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         end: false,
         visible: can('evidence.read'),
       },
+      {
+        to: '/it/audits',
+        labelKey: 'nav.audits',
+        icon: FileText,
+        end: false,
+        visible: can('audit.read'),
+      },
     ],
     [can],
   )
@@ -356,6 +363,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/controls')) return t('nav.controls')
   if (pathname.startsWith('/it/compliance')) return t('nav.compliance')
   if (pathname.startsWith('/it/evidence')) return t('nav.evidence')
+  if (pathname.startsWith('/it/audits')) return t('nav.audits')
   if (pathname.startsWith('/it/governance') || pathname.startsWith('/governance')) return t('nav.governance')
   return t('nav.foundation')
 }

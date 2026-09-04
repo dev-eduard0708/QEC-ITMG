@@ -2239,5 +2239,255 @@ export const evidenceApi = {
   },
 }
 
+export type AuditEngagement = {
+  id: string
+  auditNumber: string
+  title: string
+  auditType: string
+  objective: string | null
+  scopeSummary: string | null
+  leadAuditorUserId: string | null
+  ownerUserId: string | null
+  startDate: string | null
+  endDate: string | null
+  status: string
+  createdAtUtc: string
+  updatedAtUtc: string
+  closedAtUtc: string | null
+  rowVersion: string
+}
+
+export type AuditListResult = {
+  items: AuditEngagement[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type AuditScopeLink = {
+  id: string
+  auditEngagementId: string
+  targetType: string
+  targetId: string
+  createdByUserId: string
+  createdAtUtc: string
+}
+
+export type AuditQuestion = {
+  id: string
+  auditEngagementId: string
+  questionCode: string | null
+  category: string
+  questionText: string
+  frameworkRequirementId: string | null
+  internalControlId: string | null
+  responseType: string
+  required: boolean
+  sortOrder: number
+  status: string
+  response: string | null
+  respondedByUserId: string | null
+  respondedAtUtc: string | null
+  reviewerNotes: string | null
+}
+
+export type AuditFinding = {
+  id: string
+  findingNumber: string
+  auditEngagementId: string
+  internalControlId: string | null
+  title: string
+  description: string
+  severity: string
+  status: string
+  ownerUserId: string | null
+  dueAtUtc: string | null
+  acceptedRiskReason: string | null
+  exceptionReference: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  closedAtUtc: string | null
+  rowVersion: string
+}
+
+export type CorrectiveAction = {
+  id: string
+  actionNumber: string | null
+  findingId: string
+  title: string
+  description: string
+  ownerUserId: string
+  dueAtUtc: string | null
+  status: string
+  isMandatory: boolean
+  isOverdue: boolean
+  completedAtUtc: string | null
+  verifiedByUserId: string | null
+  verifiedAtUtc: string | null
+  verificationNotes: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type AuditEvidenceRequest = {
+  id: string
+  auditEngagementId: string
+  auditQuestionId: string | null
+  internalControlId: string | null
+  title: string
+  description: string | null
+  requestedFromUserId: string | null
+  dueAtUtc: string | null
+  status: string
+  evidenceId: string | null
+  createdByUserId: string
+  createdAtUtc: string
+  fulfilledAtUtc: string | null
+  notes: string | null
+  isOverdue: boolean
+}
+
+export type AuditReadiness = {
+  controlsWithoutAcceptedEvidence: number
+  expiredEvidence: number
+  openFindings: number
+  overdueCapa: number
+  policiesOverdueReview: number
+  openEvidenceRequests: number
+  overdueEvidenceRequests: number
+  capaCompletedAwaitingVerification: number
+  capaVerified: number
+  note: string
+}
+
+export type CapaSummary = {
+  open: number
+  overdue: number
+  completedAwaitingVerification: number
+  verified: number
+}
+
+export const auditsApi = {
+  list: (params?: { page?: number; pageSize?: number; search?: string; status?: string; type?: string }) =>
+    apiFetch<AuditListResult>(
+      `/api/v1/audits${opsQuery({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        search: params?.search,
+        status: params?.status,
+        type: params?.type,
+      })}`,
+    ),
+  get: (id: string) => apiFetch<AuditEngagement>(`/api/v1/audits/${id}`),
+  create: (payload: {
+    title: string
+    auditType?: string
+    objective?: string | null
+    scopeSummary?: string | null
+  }) => apiFetch<AuditEngagement>('/api/v1/audits', { method: 'POST', body: JSON.stringify(payload) }),
+  transition: (id: string, status: string) =>
+    apiFetch<AuditEngagement>(`/api/v1/audits/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+  listScope: (id: string) => apiFetch<AuditScopeLink[]>(`/api/v1/audits/${id}/scope`),
+  addScope: (id: string, targetType: string, targetId: string) =>
+    apiFetch<AuditScopeLink>(`/api/v1/audits/${id}/scope`, {
+      method: 'POST',
+      body: JSON.stringify({ targetType, targetId }),
+    }),
+  listQuestions: (id: string) => apiFetch<AuditQuestion[]>(`/api/v1/audits/${id}/questions`),
+  answerQuestion: (id: string, questionId: string, response: string) =>
+    apiFetch<AuditQuestion>(`/api/v1/audits/${id}/questions/${questionId}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ response }),
+    }),
+  listFindings: (params?: { engagementId?: string; status?: string }) =>
+    apiFetch<AuditFinding[]>(
+      `/api/v1/audits/findings${opsQuery({
+        engagementId: params?.engagementId,
+        status: params?.status,
+      })}`,
+    ),
+  createFinding: (
+    engagementId: string,
+    payload: { title: string; description: string; severity?: string },
+  ) =>
+    apiFetch<AuditFinding>(`/api/v1/audits/${engagementId}/findings`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  transitionFinding: (
+    findingId: string,
+    payload: { status: string; acceptedRiskReason?: string; exceptionReference?: string; overrideCapaGate?: boolean },
+  ) =>
+    apiFetch<AuditFinding>(`/api/v1/audits/findings/${findingId}/transition`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  addManagementResponse: (
+    findingId: string,
+    payload: { responseText: string; targetDate?: string | null; managementOwnerUserId?: string | null },
+  ) =>
+    apiFetch<unknown>(`/api/v1/audits/findings/${findingId}/responses`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listCapa: (params?: { findingId?: string; engagementId?: string }) =>
+    apiFetch<CorrectiveAction[]>(
+      `/api/v1/audits/capa${opsQuery({
+        findingId: params?.findingId,
+        engagementId: params?.engagementId,
+      })}`,
+    ),
+  capaSummary: (engagementId?: string) =>
+    apiFetch<CapaSummary>(`/api/v1/audits/capa/summary${opsQuery({ engagementId })}`),
+  createCapa: (
+    findingId: string,
+    payload: { title: string; description: string; ownerUserId: string; dueAtUtc?: string | null },
+  ) =>
+    apiFetch<CorrectiveAction>(`/api/v1/audits/findings/${findingId}/capa`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  transitionCapa: (capaId: string, status: string, notes?: string) =>
+    apiFetch<CorrectiveAction>(`/api/v1/audits/capa/${capaId}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ status, notes }),
+    }),
+  listEvidenceRequests: (params?: { engagementId?: string; status?: string }) =>
+    apiFetch<AuditEvidenceRequest[]>(
+      `/api/v1/audits/evidence-requests${opsQuery({
+        engagementId: params?.engagementId,
+        status: params?.status,
+      })}`,
+    ),
+  createEvidenceRequest: (
+    engagementId: string,
+    payload: { title: string; description?: string | null; requestedFromUserId?: string | null },
+  ) =>
+    apiFetch<AuditEvidenceRequest>(`/api/v1/audits/${engagementId}/evidence-requests`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  fulfillEvidenceRequest: (requestId: string, evidenceId: string, notes?: string) =>
+    apiFetch<AuditEvidenceRequest>(`/api/v1/audits/evidence-requests/${requestId}/fulfill`, {
+      method: 'POST',
+      body: JSON.stringify({ evidenceId, notes }),
+    }),
+  readiness: () => apiFetch<AuditReadiness>('/api/v1/audits/readiness'),
+  exportPack: async (id: string, purpose?: string) => {
+    const res = await fetch(`/api/v1/audits/${id}/export-pack`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ purpose }),
+    })
+    if (!res.ok) throw new Error('Export pack failed')
+    return res.blob()
+  },
+}
+
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
