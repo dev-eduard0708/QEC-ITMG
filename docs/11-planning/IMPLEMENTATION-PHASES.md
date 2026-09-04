@@ -173,15 +173,17 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 | ID | Work |
 |----|------|
-| P5-01 | Incident fields, security permission |
-| P5-02 | Promote from event (stub until P8) |
-| P5-03 | Problem domain/API/UI |
-| P5-04 | Link incidents |
-| P5-05 | Recurring metrics |
-| P5-06 | Tests security IDOR |
-| P5-07 | Known error flag |
+| P5-01 | Incident fields, security permission | Done |
+| P5-02 | Promote from event (stub until P8) | Done |
+| P5-03 | Problem domain/API/UI | Done |
+| P5-04 | Link incidents | Done |
+| P5-05 | Recurring metrics | |
+| P5-06 | Tests security IDOR | |
+| P5-07 | Known error flag | |
 
 **Out of scope:** Full PIR methodology UI.
+
+**Next:** P5-05 — Recurring metrics.
 
 ---
 
@@ -380,4 +382,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete. Phase 4 (Service desk) is COMPLETE (P4-01..P4-12).** Next: **P5-01 Incident specialization.**
+**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete. Phase 4 (Service desk) is COMPLETE (P4-01..P4-12).** Phase 5 in progress: **P5-01..P5-04 Done.** Next: **P5-05 Recurring metrics.**
