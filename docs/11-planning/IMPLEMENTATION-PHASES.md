@@ -204,18 +204,20 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ### Packages
 
-| ID | Work |
-|----|------|
-| P6-01 | Change domain |
-| P6-02 | API + CI links |
-| P6-03 | Approval SoD |
-| P6-04 | Implementation/validation/PIR states |
-| P6-05 | UI |
-| P6-06 | Notifications approval |
-| P6-07 | Tests SoD |
-| P6-08 | Standard change catalog (optional) |
-| P6-09 | Emergency retrospective path |
-| P6-10 | History |
+| ID | Work | Status |
+|----|------|--------|
+| P6-01 | Change domain | Done |
+| P6-02 | API + CI links | Done |
+| P6-03 | Approval SoD | Done |
+| P6-04 | Implementation/validation/PIR states | Done |
+| P6-05 | UI | Done |
+| P6-06 | Notifications approval | |
+| P6-07 | Tests SoD | |
+| P6-08 | Standard change catalog (optional) | |
+| P6-09 | Emergency retrospective path | |
+| P6-10 | History | |
+
+**NEXT:** P6-06?10 (notifications, SoD tests, catalog, retrospective polish, history). Phase 6 is not complete until those packages land. After P6, execution priority remains **P8 Events / IT Operations** (P7 Remote Support retained but lower priority).
 
 ---
 
