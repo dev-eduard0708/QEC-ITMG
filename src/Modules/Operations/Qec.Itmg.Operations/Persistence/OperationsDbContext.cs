@@ -9,6 +9,14 @@ public sealed class OperationsDbContext(DbContextOptions<OperationsDbContext> op
     public const string SchemaName = "ops";
 
     public DbSet<OperationalEvent> OperationalEvents => Set<OperationalEvent>();
+    public DbSet<BackupJob> BackupJobs => Set<BackupJob>();
+    public DbSet<BackupRun> BackupRuns => Set<BackupRun>();
+    public DbSet<RestoreTest> RestoreTests => Set<RestoreTest>();
+    public DbSet<CertificateRecord> CertificateRecords => Set<CertificateRecord>();
+    public DbSet<CertificateExpiryNotificationLog> CertificateExpiryNotificationLogs => Set<CertificateExpiryNotificationLog>();
+    public DbSet<PatchBaseline> PatchBaselines => Set<PatchBaseline>();
+    public DbSet<PatchDeployment> PatchDeployments => Set<PatchDeployment>();
+    public DbSet<ScheduledJob> ScheduledJobs => Set<ScheduledJob>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

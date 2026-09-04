@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.Contracts.Modules;
 using Qec.Itmg.Operations.Persistence;
@@ -18,9 +19,13 @@ public sealed class OperationsModule : IModule
                 $"Connection string '{QecEfConventions.ConnectionStringName}' is not configured.");
         }
 
+        services.Configure<OperationsOptions>(configuration.GetSection(OperationsOptions.SectionName));
         services.AddQecSqlServerDbContext<OperationsDbContext>(
             connectionString,
             OperationsDbContext.SchemaName);
         services.AddScoped<EventService>();
+        services.AddScoped<OpsRecordsService>();
+        services.AddScoped<CertificateExpiryService>();
+        services.AddScoped<EventRetentionService>();
     }
 }

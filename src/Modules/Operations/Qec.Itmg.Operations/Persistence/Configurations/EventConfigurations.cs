@@ -30,6 +30,8 @@ internal sealed class OperationalEventConfiguration : IEntityTypeConfiguration<O
             .HasDatabaseName("IX_OperationalEvent_Source_SourceEventKey");
         builder.HasIndex(item => new { item.Status, item.LastSeenAtUtc })
             .HasDatabaseName("IX_OperationalEvent_Status_LastSeenAtUtc");
+        builder.HasIndex(item => new { item.Status, item.UpdatedAtUtc })
+            .HasDatabaseName("IX_OperationalEvent_Status_UpdatedAtUtc");
         builder.HasIndex(item => item.ConfigurationItemId).HasDatabaseName("IX_OperationalEvent_ConfigurationItemId");
     }
 }

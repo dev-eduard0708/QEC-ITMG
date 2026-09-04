@@ -49,6 +49,11 @@ public static class IdentitySeedCatalog
         ("event.acknowledge", "Acknowledge operational events"),
         ("event.promote", "Promote operational events to incidents"),
         ("event.admin", "Ingest and administer operational events"),
+        ("ops.read", "View IT operations records (backups, certificates, patches, jobs)"),
+        ("ops.manage", "Manage IT operations job metadata"),
+        ("backup.manage", "Manage backup jobs, runs, and restore tests"),
+        ("cert.manage", "Manage certificate records (no private keys)"),
+        ("patch.manage", "Manage patch baselines and deployment tracking"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
     ];
