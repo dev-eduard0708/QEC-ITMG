@@ -84,6 +84,8 @@ try
         builder.Services.AddHangfireServer();
         builder.Services.AddTransient<NotificationEmailJob>();
         builder.Services.AddTransient<SlaBreachDetectionJob>();
+        builder.Services.AddTransient<CertificateExpiryNotificationJob>();
+        builder.Services.AddTransient<EventRetentionJob>();
         builder.Services.RemoveAll<IEmailQueue>();
         builder.Services.AddSingleton<IEmailQueue, HangfireEmailQueue>();
     }
@@ -110,6 +112,14 @@ try
             "sla-breach-detection",
             job => job.ExecuteAsync(CancellationToken.None),
             "*/5 * * * *");
+        recurringJobs.AddOrUpdate<CertificateExpiryNotificationJob>(
+            "certificate-expiry-notify",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "0 6 * * *");
+        recurringJobs.AddOrUpdate<EventRetentionJob>(
+            "ops-event-retention",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "15 2 * * *");
     }
 
     app.UseSerilogRequestLogging();
@@ -148,6 +158,7 @@ try
     app.MapKnowledgeBaseEndpoints();
     app.MapChangeEndpoints();
     app.MapEventEndpoints();
+    app.MapOpsRecordsEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))
