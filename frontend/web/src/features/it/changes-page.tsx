@@ -111,11 +111,18 @@ export function ChangesPage() {
         title={t('changes.title')}
         description={t('changes.description')}
         actions={
-          can('change.create') ? (
-            <Button type="button" onClick={() => navigate('/it/changes/new')}>
-              {t('changes.new')}
-            </Button>
-          ) : undefined
+          <div className="flex gap-2">
+            {can('change.read') ? (
+              <Button type="button" variant="outline" onClick={() => navigate('/it/changes/catalog')}>
+                {t('changes.catalog.title')}
+              </Button>
+            ) : null}
+            {can('change.create') ? (
+              <Button type="button" onClick={() => navigate('/it/changes/new')}>
+                {t('changes.new')}
+              </Button>
+            ) : null}
+          </div>
         }
       />
 

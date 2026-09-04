@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Qec.Itmg.ChangeManagement.Persistence;
 
@@ -11,9 +12,11 @@ using Qec.Itmg.ChangeManagement.Persistence;
 namespace Qec.Itmg.ChangeManagement.Persistence.Migrations
 {
     [DbContext(typeof(ChangeManagementDbContext))]
-    partial class ChangeManagementDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260904054619_P6_06_10_ChangeCloseout")]
+    partial class P6_06_10_ChangeCloseout
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

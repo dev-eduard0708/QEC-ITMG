@@ -724,6 +724,10 @@ export type ChangeRequest = {
   pirNotes: string | null
   isRetrospective: boolean
   isPreAuthorizedStandard: boolean
+  catalogItemId: string | null
+  retrospectiveReason: string | null
+  actualImplementationAtUtc: string | null
+  retrospectiveRecordedAtUtc: string | null
   createdAtUtc: string
   updatedAtUtc: string
   closedAtUtc: string | null
@@ -755,13 +759,28 @@ export type ChangeApproval = {
   createdAtUtc: string
 }
 
-export type ChangeHistoryEntry = {
+export type ChangeTimelineEvent = {
   id: string
-  fromStatus: string
-  toStatus: string
-  changedByUserId: string
-  comment: string | null
-  changedAtUtc: string
+  event: string
+  actorUserId: string | null
+  occurredAtUtc: string
+  summary: string
+  details: string | null
+}
+
+export type ChangeCatalogItem = {
+  id: string
+  code: string
+  name: string
+  description: string | null
+  riskRating: string
+  implementationPlan: string
+  testPlan: string
+  rollbackPlan: string
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
 }
 
 export const changesApi = {
@@ -794,10 +813,17 @@ export const changesApi = {
     ownerUserId?: string | null
     isRetrospective?: boolean
     isPreAuthorizedStandard?: boolean
+    retrospectiveReason?: string | null
+    actualImplementationAtUtc?: string | null
   }) =>
     apiFetch<ChangeRequest>('/api/v1/changes', {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+  createFromCatalog: (catalogItemId: string, payload?: { title?: string; description?: string }) =>
+    apiFetch<ChangeRequest>(`/api/v1/changes/from-catalog/${catalogItemId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload ?? {}),
     }),
   update: (
     id: string,
@@ -823,6 +849,14 @@ export const changesApi = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
+  markRetrospective: (
+    id: string,
+    payload: { reason: string; actualImplementationAtUtc?: string | null; rowVersion?: string | null },
+  ) =>
+    apiFetch<ChangeRequest>(`/api/v1/changes/${id}/retrospective`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   listCis: (id: string) => apiFetch<ChangeCiLink[]>(`/api/v1/changes/${id}/configuration-items`),
   linkCi: (id: string, configurationItemId: string) =>
     apiFetch<ChangeCiLink[]>(`/api/v1/changes/${id}/configuration-items`, {
@@ -842,7 +876,39 @@ export const changesApi = {
       method: 'POST',
       body: JSON.stringify({ comment: comment ?? null }),
     }),
-  listHistory: (id: string) => apiFetch<ChangeHistoryEntry[]>(`/api/v1/changes/${id}/history`),
+  listHistory: (id: string) => apiFetch<ChangeTimelineEvent[]>(`/api/v1/changes/${id}/history`),
+  listCatalog: () => apiFetch<ChangeCatalogItem[]>('/api/v1/changes/catalog'),
+  getCatalog: (id: string) => apiFetch<ChangeCatalogItem>(`/api/v1/changes/catalog/${id}`),
+  createCatalog: (payload: {
+    code: string
+    name: string
+    description?: string | null
+    riskRating: string
+    implementationPlan: string
+    testPlan: string
+    rollbackPlan: string
+  }) =>
+    apiFetch<ChangeCatalogItem>('/api/v1/changes/catalog', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateCatalog: (
+    id: string,
+    payload: {
+      name: string
+      description?: string | null
+      riskRating: string
+      implementationPlan: string
+      testPlan: string
+      rollbackPlan: string
+      isActive: boolean
+      rowVersion: string
+    },
+  ) =>
+    apiFetch<ChangeCatalogItem>(`/api/v1/changes/catalog/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
   transition: (
     id: string,
     payload: {
@@ -852,6 +918,7 @@ export const changesApi = {
       pirNotes?: string | null
       result?: string | null
       rowVersion?: string | null
+      approverUserId?: string | null
     },
   ) =>
     apiFetch<ChangeRequest>(`/api/v1/changes/${id}/transition`, {

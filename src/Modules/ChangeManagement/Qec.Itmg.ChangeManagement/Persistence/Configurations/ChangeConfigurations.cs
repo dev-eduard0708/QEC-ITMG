@@ -25,6 +25,7 @@ internal sealed class ChangeRequestConfiguration : IEntityTypeConfiguration<Chan
         builder.Property(item => item.RollbackPlan).HasMaxLength(4000).HasColumnType("nvarchar(4000)");
         builder.Property(item => item.ValidationNotes).HasMaxLength(4000).HasColumnType("nvarchar(4000)");
         builder.Property(item => item.PirNotes).HasMaxLength(4000).HasColumnType("nvarchar(4000)");
+        builder.Property(item => item.RetrospectiveReason).HasMaxLength(2000).HasColumnType("nvarchar(2000)");
         builder.Property(item => item.CreatedAtUtc).IsRequired();
         builder.Property(item => item.UpdatedAtUtc).IsRequired();
         builder.Property(item => item.RowVersion).IsRowVersion().IsConcurrencyToken();
@@ -33,6 +34,8 @@ internal sealed class ChangeRequestConfiguration : IEntityTypeConfiguration<Chan
         builder.HasIndex(item => new { item.Status, item.UpdatedAtUtc }).HasDatabaseName("IX_ChangeRequest_Status_UpdatedAtUtc");
         builder.HasIndex(item => item.Type).HasDatabaseName("IX_ChangeRequest_Type");
         builder.HasIndex(item => item.OwnerUserId).HasDatabaseName("IX_ChangeRequest_OwnerUserId");
+        builder.HasIndex(item => item.CatalogItemId).HasDatabaseName("IX_ChangeRequest_CatalogItemId");
+        builder.HasIndex(item => item.IsRetrospective).HasDatabaseName("IX_ChangeRequest_IsRetrospective");
     }
 }
 
@@ -77,5 +80,26 @@ internal sealed class ChangeStatusHistoryConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(item => new { item.ChangeRequestId, item.ChangedAtUtc })
             .HasDatabaseName("IX_ChangeStatusHistory_Change_ChangedAt");
         builder.HasOne<ChangeRequest>().WithMany().HasForeignKey(item => item.ChangeRequestId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class StandardChangeCatalogItemConfiguration : IEntityTypeConfiguration<StandardChangeCatalogItem>
+{
+    public void Configure(EntityTypeBuilder<StandardChangeCatalogItem> builder)
+    {
+        builder.ToTable("StandardChangeCatalogItem");
+        builder.HasKey(item => item.Id);
+        builder.Property(item => item.Code).IsRequired().HasMaxLength(64).HasColumnType("nvarchar(64)");
+        builder.Property(item => item.Name).IsRequired().HasMaxLength(256).HasColumnType("nvarchar(256)");
+        builder.Property(item => item.Description).HasMaxLength(2000).HasColumnType("nvarchar(2000)");
+        builder.Property(item => item.RiskRating).IsRequired().HasConversion<string>().HasMaxLength(32).HasColumnType("nvarchar(32)");
+        builder.Property(item => item.ImplementationPlan).IsRequired().HasMaxLength(4000).HasColumnType("nvarchar(4000)");
+        builder.Property(item => item.TestPlan).IsRequired().HasMaxLength(4000).HasColumnType("nvarchar(4000)");
+        builder.Property(item => item.RollbackPlan).IsRequired().HasMaxLength(4000).HasColumnType("nvarchar(4000)");
+        builder.Property(item => item.CreatedAtUtc).IsRequired();
+        builder.Property(item => item.UpdatedAtUtc).IsRequired();
+        builder.Property(item => item.RowVersion).IsRowVersion().IsConcurrencyToken();
+        builder.HasIndex(item => item.Code).IsUnique().HasDatabaseName("IX_StandardChangeCatalogItem_Code");
+        builder.HasIndex(item => item.IsActive).HasDatabaseName("IX_StandardChangeCatalogItem_IsActive");
     }
 }

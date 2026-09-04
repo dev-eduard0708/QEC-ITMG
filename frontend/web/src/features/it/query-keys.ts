@@ -46,4 +46,5 @@ export const changeKeys = {
   cis: (id: string) => [...changeKeys.all, 'cis', id] as const,
   approvals: (id: string) => [...changeKeys.all, 'approvals', id] as const,
   history: (id: string) => [...changeKeys.all, 'history', id] as const,
+  catalog: () => [...changeKeys.all, 'catalog'] as const,
 }

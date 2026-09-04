@@ -12,6 +12,7 @@ public sealed class ChangeManagementDbContext(DbContextOptions<ChangeManagementD
     public DbSet<ChangeConfigurationItem> ChangeConfigurationItems => Set<ChangeConfigurationItem>();
     public DbSet<ChangeApproval> ChangeApprovals => Set<ChangeApproval>();
     public DbSet<ChangeStatusHistory> ChangeStatusHistories => Set<ChangeStatusHistory>();
+    public DbSet<StandardChangeCatalogItem> StandardChangeCatalogItems => Set<StandardChangeCatalogItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
