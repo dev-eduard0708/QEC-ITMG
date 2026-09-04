@@ -12,6 +12,7 @@ using Qec.Itmg.Host.Email;
 using Qec.Itmg.Host.Lookups;
 using Qec.Itmg.Host.Notifications;
 using Qec.Itmg.Host.Persistence;
+using Qec.Itmg.Host.ChangeManagement;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Identity.Admin;
@@ -142,6 +143,7 @@ try
     app.MapProblemEndpoints();
     app.MapTicketRelatedProblemEndpoints();
     app.MapKnowledgeBaseEndpoints();
+    app.MapChangeEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))
