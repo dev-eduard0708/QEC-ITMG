@@ -1,6 +1,6 @@
 # COBIT strategy
 
-Related: [CONTROL-MODEL.md](CONTROL-MODEL.md) · [../03-modules/GOVERNANCE.md](../03-modules/GOVERNANCE.md)
+See also: [COBIT-STRATEGY.md](COBIT-STRATEGY.md) · [ISA-315-AUDIT-PROFILE.md](ISA-315-AUDIT-PROFILE.md)
 
 ## Purpose of COBIT (in QEC ITMG)
 
@@ -18,6 +18,12 @@ COBIT is used as a **broad IT governance and management** reference (objectives,
 Load COBIT **version** as `Framework` data (objectives/practices as requirements). Map QEC Internal Controls. Assessments test **QEC controls**, then roll up to COBIT requirement coverage.
 
 A cybersecurity checklist that maps to some DSS/MEA-related practices does **not** complete EDM governance objectives automatically.
+
+## Governance / control mapping
+
+COBIT is the primary **governance and management** mapping surface for ITMG’s InternalControl library (views, coverage, gap discussions). Other frameworks (ISO/IEC 27001, NIST CSF, CIS, COSO, checklists, ISA 315–oriented audit questions) attach as additional citations—never as duplicate control masters.
+
+See also: [ISA-315-AUDIT-PROFILE.md](ISA-315-AUDIT-PROFILE.md).
 
 ## Product implication
 

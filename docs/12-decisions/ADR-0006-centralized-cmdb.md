@@ -9,7 +9,11 @@ Applications, servers, and services appear in support, DR, security, vendors, an
 
 ## Decision
 
-A **single CMDB** (Configuration Items + typed relationships + business services). Assets overlay financial/custody data, possibly 1:1 with a CI.
+A **single CMDB inside ITMG** (Configuration Items + typed relationships + business services) is the operational source of truth for service dependency and IT work linkage.
+
+**Physical asset lifecycle** remains authoritative in the **external Asset Management** system. ITMG Asset entities are a **compatibility/correlation layer** (identifiers, assignment views, links to CIs)—not a second financial register.
+
+Assets may overlay 1:1 with a CI when useful; CI relationships stay ITMG-owned.
 
 ## Rationale
 

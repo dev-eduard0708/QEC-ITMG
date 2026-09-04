@@ -4,11 +4,13 @@ Related: [ADR-0006](../12-decisions/ADR-0006-centralized-cmdb.md) · [../02-doma
 
 ## Two concepts
 
-**Asset:** purchase, cost (optional), vendor, warranty, custody, assignment to user, lifecycle (ordered, in stock, assigned, repair, disposed), serial, financial notes.
+**External Asset Management (authoritative):** QEC’s separate physical asset lifecycle system remains the **system of record** for purchase, custody, warranty, disposal, and financial asset lifecycle. ITMG does **not** replace that product.
 
-**Configuration Item:** operational identity, CI type, environment (prod/test), criticality, owner, support group, relationships, monitoring, RTO/RPO **on the business service**, change/incident history.
+**ITMG Asset records:** a **compatibility / correlation layer** inside ITMG. They hold enough identifiers and custody pointers to link operational work (tickets, assignment views, audits) to the external asset identity. Prefer sync/correlation over duplicating the full financial register.
 
-They overlap but are not identical. UI may show a combined “laptop” page that edits both records in one use case.
+**Configuration Item (CI):** operational identity owned by ITMG — CI type, environment, criticality, owner, support group, relationships, monitoring hooks, service dependency. **ITMG owns operational CI/service relationships** and the CMDB graph used by incidents, changes, DR, and security.
+
+Asset and CI overlap but are not identical. UI may show a combined “laptop” page that edits the ITMG Asset correlation record and/or linked CI in one use case; financial truth stays external unless explicitly imported for display.
 
 ## CI types (initial data, extensible)
 
