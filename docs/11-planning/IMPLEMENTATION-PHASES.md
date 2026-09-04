@@ -311,7 +311,19 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ### Packages
 
-P10-01 ManagedDocument versions; P10-02 Policy UX; P10-03 Approvals; P10-04 Acknowledgements; P10-05 Review notifications; P10-06 Diagram type; P10-07 Tests.
+| ID | Work | Status |
+|----|------|--------|
+| P10-01 | ManagedDocument versions | Done |
+| P10-02 | Policy UX | Done |
+| P10-03 | Approvals | Done |
+| P10-04 | Acknowledgements | Done |
+| P10-05 | Review notifications | Done |
+| P10-06 | Diagram type | Done |
+| P10-07 | Tests | Deferred ? dedicated project testing phase |
+
+**Phase 10:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P10-07).
+
+**NEXT:** P11 Governance and control library.
 
 ---
 
