@@ -17,6 +17,7 @@ using Qec.Itmg.Host.AccessManagement;
 using Qec.Itmg.Host.DocumentManagement;
 using Qec.Itmg.Host.Governance;
 using Qec.Itmg.Host.Compliance;
+using Qec.Itmg.Host.Evidence;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -93,6 +94,7 @@ try
         builder.Services.AddTransient<CertificateExpiryNotificationJob>();
         builder.Services.AddTransient<EventRetentionJob>();
         builder.Services.AddTransient<DocumentReviewReminderJob>();
+        builder.Services.AddTransient<EvidenceExpiryJob>();
         builder.Services.RemoveAll<IEmailQueue>();
         builder.Services.AddSingleton<IEmailQueue, HangfireEmailQueue>();
     }
@@ -131,6 +133,10 @@ try
             "document-review-reminders",
             job => job.ExecuteAsync(CancellationToken.None),
             "0 7 * * *");
+        recurringJobs.AddOrUpdate<EvidenceExpiryJob>(
+            "evidence-expiry",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "30 7 * * *");
     }
 
     app.UseSerilogRequestLogging();
@@ -174,6 +180,7 @@ try
     app.MapDocumentEndpoints();
     app.MapGovernanceEndpoints();
     app.MapComplianceEndpoints();
+    app.MapEvidenceEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

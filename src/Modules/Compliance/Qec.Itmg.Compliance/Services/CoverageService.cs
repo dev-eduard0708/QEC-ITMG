@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Compliance.Domain;
 using Qec.Itmg.Compliance.Persistence;
+using Qec.Itmg.Contracts.Evidence;
 
 namespace Qec.Itmg.Compliance.Services;
 
@@ -20,11 +21,15 @@ public sealed record FrameworkCoverageDto(
     int AssessedControls,
     int UnassessedControls,
     CoverageResultDistribution ResultDistribution,
-    string EvidenceMissingStatus,
-    string EvidenceExpiredStatus,
+    int EvidenceAvailable,
+    int EvidenceMissing,
+    int EvidenceExpired,
     string Notes);
 
-public sealed class CoverageService(ComplianceDbContext db, IClock clock)
+public sealed class CoverageService(
+    ComplianceDbContext db,
+    IClock clock,
+    IEvidenceCoverageQuery evidenceCoverage)
 {
     public async Task<FrameworkCoverageDto> GetCoverageAsync(
         Guid frameworkVersionId, DateOnly? periodStart, DateOnly? periodEnd, CancellationToken ct)
@@ -48,7 +53,6 @@ public sealed class CoverageService(ComplianceDbContext db, IClock clock)
         HashSet<Guid> mappedReqIds = mappings.Select(x => x.FrameworkRequirementId).ToHashSet();
         HashSet<Guid> mappedControlIds = mappings.Select(x => x.InternalControlId).ToHashSet();
 
-        // Latest completed assessment per control in optional period context
         IQueryable<ControlAssessment> assessmentsQ = db.ControlAssessments.AsNoTracking()
             .Where(x => x.Status == AssessmentStatus.Complete && mappedControlIds.Contains(x.InternalControlId));
         if (periodStart is DateOnly ps)
@@ -80,6 +84,16 @@ public sealed class CoverageService(ComplianceDbContext db, IClock clock)
             }
         }
 
+        int evidenceAvailable = 0, evidenceMissing = mappedControlIds.Count, evidenceExpired = 0;
+        if (mappedControlIds.Count > 0)
+        {
+            EvidenceCoverageSnapshot snap = await evidenceCoverage.GetForControlsAsync(
+                mappedControlIds.ToList(), clock.UtcNow, ct);
+            evidenceAvailable = snap.ControlsWithAvailableEvidence;
+            evidenceMissing = snap.ControlsMissingEvidence;
+            evidenceExpired = snap.ControlsWithExpiredOnlyEvidence;
+        }
+
         return new(
             frameworkVersionId,
             framework.Code,
@@ -92,8 +106,9 @@ public sealed class CoverageService(ComplianceDbContext db, IClock clock)
             assessed,
             Math.Max(0, unassessed),
             new CoverageResultDistribution(compliant, partial, non, na, notTested),
-            "N/A — Evidence library not available until P13",
-            "N/A — Evidence library not available until P13",
-            "Counts only. Mapping does not imply compliance. No organization-wide percentage is computed.");
+            evidenceAvailable,
+            evidenceMissing,
+            evidenceExpired,
+            "Counts only. Mapping or evidence does not imply compliance. No organization-wide percentage is computed.");
     }
 }

@@ -30,5 +30,6 @@
     <ProjectReference Include="..\Modules\DocumentManagement\Qec.Itmg.DocumentManagement\Qec.Itmg.DocumentManagement.csproj" />
     <ProjectReference Include="..\Modules\Governance\Qec.Itmg.Governance\Qec.Itmg.Governance.csproj" />
     <ProjectReference Include="..\Modules\Compliance\Qec.Itmg.Compliance\Qec.Itmg.Compliance.csproj" />
+    <ProjectReference Include="..\Modules\Evidence\Qec.Itmg.Evidence\Qec.Itmg.Evidence.csproj" />
   </ItemGroup>
 </Project>

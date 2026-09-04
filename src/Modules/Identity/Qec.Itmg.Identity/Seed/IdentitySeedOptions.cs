@@ -74,6 +74,10 @@ public static class IdentitySeedCatalog
         ("framework.manage", "Manage compliance frameworks, versions, and requirement content"),
         ("compliance.read", "View frameworks, mappings, coverage, and compliance calendar"),
         ("assessment.perform", "Perform and record control assessments"),
+        ("evidence.read", "View evidence metadata and authorized attachments"),
+        ("evidence.upload", "Create and upload evidence drafts and versions"),
+        ("evidence.accept", "Accept, return, or withdraw evidence"),
+        ("evidence.export", "Privileged audited evidence export"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
     ];

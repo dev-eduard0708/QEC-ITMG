@@ -12,6 +12,7 @@ public enum AuditAggregateType
     Document = 8,
     Control = 9,
     Assessment = 10,
+    Evidence = 11,
 }
 
 public enum AuditActorType

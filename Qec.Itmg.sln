@@ -65,6 +65,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Compliance", "Compliance", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Qec.Itmg.Compliance", "src\Modules\Compliance\Qec.Itmg.Compliance\Qec.Itmg.Compliance.csproj", "{DCD2E593-9BE9-4F54-A969-B41B5ED3B1EB}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Evidence", "Evidence", "{0ACD1564-5EDF-BFF8-37A5-918F9FD05228}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Qec.Itmg.Evidence", "src\Modules\Evidence\Qec.Itmg.Evidence\Qec.Itmg.Evidence.csproj", "{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -279,6 +283,18 @@ Global
 		{DCD2E593-9BE9-4F54-A969-B41B5ED3B1EB}.Release|x64.Build.0 = Release|Any CPU
 		{DCD2E593-9BE9-4F54-A969-B41B5ED3B1EB}.Release|x86.ActiveCfg = Release|Any CPU
 		{DCD2E593-9BE9-4F54-A969-B41B5ED3B1EB}.Release|x86.Build.0 = Release|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Debug|x64.Build.0 = Debug|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Debug|x86.Build.0 = Debug|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Release|x64.ActiveCfg = Release|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Release|x64.Build.0 = Release|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Release|x86.ActiveCfg = Release|Any CPU
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -312,6 +328,8 @@ Global
 		{F8D05886-FC60-4BD0-80D5-9915C362646D} = {261CDCAE-177B-F4D8-2B1F-F51C6E02E44C}
 		{2124C7B3-EA21-F438-A58A-6BD7403B9A1E} = {A1000001-0000-4000-8000-000000000005}
 		{DCD2E593-9BE9-4F54-A969-B41B5ED3B1EB} = {2124C7B3-EA21-F438-A58A-6BD7403B9A1E}
+		{0ACD1564-5EDF-BFF8-37A5-918F9FD05228} = {A1000001-0000-4000-8000-000000000005}
+		{DACCDE6D-A5C5-4048-96B4-3D3C502CE4F9} = {0ACD1564-5EDF-BFF8-37A5-918F9FD05228}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {C1000001-0000-4000-8000-000000000001}
