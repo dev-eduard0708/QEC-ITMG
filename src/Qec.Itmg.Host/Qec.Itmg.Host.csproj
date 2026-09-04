@@ -25,5 +25,6 @@
     <ProjectReference Include="..\Modules\Cmdb\Qec.Itmg.Cmdb\Qec.Itmg.Cmdb.csproj" />
     <ProjectReference Include="..\Modules\ServiceDesk\Qec.Itmg.ServiceDesk\Qec.Itmg.ServiceDesk.csproj" />
     <ProjectReference Include="..\Modules\ChangeManagement\Qec.Itmg.ChangeManagement\Qec.Itmg.ChangeManagement.csproj" />
+    <ProjectReference Include="..\Modules\Operations\Qec.Itmg.Operations\Qec.Itmg.Operations.csproj" />
   </ItemGroup>
 </Project>

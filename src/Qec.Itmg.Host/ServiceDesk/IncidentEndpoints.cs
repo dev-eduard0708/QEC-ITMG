@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Qec.Itmg.Identity.Authorization;
 using Qec.Itmg.Identity.CurrentUser;
+using Qec.Itmg.Operations.Services;
 using Qec.Itmg.ServiceDesk.Domain;
 using Qec.Itmg.ServiceDesk.Services;
 using TicketEntity = Qec.Itmg.ServiceDesk.Domain.Ticket;
@@ -11,8 +12,7 @@ using TicketEntity = Qec.Itmg.ServiceDesk.Domain.Ticket;
 namespace Qec.Itmg.Host.ServiceDesk;
 
 /// <summary>
-/// P5 stub only. P8 will replace/extend promote-from-event with the real Event aggregate and FK/relationship.
-/// Do not create Event monitoring/telemetry here.
+/// Legacy promote path. Prefer POST /api/v1/events/{id}/promote which validates the OperationalEvent and updates its status.
 /// </summary>
 public static class IncidentEndpoints
 {
@@ -23,6 +23,7 @@ public static class IncidentEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             TicketService service,
+            EventService events,
             CancellationToken cancellationToken) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, cancellationToken);
@@ -43,6 +44,13 @@ public static class IncidentEndpoints
                 return ValidationProblem("title and description are required.");
             }
 
+            if (!await events.ExistsAsync(request.EventId, cancellationToken))
+            {
+                return Results.Json(
+                    new { error = new { code = "not_found", message = "Event was not found." } },
+                    statusCode: StatusCodes.Status404NotFound);
+            }
+
             TicketPriority priority = TicketPriority.Medium;
             if (!string.IsNullOrWhiteSpace(request.Priority)
                 && !Enum.TryParse(request.Priority, ignoreCase: true, out priority))
@@ -60,6 +68,8 @@ public static class IncidentEndpoints
                     priority,
                     request.ConfigurationItemId,
                     cancellationToken);
+
+                await events.MarkPromotedAsync(request.EventId, created.Id, cancellationToken);
 
                 bool includeSecurity = session.Permissions.Any(item =>
                     string.Equals(item, TicketEndpoints.IncidentsSecurity, StringComparison.OrdinalIgnoreCase));

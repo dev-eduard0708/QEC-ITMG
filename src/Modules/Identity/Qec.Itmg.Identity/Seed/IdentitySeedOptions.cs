@@ -45,6 +45,10 @@ public static class IdentitySeedCatalog
         ("change.implement", "Implement and validate changes"),
         ("change.pir", "Complete post-implementation review"),
         ("change.catalog.manage", "Manage standard change catalog"),
+        ("event.read", "View operational events"),
+        ("event.acknowledge", "Acknowledge operational events"),
+        ("event.promote", "Promote operational events to incidents"),
+        ("event.admin", "Ingest and administer operational events"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
     ];

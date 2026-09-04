@@ -5,6 +5,7 @@ using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Identity;
 using Qec.Itmg.ChangeManagement;
 using Qec.Itmg.Cmdb;
+using Qec.Itmg.Operations;
 using Qec.Itmg.Organization;
 using Qec.Itmg.Platform;
 using Qec.Itmg.ServiceDesk;
@@ -26,6 +27,7 @@ internal static class ModuleRegistration
             new CmdbModule(),
             new ServiceDeskModule(),
             new ChangeManagementModule(),
+            new OperationsModule(),
         ];
 
         foreach (IModule module in modules)
