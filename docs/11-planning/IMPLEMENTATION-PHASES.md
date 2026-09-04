@@ -1,6 +1,6 @@
 # Implementation phases
 
-Related: [MASTER-ROADMAP.md](MASTER-ROADMAP.md) · [MVP-DEFINITION.md](MVP-DEFINITION.md) · [DEFINITION-OF-DONE.md](DEFINITION-OF-DONE.md)
+Related: [MASTER-ROADMAP.md](MASTER-ROADMAP.md) � [MVP-DEFINITION.md](MVP-DEFINITION.md) � [DEFINITION-OF-DONE.md](DEFINITION-OF-DONE.md)
 
 Phases are ordered by **dependency**, not by sidebar menus. Each package is a later Cursor implementation task.
 
@@ -10,7 +10,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ---
 
-## Phase 0 — Architecture, repository foundation, engineering standards
+## Phase 0 ? Architecture, repository foundation, engineering standards
 
 **Status:** Complete (P0-07 Docker Compose for SQL optionally deferred; local SQL Express in use).
 
@@ -32,7 +32,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 | P0-04 | EF conventions, SQL connection, migrate empty |
 | P0-05 | CI pipeline (build/test) |
 | P0-06 | Architecture tests skeleton |
-| P0-07 | Docker compose optional SQL for dev (**deferred** — SQL Express already works locally) |
+| P0-07 | Docker compose optional SQL for dev (**deferred** ? SQL Express already works locally) |
 | P0-08 | Phase 0 closeout: README / status pointers reflect foundation complete |
 
 **Backend:** Host, BuildingBlocks empty types (`IClock`).
@@ -46,7 +46,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ---
 
-## Phase 1 — Identity, organization, users, roles, permissions, audit foundation
+## Phase 1 ? Identity, organization, users, roles, permissions, audit foundation
 
 **Status:** Complete (P1-01 through P1-10).
 
@@ -80,7 +80,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ---
 
-## Phase 2 — Shared platform foundations
+## Phase 2 ? Shared platform foundations
 
 **Objective:** Numbering, attachments, comments/timeline, workflow, notifications, lookups.
 
@@ -107,9 +107,14 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ---
 
-## Phase 3 — Asset management / CMDB foundation
+## Phase 3 ? Asset management / CMDB foundation
 
-**Objective:** CI + Asset as source of truth.
+**Objective:** Operational CMDB foundation in ITMG, with Asset records as a compatibility/correlation layer.
+
+**Source-of-truth model (unchanged by Phase 3 completion):**
+
+- **External Asset Management** = authoritative physical asset lifecycle source of truth
+- **QEC ITMG** = operational CI / service relationship source, plus existing Asset compatibility/correlation records
 
 **Prerequisites:** P2.
 
@@ -134,7 +139,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ---
 
-## Phase 4 — Service desk / support tickets / service requests
+## Phase 4 ? Service desk / support tickets / service requests
 
 **Objective:** Daily ITSM for SR and incidents (incident = ticket type).
 
@@ -161,13 +166,13 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ---
 
-## Phase 5 — Incident and problem management
+## Phase 5 ? Incident and problem management
 
 **Objective:** Incident specialization (major flag, security classification) and Problem aggregate.
 
 **Prerequisites:** P4.
 
-**MVP note:** Security classification + major flag should not wait if P4 shipped without them — include in P4 if possible; P5 completes problem.
+**MVP note:** Security classification + major flag should not wait if P4 shipped without them ? include in P4 if possible; P5 completes problem.
 
 ### Packages
 
@@ -177,17 +182,21 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 | P5-02 | Promote from event (stub until P8) | Done |
 | P5-03 | Problem domain/API/UI | Done |
 | P5-04 | Link incidents | Done |
-| P5-05 | Recurring metrics | |
-| P5-06 | Tests security IDOR | |
-| P5-07 | Known error flag | |
+| P5-05 | Recurring metrics | Done |
+| P5-06 | Tests security IDOR | Deferred — dedicated testing day |
+| P5-07 | Known error flag | Done |
 
 **Out of scope:** Full PIR methodology UI.
 
-**Next:** P5-05 — Recurring metrics.
+**Feature status:** FEATURE COMPLETE (VALIDATION/HARDENING DEFERRED).
+
+**Next:** P6 Change Management.
+
+**Note:** P7 Remote Support remains retained but lower priority. Near-term execution priority: **P5 ? P6 ? P8 ? P9 ? P11?P14**.
 
 ---
 
-## Phase 6 — Change management
+## Phase 6 ? Change management
 
 **Objective:** Standard/normal/emergency with SoD approvals and CI links.
 
@@ -214,6 +223,8 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 **Objective:** ITMG-owned attended sessions; adapter to MeshCentral; no engine bypass.
 
+**Priority note:** Retained in roadmap but **lower near-term priority** than P6 → P8 → P9 → P11–P14.
+
 **Prerequisites:** P1, P3, P4 (ticket). P6 recommended before unattended.
 
 ### Packages
@@ -236,7 +247,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 ---
 
-## Phase 8 — Events, monitoring, IT operations
+## Phase 8 ? Events, monitoring, IT operations
 
 **Prerequisites:** P3. P4 for promote-to-incident.
 
@@ -248,7 +259,7 @@ P8-01 Event ingest/dedup; P8-02 Acknowledge/promote; P8-03 Backup/restore test r
 
 ---
 
-## Phase 9 — Access management / JML
+## Phase 9 ? Access management / JML
 
 **Prerequisites:** P1, P3 (apps as CI), P2 workflow. P4 optional work orders.
 
@@ -260,7 +271,7 @@ P9-01 AccessCase; P9-02 Joiner; P9-03 Mover; P9-04 Leaver checklist; P9-05 Acces
 
 ---
 
-## Phase 10 — Policy and document management
+## Phase 10 ? Policy and document management
 
 **Prerequisites:** P2 files, P1 users.
 
@@ -270,7 +281,7 @@ P10-01 ManagedDocument versions; P10-02 Policy UX; P10-03 Approvals; P10-04 Ackn
 
 ---
 
-## Phase 11 — Governance and control library
+## Phase 11 ? Governance and control library
 
 **Prerequisites:** P3 for registers-as-views; P10 optional policy links.
 
@@ -282,7 +293,7 @@ P11-01 Org chart; P11-02 Register views; P11-03 InternalControl CRUD; P11-04 Own
 
 ---
 
-## Phase 12 — Compliance framework mapping
+## Phase 12 ? Compliance framework mapping
 
 **Prerequisites:** P11.
 
@@ -294,7 +305,7 @@ Content packs: load licensed/public text as **data files**, not code.
 
 ---
 
-## Phase 13 — Evidence library
+## Phase 13 ? Evidence library
 
 **Prerequisites:** P11, P2 files.
 
@@ -304,7 +315,7 @@ P13-01 Evidence entity; P13-02 Links; P13-03 Validity job; P13-04 Accept workflo
 
 ---
 
-## Phase 14 — Audit management
+## Phase 14 ? Audit management
 
 **Prerequisites:** P13.
 
@@ -314,7 +325,7 @@ P14-01 Engagement; P14-02 Questions; P14-03 Findings; P14-04 CAPA; P14-05 Eviden
 
 ---
 
-## Phase 15 — Security management
+## Phase 15 ? Security management
 
 **Prerequisites:** P3, P4 (security tickets), P11 optional risk-control link.
 
@@ -326,7 +337,7 @@ Scanner ingest: stub adapter.
 
 ---
 
-## Phase 16 — Business continuity
+## Phase 16 ? Business continuity
 
 **Prerequisites:** P3 BusinessService RTO/RPO.
 
@@ -336,7 +347,7 @@ P16-01 BIA; P16-02 Plans; P16-03 Procedures; P16-04 DR tests + evidence; P16-05 
 
 ---
 
-## Phase 17 — Vendor / third-party
+## Phase 17 ? Vendor / third-party
 
 **Prerequisites:** P3 vendor FK may already exist; this fills Vendor aggregate.
 
@@ -346,7 +357,7 @@ P17-01 Vendor/contract; P17-02 Assessments; P17-03 Expiry notify; P17-04 Vendor 
 
 ---
 
-## Phase 18 — Advanced reporting / executive dashboards
+## Phase 18 ? Advanced reporting / executive dashboards
 
 **Prerequisites:** Data from prior phases. MVP used P4-12 widgets.
 
@@ -356,7 +367,7 @@ P18-01 Report API package; P18-02 Snapshots Hangfire; P18-03 Exec dashboard; P18
 
 ---
 
-## Phase 19 — Integrations / automation
+## Phase 19 ? Integrations / automation
 
 **Prerequisites:** Adapters behind interfaces already. This wires real systems.
 
@@ -364,11 +375,11 @@ P18-01 Report API package; P18-02 Snapshots Hangfire; P18-03 Exec dashboard; P18
 
 P19-01 Directory sync/JML; P19-02 Mail/M365; P19-03 Veeam/events; P19-04 vCenter/Hyper-V enrich; P19-05 Vuln scanner; P19-06 SIEM outbound; P19-07 Webhook hardening; P19-08 Tests/secrets.
 
-**Out of scope:** Building those vendors’ products.
+**Out of scope:** Building those vendors? products.
 
 ---
 
-## Phase 20 — AI assistance
+## Phase 20 ? AI assistance
 
 **Prerequisites:** Stable APIs + RBAC. Local/on-prem model optional.
 
@@ -382,4 +393,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete. Phase 4 (Service desk) is COMPLETE (P4-01..P4-12).** Phase 5 in progress: **P5-01..P5-04 Done.** Next: **P5-05 Recurring metrics.**
+**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete. Phase 4 (Service desk) is COMPLETE (P4-01..P4-12).** Phase 5 FEATURE COMPLETE (P5-01..P5-05, P5-07 Done; P5-06 deferred to testing day). Next: **P6 Change Management**.
