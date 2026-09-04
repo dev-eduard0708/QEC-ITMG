@@ -200,6 +200,8 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 **Objective:** Standard/normal/emergency with SoD approvals and CI links.
 
+**Status:** FEATURE COMPLETE (validation/hardening deferred ? P6-07 dedicated testing day).
+
 **Prerequisites:** P3, P2 workflow. P4 for optional ticket link.
 
 ### Packages
@@ -211,13 +213,13 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 | P6-03 | Approval SoD | Done |
 | P6-04 | Implementation/validation/PIR states | Done |
 | P6-05 | UI | Done |
-| P6-06 | Notifications approval | |
-| P6-07 | Tests SoD | |
-| P6-08 | Standard change catalog (optional) | |
-| P6-09 | Emergency retrospective path | |
-| P6-10 | History | |
+| P6-06 | Notifications approval | Done |
+| P6-07 | Tests SoD | Deferred ? dedicated testing day |
+| P6-08 | Standard change catalog (optional) | Done |
+| P6-09 | Emergency retrospective path | Done |
+| P6-10 | History | Done |
 
-**NEXT:** P6-06?10 (notifications, SoD tests, catalog, retrospective polish, history). Phase 6 is not complete until those packages land. After P6, execution priority remains **P8 Events / IT Operations** (P7 Remote Support retained but lower priority).
+**NEXT:** P8 Events / IT Operations. P7 Remote Support remains retained but lower priority. VALIDATION/HARDENING for Phase 6 is deferred (P6-07).
 
 ---
 
