@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAnyPermission, RequireAuth, RequirePermission } from '@/auth/route-guards'
-import { AppShell } from '@/components/layout/app-shell'
+import { AppShell, RootWorkspaceRedirect } from '@/components/layout/app-shell'
 import { AdminIndexRedirect } from '@/features/admin/admin-index-redirect'
 import { AdminLayout } from '@/features/admin/admin-layout'
 import { AdminLookupsPage } from '@/features/admin/lookups-page'
@@ -82,7 +82,10 @@ export function AppRouter() {
 
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route index element={<FoundationHomePage />} />
+          <Route index element={<RootWorkspaceRedirect />} />
+          {import.meta.env.DEV ? (
+            <Route path="dev/foundation" element={<FoundationHomePage />} />
+          ) : null}
           <Route path="employee" element={<EmployeeHomePage />} />
           <Route path="employee/equipment" element={<MyEquipmentPage />} />
           <Route path="employee/requests" element={<MyRequestsPage />} />
