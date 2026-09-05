@@ -2,58 +2,71 @@
 
 Related: [SYSTEM-ARCHITECTURE.md](SYSTEM-ARCHITECTURE.md) · [../10-operations/CONFIGURATION.md](../10-operations/CONFIGURATION.md)
 
-## Status: readiness stubs only
+## Status: real adapters implemented (disabled by default)
 
-Three vendor integrations are defined as **disabled adapters**.
-No outbound vendor connections exist. Production integration requires explicit **QEC authorization**.
+Vendor and platform integrations ship as **real adapter code** behind contracts.
+Runtime defaults to **Disabled**. Activation requires explicit QEC configuration and authorization.
+No live vendor connectivity is assumed in development.
 
-## Approved vendors (disabled)
+## Providers
 
-| Vendor | Interface | Config prefix |
-|--------|-----------|---------------|
-| Veeam Backup & Replication / Enterprise Manager | `IVeeamClient` | `Integrations:Veeam` |
-| SonicWall Capture Client | `ISonicWallCaptureClient` | `Integrations:SonicWallCaptureClient` |
+| Provider | Interface | Config prefix |
+|----------|-----------|---------------|
+| Directory (Graph/LDAP style) | `IDirectorySyncClient` | `Integrations:Directory` |
+| Mail / M365 Graph | `IEmailSender` via `ConfigurableEmailSender` | `Integrations:Mail` (+ SMTP default) |
+| Veeam | `IVeeamClient` | `Integrations:Veeam` |
 | Synology DSM | `ISynologyMonitor` | `Integrations:Synology` |
-
-All three default to `Enabled: false` and `RuntimeMode: Disabled`.
+| SonicWall Capture Client | `ISonicWallCaptureClient` | `Integrations:SonicWallCaptureClient` |
+| Virtualization (vCenter/Hyper-V) | `IVirtualizationEnrichmentClient` | `Integrations:Virtualization` |
+| Vulnerability scanner | `IVulnerabilityScannerIngestClient` | `Integrations:VulnerabilityScanner` |
+| SIEM outbound | `ISiemPublisher` | `Integrations:Siem` |
+| Inbound webhooks | `IIntegrationWebhookProcessor` | `Integrations:Webhook` |
 
 ## Configuration
 
 ```json
 "Integrations": {
-  "Veeam":                 { "Enabled": false, "BaseUrl": "", "CredentialReference": "" },
-  "SonicWallCaptureClient": { "Enabled": false, "BaseUrl": "", "CredentialReference": "" },
-  "Synology":              { "Enabled": false, "BaseUrl": "", "CredentialReference": "" }
+  "Veeam": { "Enabled": false, "BaseUrl": "", "CredentialReference": "" },
+  "Directory": { "Enabled": false, "BaseUrl": "", "CredentialReference": "", "ProviderKind": "Graph" },
+  "Mail": { "Enabled": false, "BaseUrl": "https://graph.microsoft.com", "CredentialReference": "", "ProviderKind": "Graph", "MailboxAddress": "" },
+  "Siem": { "Enabled": false, "BaseUrl": "", "CredentialReference": "" },
+  "Webhook": { "Enabled": false, "CredentialReference": "", "RequiresBaseUrl": false, "WebhookSignatureReference": "" }
 }
 ```
 
-- `CredentialReference` is a **secret-store reference name only** — never an actual API key, token, username, or password.
-- `Configured` becomes `true` only when `Enabled`, `BaseUrl`, and `CredentialReference` are all non-empty.
+- `CredentialReference` is a **secret-store reference name only** — never an API key, token, username, or password.
+- Secrets resolve via `ISecretResolver` from environment `ITMG_SECRET_{REFERENCE}` or configuration `Secrets:{REFERENCE}` (user-secrets/env for development; pluggable store for production).
+- Readiness statuses: **Disabled / NotConfigured / Configured / Healthy / Unhealthy**.
+- Healthy/Unhealthy are set only after real runtime sync attempts.
 
-## Contracts
+## Secrets policy
 
-Interfaces and snapshot DTOs live under `src/Qec.Itmg.Contracts/Integrations/`.
-Read-only data retrieval only. No write, remote-control, or scan/remediation commands are defined.
+Never store passwords, API keys, client secrets, access tokens, or refresh tokens in:
 
-## Readiness API
+- `appsettings*.json`
+- database tables
+- Git
+- audit/integration logs
+- admin UI
 
-`GET /api/v1/admin/integrations/readiness` — requires `admin.integrations` permission.
+## Operations
 
-Returns configuration/readiness state. **Never contacts any vendor system.**
+- Hangfire job `integration-polling` syncs **enabled** providers hourly (skips disabled; overlap-safe).
+- Admin API/UI: `/api/v1/admin/integrations/*` and `/it/admin/integrations` (`admin.integrations`).
+- Sync now never silently enables a provider.
+- JML directory actions require AccessCase in **Fulfillment**; approvals/SoD remain authoritative.
+- Webhooks require HMAC signature, timestamp freshness, idempotency, allowlist, and payload size limits.
 
-## Road map
+## Persistence (`plt`)
 
-| Phase | Work |
-|-------|------|
-| P2-03 | Generic `IMalwareScanner` abstraction for attachment scanning — SonicWall Capture Client is **not** the scanner |
-| P3 | Map external devices and workloads to CMDB entities |
-| P8 | Consume Veeam / Synology backup and replication operational data |
-| P15 | Consume SonicWall Capture Client endpoint security and detection data |
-| P19 | Implement real vendor adapters after production authorization is granted |
+- `IntegrationRun` — sync history/counts
+- `IntegrationWebhookReceipt` — inbound idempotency (payload hash only)
+- `IntegrationCorrelation` — external ID ↔ CI/user/finding correlation (including unmatched review)
 
 ## Inbound integrations (existing)
 
 | System | Direction | Purpose |
 |--------|-----------|---------|
 | Google OIDC | Inbound | Authentication (primary) |
-| SMTP / Mailpit | Outbound | Email notifications (future) |
+| SMTP / Mailpit | Outbound | Default email notifications |
+| Hardened webhooks | Inbound | Provider events (`POST /api/v1/integrations/webhooks/{provider}`) |

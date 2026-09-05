@@ -519,9 +519,23 @@ Scanner ingest: stub adapter only (real scanners in P19).
 
 ### Packages
 
-P19-01 Directory sync/JML; P19-02 Mail/M365; P19-03 Veeam/events; P19-04 vCenter/Hyper-V enrich; P19-05 Vuln scanner; P19-06 SIEM outbound; P19-07 Webhook hardening; P19-08 Tests/secrets.
+| Package | Status |
+|---------|--------|
+| P19-01 Directory sync/JML | Done |
+| P19-02 Mail/M365 | Done |
+| P19-03 Veeam/events (+ Synology read-only) | Done |
+| P19-04 vCenter/Hyper-V enrich | Done |
+| P19-05 Vuln scanner (+ SonicWall telemetry separate) | Done |
+| P19-06 SIEM outbound | Done |
+| P19-07 Webhook hardening | Done |
+| P19-08 Secrets | Done |
+| P19-08 Tests | Deferred ? dedicated project testing phase |
 
-**Out of scope:** Building those vendors' products.
+**Out of scope:** Building those vendors' products. Live vendor connectivity tests not required to close P19.
+
+**Phase 19:** FEATURE COMPLETE. FORMAL TESTING/HARDENING DEFERRED (P19-08 tests).
+
+**NEXT:** P20 AI assistance.
 
 ---
 
@@ -539,4 +553,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phases 0?18 are FEATURE COMPLETE** (dedicated package tests deferred to project testing phase where noted). Next: **P19 Integrations / automation**.
+**Phases 0?19 are FEATURE COMPLETE** (dedicated package tests deferred to project testing phase where noted). Next: **P20 AI assistance**.
