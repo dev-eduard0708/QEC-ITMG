@@ -108,6 +108,8 @@ public static class IdentitySeedCatalog
         ("report.vendor", "View vendor reports"),
         ("report.executive", "View executive reporting dashboard"),
         ("report.export", "Export authorized reports as CSV"),
+        ("ai.use", "Use AI assistance capabilities as the current user"),
+        ("ai.admin", "View AI readiness and interaction metadata"),
     ];
 
     /// <summary>Read-oriented auditor role. Does not include manage/export/admin permissions.</summary>

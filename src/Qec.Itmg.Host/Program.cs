@@ -24,6 +24,7 @@ using Qec.Itmg.Host.BusinessContinuity;
 using Qec.Itmg.Host.ThirdParty;
 using Qec.Itmg.Host.Reporting;
 using Qec.Itmg.Host.Integrations;
+using Qec.Itmg.Host.Ai;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Host.ServiceDesk;
@@ -112,6 +113,7 @@ try
 
     builder.Services.AddScoped<IIntegrationDomainSync, HostIntegrationDomainSync>();
     builder.Services.AddScoped<DirectoryJmlFulfillmentService>();
+    builder.Services.AddScoped<AiAssistanceOrchestrator>();
 
     builder.Services
         .AddHealthChecks()
@@ -229,6 +231,7 @@ try
     app.MapVendorEndpoints();
     app.MapReportEndpoints();
     app.MapIntegrationReadinessEndpoints();
+    app.MapAiEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))
     {

@@ -29,6 +29,7 @@ public enum AuditAggregateType
     ReportExport = 25,
     ReportSnapshot = 26,
     IntegrationRun = 27,
+    AiInteraction = 28,
 }
 
 public enum AuditActorType
