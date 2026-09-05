@@ -168,7 +168,8 @@ public static class IdentityAuthenticationExtensions
                         await SecurityAuditHooks.LogLoginFailureAsync(
                             context.HttpContext,
                             context.Failure?.Message);
-                        context.Response.Redirect("/?authError=remote");
+                        // SPA login route (Vite origin in Development) — keep relative path only.
+                        context.Response.Redirect("/login?authError=remote");
                         context.HandleResponse();
                     },
                 };

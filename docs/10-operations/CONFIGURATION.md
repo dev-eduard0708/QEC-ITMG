@@ -5,6 +5,7 @@ ASP.NET configuration:
 - Connection strings
 - File root path
 - OIDC (Google): Authority, ClientId/ClientSecret (secret store), AllowedDomains
+- Local Development Google login: `appsettings.Development.local.json` (gitignored); see [../01-foundation/GOOGLE-OAUTH-LOCAL-DEVELOPMENT.md](../01-foundation/GOOGLE-OAUTH-LOCAL-DEVELOPMENT.md)
 - Break-glass: `Authentication:BreakGlass` accounts + password hashes (secret store / local overrides only)
 - Identity seed: optional `Identity:Seed:PlatformAdministratorUpn` (local/env only; never commit a real mailbox)
 - SMTP (`Email:Smtp` — Development defaults target Mailpit on localhost:1025; UI on :8025)

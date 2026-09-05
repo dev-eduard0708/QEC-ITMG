@@ -1,5 +1,7 @@
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Identity.Admin;
@@ -19,7 +21,9 @@ public sealed class CurrentUserService(
     IdentityDbContext db,
     IClock clock,
     IBusinessAuditWriter businessAudit,
-    ISharedDbTransaction sharedDbTransaction) : ICurrentUserService
+    ISharedDbTransaction sharedDbTransaction,
+    IHostEnvironment environment,
+    IOptions<OidcAuthenticationOptions> oidcOptions) : ICurrentUserService
 {
     public const string EmployeeRoleName = IdentitySeedCatalog.EmployeeRoleName;
 
@@ -57,7 +61,7 @@ public sealed class CurrentUserService(
             externalId,
             upn,
             displayName,
-            allowJit: !isBreakGlass,
+            allowJit: AllowGoogleJitProvisioning(isBreakGlass),
             cancellationToken);
 
         if (user is null || user.Status != UserStatus.Active)
@@ -66,6 +70,22 @@ public sealed class CurrentUserService(
         }
 
         return await MapSessionAsync(user, authMethod, cancellationToken);
+    }
+
+    private bool AllowGoogleJitProvisioning(bool isBreakGlass)
+    {
+        if (isBreakGlass)
+        {
+            return false;
+        }
+
+        // Development-only switch; Production continues existing domain-gated JIT (Employee role only).
+        if (environment.IsDevelopment())
+        {
+            return oidcOptions.Value.DevelopmentAutoProvisionEmployee;
+        }
+
+        return true;
     }
 
     private async Task<User?> ResolveUserAsync(

@@ -35,6 +35,8 @@ Google Workspace / IdP MFA for IT and admin accounts. Application additionally c
 
 On first Google login via `GET /api/v1/me`: create User from `sub` + email UPN when missing; assign Employee role if seeded. Pre-provisioned users matched by UPN get Google `sub` bound to `DirectoryObjectId`. Break-glass never JIT-creates users. IT roles assigned in Administration (not from Google groups).
 
+Development: `Authentication:Oidc:DevelopmentAutoProvisionEmployee` (default `true`) gates that Employee JIT. The switch is ignored outside Development. See [GOOGLE-OAUTH-LOCAL-DEVELOPMENT.md](../01-foundation/GOOGLE-OAUTH-LOCAL-DEVELOPMENT.md) for personal Gmail / External OAuth Testing setup (Workspace not required).
+
 ## Break-glass
 
 Emergency local login independent of Google, disabled by default:

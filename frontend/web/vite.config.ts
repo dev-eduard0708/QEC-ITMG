@@ -6,6 +6,15 @@ import { defineConfig } from 'vite'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
 
+/** Proxy API/auth/OIDC to the ASP.NET host while keeping the browser Host as localhost:5173. */
+function backendProxy(preserveBrowserHost: boolean) {
+  return {
+    target: 'http://localhost:5080',
+    // changeOrigin:false keeps Host: localhost:5173 so OIDC redirect_uri is http://localhost:5173/signin-oidc
+    changeOrigin: !preserveBrowserHost,
+  }
+}
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -17,18 +26,12 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/api': {
-        target: 'http://localhost:5080',
-        changeOrigin: true,
-      },
-      '/auth': {
-        target: 'http://localhost:5080',
-        changeOrigin: true,
-      },
-      '/health': {
-        target: 'http://localhost:5080',
-        changeOrigin: true,
-      },
+      '/api': backendProxy(false),
+      '/health': backendProxy(false),
+      // Auth challenge + OIDC callbacks must preserve the Vite origin for redirect_uri / cookies.
+      '/auth': backendProxy(true),
+      '/signin-oidc': backendProxy(true),
+      '/signout-callback-oidc': backendProxy(true),
     },
   },
 })

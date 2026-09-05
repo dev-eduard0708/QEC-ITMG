@@ -27,6 +27,13 @@ public sealed class OidcAuthenticationOptions
     /// </summary>
     public List<string> AllowedDomains { get; set; } = [];
 
+    /// <summary>
+    /// Development-only: when true (default), first verified Google sign-in JIT-provisions an Active Employee.
+    /// Ignored outside Development — production JIT remains governed by AllowedDomains + ops process.
+    /// Never grants Admin/IT permissions.
+    /// </summary>
+    public bool DevelopmentAutoProvisionEmployee { get; set; } = true;
+
     public void EnsureValidWhenEnabled()
     {
         if (!Enabled)
@@ -40,12 +47,12 @@ public sealed class OidcAuthenticationOptions
             missing.Add(nameof(Authority));
         }
 
-        if (string.IsNullOrWhiteSpace(ClientId))
+        if (string.IsNullOrWhiteSpace(ClientId) || IsPlaceholderSecret(ClientId))
         {
             missing.Add(nameof(ClientId));
         }
 
-        if (string.IsNullOrWhiteSpace(ClientSecret))
+        if (string.IsNullOrWhiteSpace(ClientSecret) || IsPlaceholderSecret(ClientSecret))
         {
             missing.Add(nameof(ClientSecret));
         }
@@ -60,7 +67,17 @@ public sealed class OidcAuthenticationOptions
             throw new InvalidOperationException(
                 "OIDC authentication is enabled but required configuration is missing: "
                 + string.Join(", ", missing)
-                + ". Set Authentication:Oidc values or environment variables Authentication__Oidc__*.");
+                + ". For local Development, copy src/Qec.Itmg.Host/appsettings.Development.local.example.json "
+                + "to appsettings.Development.local.json (gitignored) and paste your Google OAuth Client ID/Secret. "
+                + "Authorized redirect URI must be exactly http://localhost:5173/signin-oidc. "
+                + "See docs/01-foundation/GOOGLE-OAUTH-LOCAL-DEVELOPMENT.md. "
+                + "Do not log or commit ClientSecret. "
+                + "Production uses environment/secret store Authentication__Oidc__* values.");
         }
     }
+
+    private static bool IsPlaceholderSecret(string value) =>
+        value.Contains("PASTE_", StringComparison.OrdinalIgnoreCase)
+        || value.Contains("YOUR_", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(value, "changeme", StringComparison.OrdinalIgnoreCase);
 }

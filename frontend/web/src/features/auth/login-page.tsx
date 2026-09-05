@@ -15,12 +15,13 @@ import { cn } from '@/lib/utils'
 type QuickLoginKind = 'admin' | 'employee'
 
 function sanitizeLocalReturnUrl(candidate: string | null | undefined): string {
-  if (!candidate || !candidate.trim()) return '/it'
+  // Default "/" lets RootWorkspaceRedirect send Employees to /employee and IT users to /it.
+  if (!candidate || !candidate.trim()) return '/'
   const value = candidate.trim().split('#')[0]?.split('?')[0] ?? ''
-  if (!value || value[0] !== '/') return '/it'
-  if (value.length > 1 && (value[1] === '/' || value[1] === '\\')) return '/it'
-  if (value.includes('\\') || value.includes('://')) return '/it'
-  if (value.startsWith('/login') || value.startsWith('/break-glass')) return '/it'
+  if (!value || value[0] !== '/') return '/'
+  if (value.length > 1 && (value[1] === '/' || value[1] === '\\')) return '/'
+  if (value.includes('\\') || value.includes('://')) return '/'
+  if (value.startsWith('/login') || value.startsWith('/break-glass')) return '/'
   return value
 }
 
@@ -67,7 +68,7 @@ export function LoginPage() {
 
   const returnUrl = useMemo(() => {
     const fromState = (location.state as { from?: string } | null)?.from
-    return sanitizeLocalReturnUrl(searchParams.get('returnUrl') ?? fromState ?? '/it')
+    return sanitizeLocalReturnUrl(searchParams.get('returnUrl') ?? fromState ?? '/')
   }, [location.state, searchParams])
 
   const googleLoginHref = `/auth/login?returnUrl=${encodeURIComponent(returnUrl)}`
