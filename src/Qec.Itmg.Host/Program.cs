@@ -21,6 +21,7 @@ using Qec.Itmg.Host.Evidence;
 using Qec.Itmg.Host.Audit;
 using Qec.Itmg.Host.Security;
 using Qec.Itmg.Host.BusinessContinuity;
+using Qec.Itmg.Host.ThirdParty;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -157,6 +158,10 @@ try
             "continuity-reminders",
             job => job.ExecuteAsync(CancellationToken.None),
             "0 9 * * *");
+        recurringJobs.AddOrUpdate<VendorReminderJob>(
+            "vendor-reminders",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "15 9 * * *");
     }
 
     app.UseSerilogRequestLogging();
@@ -204,6 +209,7 @@ try
     app.MapAuditEndpoints();
     app.MapSecurityEndpoints();
     app.MapContinuityEndpoints();
+    app.MapVendorEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Qec.Itmg.AccessManagement.Persistence;
 
@@ -11,9 +12,11 @@ using Qec.Itmg.AccessManagement.Persistence;
 namespace Qec.Itmg.AccessManagement.Persistence.Migrations
 {
     [DbContext(typeof(AccessManagementDbContext))]
-    partial class AccessManagementDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260905080023_P17_AccessVendorLink")]
+    partial class P17_AccessVendorLink
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -11,7 +11,7 @@ namespace Qec.Itmg.AccessManagement.Services;
 public sealed record AccessCaseDto(
     Guid Id, string CaseNumber, string Type, string Status, Guid RequesterUserId,
     Guid? SubjectUserId, string? SubjectName, string? SubjectEmail, Guid? DepartmentId,
-    Guid? ManagerUserId, Guid? DesignatedApproverUserId, Guid? LinkedTicketId,
+    Guid? ManagerUserId, Guid? DesignatedApproverUserId, Guid? LinkedTicketId, Guid? VendorId,
     DateTimeOffset? EffectiveAtUtc, string Reason, bool ExistingAccessConfirmed,
     DateTimeOffset? ExistingAccessConfirmedAtUtc, Guid? ExistingAccessConfirmedByUserId,
     DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc, DateTimeOffset? ClosedAtUtc,
@@ -115,6 +115,35 @@ public sealed class AccessCaseService(
         int pending = await db.AccessCaseItems.CountAsync(
             x => x.AccessCaseId == id && x.IsMandatory && x.Status == AccessItemStatus.Pending, ct);
         return Map(item, count, pending);
+    }
+
+    public async Task<IReadOnlyList<AccessCaseDto>> ListByVendorAsync(Guid vendorId, CancellationToken ct)
+    {
+        List<AccessCase> items = await db.AccessCases.AsNoTracking()
+            .Where(x => x.VendorId == vendorId)
+            .OrderByDescending(x => x.UpdatedAtUtc)
+            .Take(100)
+            .ToListAsync(ct);
+        List<Guid> ids = items.Select(x => x.Id).ToList();
+        Dictionary<Guid, int> counts = ids.Count == 0
+            ? []
+            : await db.AccessCaseItems.AsNoTracking().Where(x => ids.Contains(x.AccessCaseId))
+                .GroupBy(x => x.AccessCaseId).ToDictionaryAsync(g => g.Key, g => g.Count(), ct);
+        Dictionary<Guid, int> pending = ids.Count == 0
+            ? []
+            : await db.AccessCaseItems.AsNoTracking()
+                .Where(x => ids.Contains(x.AccessCaseId) && x.IsMandatory && x.Status == AccessItemStatus.Pending)
+                .GroupBy(x => x.AccessCaseId).ToDictionaryAsync(g => g.Key, g => g.Count(), ct);
+        return items.Select(x => Map(x, counts.GetValueOrDefault(x.Id), pending.GetValueOrDefault(x.Id))).ToList();
+    }
+
+    public async Task<AccessCaseDto> SetVendorAsync(Guid id, Guid? vendorId, CancellationToken ct)
+    {
+        AccessCase entity = await db.AccessCases.FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new InvalidOperationException("Access case not found.");
+        entity.SetVendorId(vendorId, clock.UtcNow);
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(entity.Id, ct))!;
     }
 
     public async Task<AccessCaseDto> CreateAsync(
@@ -430,7 +459,7 @@ public sealed class AccessCaseService(
     private static AccessCaseDto Map(AccessCase x, int itemCount, int pendingMandatory) =>
         new(x.Id, x.CaseNumber, x.Type.ToString(), x.Status.ToString(), x.RequesterUserId,
             x.SubjectUserId, x.SubjectName, x.SubjectEmail, x.DepartmentId, x.ManagerUserId,
-            x.DesignatedApproverUserId, x.LinkedTicketId, x.EffectiveAtUtc, x.Reason,
+            x.DesignatedApproverUserId, x.LinkedTicketId, x.VendorId, x.EffectiveAtUtc, x.Reason,
             x.ExistingAccessConfirmed, x.ExistingAccessConfirmedAtUtc, x.ExistingAccessConfirmedByUserId,
             x.CreatedAtUtc, x.UpdatedAtUtc, x.ClosedAtUtc, Convert.ToBase64String(x.RowVersion),
             itemCount, pendingMandatory);

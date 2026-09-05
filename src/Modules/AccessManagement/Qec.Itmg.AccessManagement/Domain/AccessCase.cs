@@ -92,6 +92,7 @@ public sealed class AccessCase
     public Guid? ManagerUserId { get; private set; }
     public Guid? DesignatedApproverUserId { get; private set; }
     public Guid? LinkedTicketId { get; private set; }
+    public Guid? VendorId { get; private set; }
     public DateTimeOffset? EffectiveAtUtc { get; private set; }
     public string Reason { get; private set; } = null!;
     public bool ExistingAccessConfirmed { get; private set; }
@@ -169,6 +170,12 @@ public sealed class AccessCase
     {
         if (ticketId == Guid.Empty) throw new ArgumentException("Ticket is required.", nameof(ticketId));
         LinkedTicketId = ticketId;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void SetVendorId(Guid? vendorId, DateTimeOffset utcNow)
+    {
+        VendorId = Norm(vendorId);
         UpdatedAtUtc = utcNow;
     }
 

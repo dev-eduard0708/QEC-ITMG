@@ -34,5 +34,6 @@
     <ProjectReference Include="..\Modules\Audit\Qec.Itmg.Audit\Qec.Itmg.Audit.csproj" />
     <ProjectReference Include="..\Modules\Security\Qec.Itmg.Security\Qec.Itmg.Security.csproj" />
     <ProjectReference Include="..\Modules\BusinessContinuity\Qec.Itmg.BusinessContinuity\Qec.Itmg.BusinessContinuity.csproj" />
+    <ProjectReference Include="..\Modules\ThirdParty\Qec.Itmg.ThirdParty\Qec.Itmg.ThirdParty.csproj" />
   </ItemGroup>
 </Project>

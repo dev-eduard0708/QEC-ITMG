@@ -93,6 +93,10 @@ public static class IdentitySeedCatalog
         ("bcm.read", "View business continuity BIA, plans, procedures, DR tests, and reports"),
         ("bcm.manage", "Manage BIA, continuity plans, procedures, and SPOF metadata"),
         ("dr.test.manage", "Schedule, run, and complete DR tests and evidence links"),
+        ("vendor.read", "View vendors, contracts, assessments, and vendor access summaries"),
+        ("vendor.manage", "Manage vendors, contacts, and CI/access vendor links"),
+        ("contract.manage", "Manage vendor contracts and contractual SLA references"),
+        ("vendor.assess", "Schedule and complete vendor assessments"),
     ];
 
     /// <summary>Read-oriented auditor role. Does not include manage/export/admin permissions.</summary>

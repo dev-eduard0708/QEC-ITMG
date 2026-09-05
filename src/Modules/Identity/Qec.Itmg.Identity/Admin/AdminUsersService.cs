@@ -56,6 +56,37 @@ public sealed class AdminUsersService(
             .ToList();
     }
 
+    public async Task<IReadOnlyList<AdminUserDto>> ListByUserTypeAsync(string userType, CancellationToken cancellationToken)
+    {
+        if (!AdminDtoMapper.TryParseUserType(userType, out UserType parsed))
+            return [];
+
+        List<User> users = await db.Users.AsNoTracking()
+            .Where(user => user.UserType == parsed)
+            .OrderBy(user => user.DisplayName)
+            .ThenBy(user => user.Upn)
+            .ToListAsync(cancellationToken);
+        if (users.Count == 0) return [];
+
+        Guid[] userIds = users.Select(user => user.Id).ToArray();
+        var roleLinks = await (
+            from userRole in db.UserRoles.AsNoTracking()
+            join role in db.Roles.AsNoTracking() on userRole.RoleId equals role.Id
+            where userIds.Contains(userRole.UserId)
+            select new { userRole.UserId, Role = new AdminRoleSummaryDto(role.Id, role.Name) })
+            .ToListAsync(cancellationToken);
+        Dictionary<Guid, List<AdminRoleSummaryDto>> rolesByUser = roleLinks
+            .GroupBy(link => link.UserId)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Select(link => link.Role).OrderBy(role => role.Name).ToList());
+        return users
+            .Select(user => MapUser(
+                user,
+                rolesByUser.TryGetValue(user.Id, out List<AdminRoleSummaryDto>? roles) ? roles : []))
+            .ToList();
+    }
+
     public async Task<IResult> CreateAsync(CreateAdminUserRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Upn))

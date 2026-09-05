@@ -148,7 +148,7 @@ public sealed class AccessReviewService(
 }
 
 public sealed record ManagedAccountDto(
-    Guid Id, string AccountName, string Type, Guid? ConfigurationItemId, Guid? OwnerUserId,
+    Guid Id, string AccountName, string Type, Guid? ConfigurationItemId, Guid? OwnerUserId, Guid? VendorId,
     string Purpose, string Status, DateTimeOffset? LastReviewedAtUtc,
     DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc, string RowVersion, bool IsPrivileged);
 
@@ -196,14 +196,31 @@ public sealed class ManagedAccountService(AccessManagementDbContext db, IClock c
     {
         ManagedAccount entity = await db.ManagedAccounts.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new InvalidOperationException("Managed account not found.");
-        entity.Update(accountName, purpose, configurationItemId, ownerUserId, status, lastReviewedAtUtc, clock.UtcNow);
+        entity.Update(accountName, purpose, configurationItemId, ownerUserId, status, lastReviewedAtUtc, clock.UtcNow, entity.VendorId);
         await businessAudit.AppendAsync(AccessAudit.Field(entity.Id, entity.AccountName, "Updated", null, status.ToString()), ct);
         await db.SaveChangesAsync(ct);
         return Map(entity);
     }
 
+    public async Task<IReadOnlyList<ManagedAccountDto>> ListByVendorAsync(Guid vendorId, CancellationToken ct) =>
+        (await db.ManagedAccounts.AsNoTracking().Where(x => x.VendorId == vendorId).OrderBy(x => x.AccountName).ToListAsync(ct))
+        .Select(Map).ToList();
+
+    public async Task<int> CountActiveWithVendorAsync(CancellationToken ct) =>
+        await db.ManagedAccounts.AsNoTracking()
+            .CountAsync(x => x.VendorId != null && x.Status == ManagedAccountStatus.Active, ct);
+
+    public async Task<ManagedAccountDto> SetVendorAsync(Guid id, Guid? vendorId, CancellationToken ct)
+    {
+        ManagedAccount entity = await db.ManagedAccounts.FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new InvalidOperationException("Managed account not found.");
+        entity.SetVendorId(vendorId, clock.UtcNow);
+        await db.SaveChangesAsync(ct);
+        return Map(entity);
+    }
+
     private static ManagedAccountDto Map(ManagedAccount x) =>
-        new(x.Id, x.AccountName, x.Type.ToString(), x.ConfigurationItemId, x.OwnerUserId, x.Purpose,
+        new(x.Id, x.AccountName, x.Type.ToString(), x.ConfigurationItemId, x.OwnerUserId, x.VendorId, x.Purpose,
             x.Status.ToString(), x.LastReviewedAtUtc, x.CreatedAtUtc, x.UpdatedAtUtc,
             Convert.ToBase64String(x.RowVersion), x.Type == ManagedAccountType.Privileged);
 }

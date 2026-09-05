@@ -113,6 +113,7 @@ public sealed class ManagedAccount
     public ManagedAccountType Type { get; private set; }
     public Guid? ConfigurationItemId { get; private set; }
     public Guid? OwnerUserId { get; private set; }
+    public Guid? VendorId { get; private set; }
     public string Purpose { get; private set; } = null!;
     public ManagedAccountStatus Status { get; private set; }
     public DateTimeOffset? LastReviewedAtUtc { get; private set; }
@@ -126,7 +127,8 @@ public sealed class ManagedAccount
         string purpose,
         DateTimeOffset utcNow,
         Guid? configurationItemId = null,
-        Guid? ownerUserId = null)
+        Guid? ownerUserId = null,
+        Guid? vendorId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(accountName);
         ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
@@ -139,6 +141,7 @@ public sealed class ManagedAccount
             Type = type,
             ConfigurationItemId = configurationItemId is null || configurationItemId == Guid.Empty ? null : configurationItemId,
             OwnerUserId = ownerUserId is null || ownerUserId == Guid.Empty ? null : ownerUserId,
+            VendorId = vendorId is null || vendorId == Guid.Empty ? null : vendorId,
             Purpose = purpose.Trim(),
             Status = ManagedAccountStatus.Active,
             CreatedAtUtc = utcNow,
@@ -153,7 +156,8 @@ public sealed class ManagedAccount
         Guid? ownerUserId,
         ManagedAccountStatus status,
         DateTimeOffset? lastReviewedAtUtc,
-        DateTimeOffset utcNow)
+        DateTimeOffset utcNow,
+        Guid? vendorId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(accountName);
         ArgumentException.ThrowIfNullOrWhiteSpace(purpose);
@@ -163,8 +167,15 @@ public sealed class ManagedAccount
         Purpose = purpose.Trim();
         ConfigurationItemId = configurationItemId is null || configurationItemId == Guid.Empty ? null : configurationItemId;
         OwnerUserId = ownerUserId is null || ownerUserId == Guid.Empty ? null : ownerUserId;
+        VendorId = vendorId is null || vendorId == Guid.Empty ? null : vendorId;
         Status = status;
         LastReviewedAtUtc = lastReviewedAtUtc;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void SetVendorId(Guid? vendorId, DateTimeOffset utcNow)
+    {
+        VendorId = vendorId is null || vendorId == Guid.Empty ? null : vendorId;
         UpdatedAtUtc = utcNow;
     }
 }

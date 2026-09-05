@@ -41,6 +41,8 @@ public sealed class ConfigurationItem
 
     public Guid? OwnerUserId { get; private set; }
 
+    public Guid? VendorId { get; private set; }
+
     public string? SerialNumber { get; private set; }
 
     public string? Manufacturer { get; private set; }
@@ -161,6 +163,12 @@ public sealed class ConfigurationItem
         SpofMitigationNotes = NormalizeOptional(mitigationNotes);
         SpofRiskId = isSpof ? NormalizeGuid(riskId) : null;
         SpofReviewedAtUtc = utcNow;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void SetVendorId(Guid? vendorId, DateTimeOffset utcNow)
+    {
+        VendorId = NormalizeGuid(vendorId);
         UpdatedAtUtc = utcNow;
     }
 

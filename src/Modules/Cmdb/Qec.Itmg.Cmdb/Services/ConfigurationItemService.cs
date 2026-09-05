@@ -21,6 +21,7 @@ public sealed record ConfigurationItemDto(
     Guid? LocationId,
     Guid? DepartmentId,
     Guid? OwnerUserId,
+    Guid? VendorId,
     string? SerialNumber,
     string? Manufacturer,
     string? Model,
@@ -210,6 +211,7 @@ public sealed class ConfigurationItemService(
                 item.LocationId,
                 item.DepartmentId,
                 item.OwnerUserId,
+                item.VendorId,
                 item.SerialNumber,
                 item.Manufacturer,
                 item.Model,
@@ -255,6 +257,28 @@ public sealed class ConfigurationItemService(
 
     public async Task<int> CountConfirmedSpofsAsync(CancellationToken cancellationToken = default) =>
         await db.ConfigurationItems.AsNoTracking().CountAsync(x => x.IsSinglePointOfFailure, cancellationToken);
+
+    public async Task<IReadOnlyList<ConfigurationItemDto>> ListByVendorAsync(
+        Guid vendorId, CancellationToken cancellationToken = default)
+    {
+        List<ConfigurationItem> items = await db.ConfigurationItems.AsNoTracking()
+            .Where(x => x.VendorId == vendorId)
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+        return await MapManyAsync(items, cancellationToken);
+    }
+
+    public async Task<ConfigurationItemDto> SetVendorAsync(
+        Guid id, Guid? vendorId, string rowVersion, CancellationToken cancellationToken = default)
+    {
+        ConfigurationItem entity = await db.ConfigurationItems.FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Configuration item was not found.");
+        if (!MatchesRowVersion(entity.RowVersion, rowVersion))
+            throw new InvalidOperationException("The configuration item was modified by another user.");
+        entity.SetVendorId(vendorId, clock.UtcNow);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await MapManyAsync([entity], cancellationToken)).Single();
+    }
 
     private static bool MatchesRowVersion(byte[] current, string expectedBase64)
     {

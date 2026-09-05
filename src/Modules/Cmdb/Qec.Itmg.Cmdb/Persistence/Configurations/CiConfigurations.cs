@@ -102,6 +102,9 @@ internal sealed class ConfigurationItemConfiguration : IEntityTypeConfiguration<
         builder.HasIndex(item => item.IsSinglePointOfFailure)
             .HasDatabaseName("IX_ConfigurationItem_IsSinglePointOfFailure");
 
+        builder.HasIndex(item => item.VendorId)
+            .HasDatabaseName("IX_ConfigurationItem_VendorId");
+
         builder.HasOne<CiType>()
             .WithMany()
             .HasForeignKey(item => item.CiTypeId)

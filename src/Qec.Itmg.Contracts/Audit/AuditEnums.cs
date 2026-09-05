@@ -23,6 +23,9 @@ public enum AuditAggregateType
     ContinuityPlan = 19,
     RecoveryProcedure = 20,
     DrTest = 21,
+    Vendor = 22,
+    Contract = 23,
+    VendorAssessment = 24,
 }
 
 public enum AuditActorType

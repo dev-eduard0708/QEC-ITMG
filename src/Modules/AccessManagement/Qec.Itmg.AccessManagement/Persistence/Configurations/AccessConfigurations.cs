@@ -22,6 +22,7 @@ internal sealed class AccessCaseConfiguration : IEntityTypeConfiguration<AccessC
         builder.HasIndex(x => x.RequesterUserId).HasDatabaseName("IX_AccessCase_RequesterUserId");
         builder.HasIndex(x => x.SubjectUserId).HasDatabaseName("IX_AccessCase_SubjectUserId");
         builder.HasIndex(x => x.EffectiveAtUtc).HasDatabaseName("IX_AccessCase_EffectiveAtUtc");
+        builder.HasIndex(x => x.VendorId).HasDatabaseName("IX_AccessCase_VendorId");
     }
 }
 
@@ -109,6 +110,7 @@ internal sealed class ManagedAccountConfiguration : IEntityTypeConfiguration<Man
         builder.HasIndex(x => new { x.Type, x.Status }).HasDatabaseName("IX_ManagedAccount_Type_Status");
         builder.HasIndex(x => x.AccountName).HasDatabaseName("IX_ManagedAccount_AccountName");
         builder.HasIndex(x => x.OwnerUserId).HasDatabaseName("IX_ManagedAccount_OwnerUserId");
+        builder.HasIndex(x => x.VendorId).HasDatabaseName("IX_ManagedAccount_VendorId");
     }
 }
 
