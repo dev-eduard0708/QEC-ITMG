@@ -217,6 +217,11 @@ export type ConfigurationItem = {
   manufacturer: string | null
   model: string | null
   notes: string | null
+  isSinglePointOfFailure: boolean
+  spofReason: string | null
+  spofReviewedAtUtc: string | null
+  spofMitigationNotes: string | null
+  spofRiskId: string | null
   rowVersion: string
   createdAtUtc: string
   updatedAtUtc: string
@@ -367,6 +372,20 @@ export const cmdbApi = {
     }),
   deleteRelationship: (id: string) =>
     apiFetch<void>(`/api/v1/cmdb/relationships/${id}`, { method: 'DELETE' }),
+  listServices: () => apiFetch<BusinessServiceItem[]>('/api/v1/cmdb/services'),
+}
+
+export type BusinessServiceItem = {
+  id: string
+  name: string
+  description: string | null
+  ownerUserId: string | null
+  criticality: string
+  rtoMinutes: number | null
+  rpoMinutes: number | null
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
 }
 
 export const meApi = {
@@ -2358,6 +2377,7 @@ export type AuditReadiness = {
   overdueEvidenceRequests: number
   capaCompletedAwaitingVerification: number
   capaVerified: number
+  drTestsMissingForCriticalServices: number
   note: string
 }
 
@@ -2705,6 +2725,261 @@ export const securityApi = {
     apiFetch(`/api/v1/security/awareness/${id}/complete`, {
       method: 'POST',
       body: JSON.stringify({ userId }),
+    }),
+}
+
+export type ContinuityDashboard = {
+  criticalServices: number
+  servicesWithoutApprovedBia: number
+  servicesWithoutActivePlan: number
+  servicesMissingRecentDrTest: number
+  upcomingDrTests: number
+  overdueDrTests: number
+  drPassed: number
+  drPassedWithGaps: number
+  drFailed: number
+  rtoMisses: number
+  rpoMisses: number
+  confirmedSpofs: number
+  plansOverdueReview: number
+  openBcmLinkedRisks: number
+  note: string
+}
+
+export type ServiceReadinessRow = {
+  businessServiceId: string
+  serviceName: string | null
+  rtoMinutes: number | null
+  rpoMinutes: number | null
+  biaStatus: string | null
+  planStatus: string | null
+  latestDrTestNumber: string | null
+  latestDrTestResult: string | null
+  spofCount: number
+}
+
+export type BiaItem = {
+  id: string
+  biaNumber: string
+  businessServiceId: string
+  ownerUserId: string
+  businessProcessName: string | null
+  businessImpactSummary: string
+  financialImpact: string | null
+  operationalImpact: string | null
+  regulatoryImpact: string | null
+  reputationalImpact: string | null
+  maximumTolerableDowntimeMinutes: number | null
+  criticality: string
+  status: string
+  reviewedAtUtc: string | null
+  approvedByUserId: string | null
+  approvedAtUtc: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type ContinuityPlanItem = {
+  id: string
+  planNumber: string
+  title: string
+  planType: string
+  ownerUserId: string
+  managedDocumentId: string | null
+  status: string
+  effectiveAtUtc: string | null
+  reviewAtUtc: string | null
+  isReviewOverdue: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type RecoveryProcedureItem = {
+  id: string
+  procedureNumber: string
+  continuityPlanId: string
+  title: string
+  ownerUserId: string
+  managedDocumentId: string | null
+  sequence: number | null
+  recoveryStage: string | null
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type DrTestItem = {
+  id: string
+  drTestNumber: string
+  title: string
+  continuityPlanId: string | null
+  businessServiceId: string
+  testType: string
+  plannedAtUtc: string
+  startedAtUtc: string | null
+  completedAtUtc: string | null
+  ownerUserId: string
+  status: string
+  result: string | null
+  observedRtoMinutes: number | null
+  observedRpoMinutes: number | null
+  summary: string | null
+  gaps: string | null
+  rtoMet: boolean | null
+  rpoMet: boolean | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type ContinuityLink = {
+  id: string
+  ownerId: string
+  ownerType: string
+  targetType: string
+  targetId: string
+  createdByUserId: string
+  createdAtUtc: string
+}
+
+export const continuityApi = {
+  dashboard: () => apiFetch<ContinuityDashboard>('/api/v1/continuity/dashboard'),
+  readiness: () => apiFetch<ServiceReadinessRow[]>('/api/v1/continuity/readiness'),
+  listBia: (params?: { businessServiceId?: string; status?: string }) =>
+    apiFetch<BiaItem[]>(
+      `/api/v1/continuity/bia${opsQuery({
+        businessServiceId: params?.businessServiceId,
+        status: params?.status,
+      })}`,
+    ),
+  getBia: (id: string) =>
+    apiFetch<{
+      bia: BiaItem
+      businessService: BusinessServiceItem | null
+      linkedConfigurationItemIds: string[]
+      links: ContinuityLink[]
+    }>(`/api/v1/continuity/bia/${id}`),
+  createBia: (payload: {
+    businessServiceId: string
+    businessImpactSummary: string
+    criticality?: string
+    businessProcessName?: string | null
+    maximumTolerableDowntimeMinutes?: number | null
+  }) => apiFetch<BiaItem>('/api/v1/continuity/bia', { method: 'POST', body: JSON.stringify(payload) }),
+  transitionBia: (id: string, status: string) =>
+    apiFetch<BiaItem>(`/api/v1/continuity/bia/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+  addBiaLink: (id: string, targetType: string, targetId: string) =>
+    apiFetch<ContinuityLink>(`/api/v1/continuity/bia/${id}/links`, {
+      method: 'POST',
+      body: JSON.stringify({ targetType, targetId }),
+    }),
+  listPlans: (params?: { type?: string; status?: string }) =>
+    apiFetch<ContinuityPlanItem[]>(
+      `/api/v1/continuity/plans${opsQuery({ type: params?.type, status: params?.status })}`,
+    ),
+  getPlan: (id: string) =>
+    apiFetch<{ plan: ContinuityPlanItem; links: ContinuityLink[]; procedures: RecoveryProcedureItem[] }>(
+      `/api/v1/continuity/plans/${id}`,
+    ),
+  createPlan: (payload: {
+    title: string
+    planType?: string
+    managedDocumentId?: string | null
+    effectiveAtUtc?: string | null
+    reviewAtUtc?: string | null
+  }) => apiFetch<ContinuityPlanItem>('/api/v1/continuity/plans', { method: 'POST', body: JSON.stringify(payload) }),
+  transitionPlan: (id: string, status: string) =>
+    apiFetch<ContinuityPlanItem>(`/api/v1/continuity/plans/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+  addPlanLink: (id: string, targetType: string, targetId: string) =>
+    apiFetch<ContinuityLink>(`/api/v1/continuity/plans/${id}/links`, {
+      method: 'POST',
+      body: JSON.stringify({ targetType, targetId }),
+    }),
+  listProcedures: (continuityPlanId?: string) =>
+    apiFetch<RecoveryProcedureItem[]>(
+      `/api/v1/continuity/procedures${opsQuery({ continuityPlanId })}`,
+    ),
+  createProcedure: (payload: {
+    continuityPlanId: string
+    title: string
+    managedDocumentId?: string | null
+    sequence?: number | null
+    recoveryStage?: string | null
+  }) =>
+    apiFetch<RecoveryProcedureItem>('/api/v1/continuity/procedures', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listTests: (params?: { businessServiceId?: string; status?: string }) =>
+    apiFetch<DrTestItem[]>(
+      `/api/v1/continuity/tests${opsQuery({
+        businessServiceId: params?.businessServiceId,
+        status: params?.status,
+      })}`,
+    ),
+  getTest: (id: string) =>
+    apiFetch<{
+      test: DrTestItem
+      businessService: BusinessServiceItem | null
+      links: ContinuityLink[]
+    }>(`/api/v1/continuity/tests/${id}`),
+  createTest: (payload: {
+    title: string
+    businessServiceId: string
+    testType?: string
+    plannedAtUtc: string
+    continuityPlanId?: string | null
+  }) => apiFetch<DrTestItem>('/api/v1/continuity/tests', { method: 'POST', body: JSON.stringify(payload) }),
+  startTest: (id: string) =>
+    apiFetch<DrTestItem>(`/api/v1/continuity/tests/${id}/start`, { method: 'POST' }),
+  completeTest: (
+    id: string,
+    payload: {
+      result: string
+      observedRtoMinutes?: number | null
+      observedRpoMinutes?: number | null
+      summary?: string | null
+      gaps?: string | null
+    },
+  ) =>
+    apiFetch<DrTestItem>(`/api/v1/continuity/tests/${id}/complete`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  cancelTest: (id: string) =>
+    apiFetch<DrTestItem>(`/api/v1/continuity/tests/${id}/cancel`, { method: 'POST' }),
+  addTestLink: (id: string, targetType: string, targetId: string) =>
+    apiFetch<ContinuityLink>(`/api/v1/continuity/tests/${id}/links`, {
+      method: 'POST',
+      body: JSON.stringify({ targetType, targetId }),
+    }),
+  listSpofs: () =>
+    apiFetch<{ items: ConfigurationItem[]; byBusinessService: Record<string, number> }>(
+      '/api/v1/continuity/spofs',
+    ),
+  setSpof: (
+    ciId: string,
+    payload: {
+      isSinglePointOfFailure: boolean
+      reason?: string | null
+      mitigationNotes?: string | null
+      riskId?: string | null
+      confirmed: boolean
+      rowVersion: string
+    },
+  ) =>
+    apiFetch<ConfigurationItem>(`/api/v1/continuity/spofs/${ciId}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
 }
 

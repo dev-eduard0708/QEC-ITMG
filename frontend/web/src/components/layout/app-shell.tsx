@@ -198,6 +198,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         end: false,
         visible: can('sec.dashboard'),
       },
+      {
+        to: '/it/continuity',
+        labelKey: 'nav.continuity',
+        icon: Shield,
+        end: false,
+        visible: can('bcm.read'),
+      },
     ],
     [can],
   )
@@ -372,6 +379,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/evidence')) return t('nav.evidence')
   if (pathname.startsWith('/it/audits')) return t('nav.audits')
   if (pathname.startsWith('/it/security')) return t('nav.security')
+  if (pathname.startsWith('/it/continuity')) return t('nav.continuity')
   if (pathname.startsWith('/it/governance') || pathname.startsWith('/governance')) return t('nav.governance')
   return t('nav.foundation')
 }

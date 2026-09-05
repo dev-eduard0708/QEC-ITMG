@@ -31,6 +31,12 @@ import { EvidenceDetailPage } from '@/features/it/evidence-detail-page'
 import { AuditsPage, AuditNewPage } from '@/features/it/audits-page'
 import { AuditDetailPage } from '@/features/it/audit-detail-page'
 import { SecurityHomePage, VulnerabilityDetailPage } from '@/features/it/security-page'
+import {
+  ContinuityHomePage,
+  BiaDetailPage,
+  ContinuityPlanDetailPage,
+  DrTestDetailPage,
+} from '@/features/it/continuity-page'
 import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
@@ -185,6 +191,16 @@ export function AppRouter() {
           </Route>
           <Route element={<RequirePermission permission="vuln.read" />}>
             <Route path="it/security/vulnerabilities/:id" element={<VulnerabilityDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="bcm.read" />}>
+            <Route path="it/continuity" element={<ContinuityHomePage />} />
+            <Route path="it/continuity/bia" element={<ContinuityHomePage />} />
+            <Route path="it/continuity/bia/:id" element={<BiaDetailPage />} />
+            <Route path="it/continuity/plans" element={<ContinuityHomePage />} />
+            <Route path="it/continuity/plans/:id" element={<ContinuityPlanDetailPage />} />
+            <Route path="it/continuity/procedures" element={<ContinuityHomePage />} />
+            <Route path="it/continuity/tests" element={<ContinuityHomePage />} />
+            <Route path="it/continuity/tests/:id" element={<DrTestDetailPage />} />
           </Route>
           <Route path="unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

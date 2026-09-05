@@ -246,6 +246,7 @@ function ReadinessCards({ data }: { data: AuditReadiness }) {
     [t('audits.readiness.openFindings'), data.openFindings],
     [t('audits.readiness.overdueCapa'), data.overdueCapa],
     [t('audits.readiness.policiesOverdue'), data.policiesOverdueReview],
+    [t('audits.readiness.drTestsMissing'), data.drTestsMissingForCriticalServices],
   ] as const
   return (
     <div className="space-y-4">
