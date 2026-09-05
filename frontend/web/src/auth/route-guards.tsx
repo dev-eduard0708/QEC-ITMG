@@ -15,7 +15,15 @@ export function RequireAuth() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    const authError = new URLSearchParams(location.search).get('authError')
+    const loginSearch = authError ? `?authError=${encodeURIComponent(authError)}` : ''
+    return (
+      <Navigate
+        to={`/login${loginSearch}`}
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
+    )
   }
 
   return <Outlet />
@@ -34,7 +42,15 @@ export function RequirePermission({ permission }: { permission: string }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    const authError = new URLSearchParams(location.search).get('authError')
+    const loginSearch = authError ? `?authError=${encodeURIComponent(authError)}` : ''
+    return (
+      <Navigate
+        to={`/login${loginSearch}`}
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
+    )
   }
 
   if (!can(permission)) {
@@ -57,7 +73,15 @@ export function RequireAnyPermission({ permissions }: { permissions: string[] })
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />
+    const authError = new URLSearchParams(location.search).get('authError')
+    const loginSearch = authError ? `?authError=${encodeURIComponent(authError)}` : ''
+    return (
+      <Navigate
+        to={`/login${loginSearch}`}
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
+    )
   }
 
   if (!permissions.some((permission) => can(permission))) {
