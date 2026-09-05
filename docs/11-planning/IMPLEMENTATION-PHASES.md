@@ -192,7 +192,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 **Next:** P6 Change Management.
 
-**Note:** P7 Remote Support remains retained but lower priority. Near-term execution priority: **P5 ? P6 ? P8 ? P9 ? P11?P14**.
+**Note:** Historical note ? P7 was deferred relative to P5?P6 / P8?P14 during mid-roadmap execution; P7 is now FEATURE COMPLETE (see Phase 7).
 
 ---
 
@@ -219,7 +219,7 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 | P6-09 | Emergency retrospective path | Done |
 | P6-10 | History | Done |
 
-**NEXT:** P8 Events / IT Operations. P7 Remote Support remains retained but lower priority. VALIDATION/HARDENING for Phase 6 is deferred (P6-07).
+**NEXT:** P8 Events / IT Operations. (Historical: P7 was still pending at Phase 6 close.) VALIDATION/HARDENING for Phase 6 is deferred (P6-07).
 
 ---
 
@@ -227,27 +227,27 @@ Global out-of-scope for every phase: custom remote protocol, microservices, Kafk
 
 **Objective:** ITMG-owned attended sessions; adapter to MeshCentral; no engine bypass.
 
-**Priority note:** Retained in roadmap but **lower near-term priority** than P6 ? P8 ? P9 ? P11?P14.
-
-**Prerequisites:** P1, P3, P4 (ticket). P6 recommended before unattended.
+**Prerequisites:** P1, P3, P4 (ticket). P6 recommended before unattended. P19 secrets/webhook patterns. P20 AI remote deny.
 
 ### Packages
 
-| ID | Work |
-|----|------|
-| P7-00 | Engine spike / lab MeshCentral |
-| P7-01 | RemoteSessionRequest domain |
-| P7-02 | Consent API/UI |
-| P7-03 | `IRemoteSupportEngine` + MeshCentral adapter |
-| P7-04 | Active/history/audit log UI |
-| P7-05 | Webhook/poll end session |
-| P7-06 | Unattended flag **off** in prod MVP |
-| P7-07 | Security tests (no start without authz) |
-| P7-08 | Degraded mode |
-| P7-09 | Notifications |
-| P7-10 | E2E with mock engine |
+| ID | Work | Status |
+|----|------|--------|
+| P7-00 | Engine readiness / MeshCentral adapter contract | Done |
+| P7-01 | RemoteSessionRequest domain | Done |
+| P7-02 | Consent API/UI | Done |
+| P7-03 | `IRemoteSupportEngine` + MeshCentral adapter | Done |
+| P7-04 | Active/history/audit log UI | Done |
+| P7-05 | Webhook/poll end session | Done |
+| P7-06 | Unattended flag **off** by default | Done |
+| P7-07 | Security tests (no start without authz) | Deferred ? project-wide validation/testing campaign |
+| P7-08 | Degraded mode | Done |
+| P7-09 | Notifications | Done |
+| P7-10 | E2E with mock engine | Deferred ? project-wide validation/testing campaign |
 
-**Out of scope:** Custom protocol; Guacamole (later adapter).
+**Out of scope:** Custom protocol; Guacamole (later adapter). Live MeshCentral connectivity not required to close P7.
+
+**Phase 7:** FEATURE COMPLETE. FORMAL TESTING/HARDENING DEFERRED (P7-07, P7-10).
 
 ---
 
@@ -541,7 +541,7 @@ Scanner ingest: stub adapter only (real scanners in P19).
 
 ## Phase 20 ? AI assistance
 
-**Prerequisites:** Stable APIs + RBAC. Local/on-prem model optional. P7 Remote Support remains pending and is not delivered by AI.
+**Prerequisites:** Stable APIs + RBAC. Local/on-prem model optional. AI never starts remote/unattended sessions.
 
 ### Packages
 
@@ -556,16 +556,18 @@ Scanner ingest: stub adapter only (real scanners in P19).
 | P20-07 Prompt-injection tests | Deferred ? dedicated project testing phase |
 | P20-08 Never unattended remote via model | Done |
 
-**Out of scope:** Autopilot changes to production. AI never starts remote/unattended sessions (P7 remains separate).
+**Out of scope:** Autopilot changes to production. AI never starts remote/unattended sessions.
 
 **Phase 20:** FEATURE COMPLETE. FORMAL TESTING/HARDENING DEFERRED (P20-07).
-
-**NEXT:** P7 Remote Support integration.
 
 ---
 
 ## Suggested next coding task
 
-**Phase 20 FEATURE COMPLETE.** P7 Remote Support remains intentionally retained and pending. Next: **P7 Remote Support integration**. After P7 feature completion: **project-wide validation/testing campaign**.
+**FEATURE ROADMAP STATUS: COMPLETE** (feature phases including P7 and P20).
 
-Do **not** interpret prior ?phases feature complete? wording as implying P7 is complete.
+Formal testing/hardening packages deferred across phases (including P7-07, P7-10, P20-07, and other deferred suites) move to the **project-wide validation/testing campaign**.
+
+**NEXT:** PROJECT-WIDE-VALIDATION-TESTING-CAMPAIGN
+
+Do **not** add another feature phase.
