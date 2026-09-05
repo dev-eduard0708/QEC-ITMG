@@ -213,6 +213,7 @@ export type ConfigurationItem = {
   locationId: string | null
   departmentId: string | null
   ownerUserId: string | null
+  vendorId: string | null
   serialNumber: string | null
   manufacturer: string | null
   model: string | null
@@ -2981,6 +2982,199 @@ export const continuityApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+}
+
+export type VendorDashboard = {
+  activeVendors: number
+  criticalVendors: number
+  contractsExpiring: number
+  expiredContracts: number
+  assessmentsDue: number
+  assessmentsOverdue: number
+  vendorsWithPrivilegedAccess: number
+  openVendorLinkedRisks: number
+  note: string
+}
+
+export type VendorItem = {
+  id: string
+  vendorNumber: string
+  name: string
+  legalName: string | null
+  status: string
+  criticality: string
+  serviceDescription: string | null
+  primaryContactName: string | null
+  primaryContactEmail: string | null
+  primaryContactPhone: string | null
+  ownerUserId: string | null
+  riskId: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type VendorContactItem = {
+  id: string
+  vendorId: string
+  name: string
+  email: string | null
+  phone: string | null
+  role: string | null
+  isPrimary: boolean
+  createdAtUtc: string
+}
+
+export type VendorContractItem = {
+  id: string
+  contractNumber: string
+  vendorId: string
+  title: string
+  contractType: string | null
+  ownerUserId: string
+  startDate: string
+  endDate: string | null
+  renewalDate: string | null
+  autoRenew: boolean
+  status: string
+  slaReference: string | null
+  managedDocumentId: string | null
+  notes: string | null
+  daysToExpiry: number | null
+  expiringSoon: boolean
+  expired: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type VendorAssessmentItem = {
+  id: string
+  assessmentNumber: string
+  vendorId: string
+  assessmentType: string
+  ownerUserId: string
+  reviewerUserId: string | null
+  scheduledAtUtc: string | null
+  dueAtUtc: string | null
+  completedAtUtc: string | null
+  status: string
+  result: string | null
+  summary: string | null
+  riskId: string | null
+  assessmentOverdue: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export const vendorsApi = {
+  dashboard: () => apiFetch<VendorDashboard>('/api/v1/vendors/dashboard'),
+  list: (params?: { search?: string; status?: string }) =>
+    apiFetch<VendorItem[]>(`/api/v1/vendors${opsQuery({ search: params?.search, status: params?.status })}`),
+  get: (id: string) => apiFetch<VendorItem>(`/api/v1/vendors/${id}`),
+  create: (payload: {
+    name: string
+    criticality?: string
+    legalName?: string | null
+    serviceDescription?: string | null
+    primaryContactName?: string | null
+    primaryContactEmail?: string | null
+    primaryContactPhone?: string | null
+    riskId?: string | null
+  }) => apiFetch<VendorItem>('/api/v1/vendors', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (
+    id: string,
+    payload: {
+      name: string
+      criticality: string
+      status: string
+      legalName?: string | null
+      serviceDescription?: string | null
+      primaryContactName?: string | null
+      primaryContactEmail?: string | null
+      primaryContactPhone?: string | null
+      riskId?: string | null
+      rowVersion: string
+    },
+  ) => apiFetch<VendorItem>(`/api/v1/vendors/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  listContacts: (id: string) => apiFetch<VendorContactItem[]>(`/api/v1/vendors/${id}/contacts`),
+  addContact: (
+    id: string,
+    payload: { name: string; email?: string | null; phone?: string | null; role?: string | null; isPrimary?: boolean },
+  ) =>
+    apiFetch<VendorContactItem>(`/api/v1/vendors/${id}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listContracts: (vendorId?: string) =>
+    apiFetch<VendorContractItem[]>(`/api/v1/vendors/contracts${opsQuery({ vendorId })}`),
+  createContract: (
+    vendorId: string,
+    payload: {
+      title: string
+      startDate: string
+      contractType?: string | null
+      endDate?: string | null
+      renewalDate?: string | null
+      autoRenew?: boolean
+      slaReference?: string | null
+      managedDocumentId?: string | null
+      notes?: string | null
+    },
+  ) =>
+    apiFetch<VendorContractItem>(`/api/v1/vendors/${vendorId}/contracts`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  transitionContract: (id: string, status: string) =>
+    apiFetch<VendorContractItem>(`/api/v1/vendors/contracts/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+  listAssessments: (vendorId?: string) =>
+    apiFetch<VendorAssessmentItem[]>(`/api/v1/vendors/assessments${opsQuery({ vendorId })}`),
+  createAssessment: (
+    vendorId: string,
+    payload: {
+      assessmentType?: string
+      dueAtUtc?: string | null
+      riskId?: string | null
+    },
+  ) =>
+    apiFetch<VendorAssessmentItem>(`/api/v1/vendors/${vendorId}/assessments`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  transitionAssessment: (id: string, status: string, result?: string | null, summary?: string | null) =>
+    apiFetch<VendorAssessmentItem>(`/api/v1/vendors/assessments/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ status, result, summary }),
+    }),
+  listCis: (id: string) => apiFetch<ConfigurationItem[]>(`/api/v1/vendors/${id}/cis`),
+  linkCi: (id: string, ciId: string, rowVersion: string) =>
+    apiFetch<ConfigurationItem>(`/api/v1/vendors/${id}/cis/${ciId}`, {
+      method: 'POST',
+      body: JSON.stringify({ rowVersion }),
+    }),
+  listLinks: (id: string) =>
+    apiFetch<{ id: string; targetType: string; targetId: string }[]>(`/api/v1/vendors/${id}/links`),
+  addLink: (id: string, targetType: string, targetId: string) =>
+    apiFetch(`/api/v1/vendors/${id}/links`, {
+      method: 'POST',
+      body: JSON.stringify({ targetType, targetId }),
+    }),
+  getAccess: (id: string) =>
+    apiFetch<{
+      accessCases: { id: string; caseNumber: string; status: string; type: string }[]
+      managedAccounts: { id: string; accountName: string; type: string; status: string }[]
+      contacts: VendorContactItem[]
+      vendorUsers: { id: string; displayName: string; upn: string; userType: string }[]
+    }>(`/api/v1/vendors/${id}/access`),
+  linkAccessCase: (id: string, caseId: string) =>
+    apiFetch(`/api/v1/vendors/${id}/access/cases/${caseId}`, { method: 'POST' }),
+  linkManagedAccount: (id: string, accountId: string) =>
+    apiFetch(`/api/v1/vendors/${id}/access/accounts/${accountId}`, { method: 'POST' }),
 }
 
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */

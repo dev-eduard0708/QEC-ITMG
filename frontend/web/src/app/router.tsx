@@ -37,6 +37,7 @@ import {
   ContinuityPlanDetailPage,
   DrTestDetailPage,
 } from '@/features/it/continuity-page'
+import { VendorsPage, VendorNewPage, VendorDetailPage } from '@/features/it/vendors-page'
 import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
@@ -201,6 +202,13 @@ export function AppRouter() {
             <Route path="it/continuity/procedures" element={<ContinuityHomePage />} />
             <Route path="it/continuity/tests" element={<ContinuityHomePage />} />
             <Route path="it/continuity/tests/:id" element={<DrTestDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="vendor.manage" />}>
+            <Route path="it/vendors/new" element={<VendorNewPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="vendor.read" />}>
+            <Route path="it/vendors" element={<VendorsPage />} />
+            <Route path="it/vendors/:id" element={<VendorDetailPage />} />
           </Route>
           <Route path="unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
