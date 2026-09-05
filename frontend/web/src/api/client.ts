@@ -1490,6 +1490,7 @@ export type ManagedDocument = {
   effectiveDate: string | null
   reviewDate: string | null
   requiresAcknowledgement: boolean
+  requireReAcknowledgement?: boolean
   retirementReason: string | null
   createdAtUtc: string
   updatedAtUtc: string
@@ -1502,6 +1503,7 @@ export type ManagedDocument = {
   currentApprovedByUserId: string | null
   currentApprovedAtUtc: string | null
   currentPublishedAtUtc: string | null
+  currentContentText?: string | null
 }
 
 export type DocumentListResult = OpsPaged<ManagedDocument> & {
@@ -1516,6 +1518,7 @@ export type DocumentVersion = {
   createdByUserId: string
   createdAtUtc: string
   changeSummary: string | null
+  contentText?: string | null
   attachmentId: string | null
   approvedByUserId: string | null
   approvedAtUtc: string | null
@@ -1526,6 +1529,53 @@ export type DocumentVersion = {
 export type AcknowledgementSummary = {
   outstandingForUser: number
   totalOutstandingVersions: number
+  required?: number
+  acknowledged?: number
+  overdue?: number
+}
+
+export type EmployeePolicyItem = {
+  assignmentId: string
+  managedDocumentId: string
+  documentVersionId: string
+  documentNumber: string
+  title: string
+  versionNumber: number
+  summary: string | null
+  contentText: string | null
+  attachmentId: string | null
+  classification: string
+  effectiveDate: string | null
+  ownerUserId: string
+  assignedAtUtc: string
+  dueAtUtc: string | null
+  isRequired: boolean
+  status: string
+  acknowledgedAtUtc: string | null
+  isOverdue: boolean
+}
+
+export type PolicyAckStats = {
+  managedDocumentId: string
+  documentVersionId: string
+  documentNumber: string
+  title: string
+  versionNumber: number
+  assigned: number
+  acknowledged: number
+  outstanding: number
+  overdue: number
+}
+
+export type PolicyEmployeeAckRow = {
+  userId: string
+  displayName: string | null
+  upn: string | null
+  assignedAtUtc: string
+  dueAtUtc: string | null
+  status: string
+  acknowledgedAtUtc: string | null
+  versionNumber: number
 }
 
 export const documentsApi = {
@@ -1627,9 +1677,37 @@ export const policiesApi = {
       body: JSON.stringify({ reason }),
     }),
   publish: (id: string) => apiFetch<ManagedDocument>(`/api/v1/policies/${id}/publish`, { method: 'POST' }),
-  acknowledge: (id: string) =>
-    apiFetch(`/api/v1/policies/${id}/acknowledge`, { method: 'POST' }),
-  outstanding: () => apiFetch<ManagedDocument[]>('/api/v1/me/policies/outstanding'),
+  assign: (
+    id: string,
+    payload: {
+      scope: 'AllEmployees' | 'SpecificUser'
+      userIds?: string[]
+      dueAtUtc?: string | null
+      isRequired?: boolean
+    },
+  ) =>
+    apiFetch<{ managedDocumentId: string; documentVersionId: string; assignmentCount: number; scope: string }>(
+      `/api/v1/policies/${id}/assign`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    ),
+  acknowledgementStats: (id: string) => apiFetch<PolicyAckStats>(`/api/v1/policies/${id}/acknowledgements/stats`),
+  acknowledgementRows: (id: string) =>
+    apiFetch<PolicyEmployeeAckRow[]>(`/api/v1/policies/${id}/acknowledgements`),
+  acknowledgementExportUrl: (id: string) => `/api/v1/policies/${id}/acknowledgements/export.csv`,
+  acknowledge: (id: string, acceptedStatement: boolean) =>
+    apiFetch(`/api/v1/policies/${id}/acknowledge`, {
+      method: 'POST',
+      body: JSON.stringify({ acceptedStatement }),
+    }),
+  mine: (filter?: string) =>
+    apiFetch<EmployeePolicyItem[]>(`/api/v1/me/policies${opsQuery({ filter })}`),
+  mineGet: (id: string) => apiFetch<EmployeePolicyItem>(`/api/v1/me/policies/${id}`),
+  mineAcknowledge: (id: string, acceptedStatement: boolean) =>
+    apiFetch(`/api/v1/me/policies/${id}/acknowledge`, {
+      method: 'POST',
+      body: JSON.stringify({ acceptedStatement }),
+    }),
+  outstanding: () => apiFetch<EmployeePolicyItem[]>('/api/v1/me/policies/outstanding'),
   summary: () => apiFetch<AcknowledgementSummary>('/api/v1/me/policies/summary'),
 }
 

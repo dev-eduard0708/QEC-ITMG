@@ -39,8 +39,17 @@ export function EmployeeHomePage() {
 
   const openCount = (ticketsQuery.data?.items ?? []).filter((item) => isOpenTicketStatus(item.status)).length
   const policyCount = policiesQuery.data?.outstandingForUser ?? 0
+  const policyOverdue = policiesQuery.data?.overdue ?? 0
   const remotePending = remoteQuery.data?.totalCount ?? (remoteQuery.data?.items?.length ?? 0)
   const equipmentCount = equipmentQuery.data?.length ?? 0
+
+  const policyMeta = policiesQuery.isLoading
+    ? null
+    : policyOverdue > 0
+      ? t('employee.counts.policiesOverdue', { count: policyOverdue })
+      : policyCount > 0
+        ? t('employee.counts.policiesDue', { count: policyCount })
+        : t('employee.counts.policiesOk')
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -99,13 +108,8 @@ export function EmployeeHomePage() {
           icon={FileText}
           title={t('nav.myPolicies')}
           description={t('employee.actions.policiesHint')}
-          meta={
-            policiesQuery.isLoading
-              ? null
-              : policyCount > 0
-                ? t('employee.counts.policiesDue', { count: policyCount })
-                : t('employee.counts.policiesOk')
-          }
+          meta={policyMeta}
+          actionLabel={t('employee.actions.reviewPolicies')}
         />
         <SecondaryCard
           to="/employee/remote-support"
@@ -183,12 +187,14 @@ function SecondaryCard({
   title,
   description,
   meta,
+  actionLabel,
 }: {
   to: string
   icon: typeof FileText
   title: string
   description: string
   meta: string | null
+  actionLabel?: string
 }) {
   return (
     <Card className="transition-colors hover:bg-muted/20">
@@ -202,7 +208,7 @@ function SecondaryCard({
       <CardContent className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">{meta ?? '—'}</span>
         <Button asChild size="sm" variant="outline">
-          <Link to={to}>{title}</Link>
+          <Link to={to}>{actionLabel ?? title}</Link>
         </Button>
       </CardContent>
     </Card>

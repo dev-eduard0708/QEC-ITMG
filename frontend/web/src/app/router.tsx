@@ -63,6 +63,7 @@ import { DocumentDetailPage } from '@/features/it/document-detail-page'
 import { PoliciesPage } from '@/features/it/policies-page'
 import { PolicyDetailPage } from '@/features/it/policy-detail-page'
 import { MyPoliciesPage } from '@/features/employee/my-policies-page'
+import { EmployeePolicyDetailPage } from '@/features/employee/employee-policy-detail-page'
 import { ChangeNewPage } from '@/features/it/change-new-page'
 import { ChangeCatalogPage } from '@/features/it/change-catalog-page'
 import { ChangeDetailPage } from '@/features/it/change-detail-page'
@@ -94,6 +95,7 @@ export function AppRouter() {
           <Route path="employee/knowledge" element={<KnowledgePage />} />
           <Route path="employee/knowledge/:slug" element={<KnowledgeArticlePage />} />
           <Route path="employee/policies" element={<MyPoliciesPage />} />
+          <Route path="employee/policies/:id" element={<EmployeePolicyDetailPage />} />
           <Route path="employee/remote-support" element={<EmployeeRemoteSupportPage />} />
           <Route path="employee/remote-support/:id" element={<EmployeeRemoteSupportDetailPage />} />
           <Route path="it" element={<ItHomePage />} />
