@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Qec.Itmg.DocumentManagement.Persistence;
 
@@ -11,9 +12,11 @@ using Qec.Itmg.DocumentManagement.Persistence;
 namespace Qec.Itmg.DocumentManagement.Persistence.Migrations
 {
     [DbContext(typeof(DocumentManagementDbContext))]
-    partial class DocumentManagementDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260905124915_P_POLICY_ACK_EMPLOYEE_WORKFLOW")]
+    partial class P_POLICY_ACK_EMPLOYEE_WORKFLOW
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -441,7 +444,7 @@ namespace Qec.Itmg.DocumentManagement.Persistence.Migrations
                     b.HasOne("Qec.Itmg.DocumentManagement.Domain.PolicyAssignment", null)
                         .WithMany()
                         .HasForeignKey("PolicyAssignmentId")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("Qec.Itmg.DocumentManagement.Domain.PolicyAcknowledgementReminderLog", b =>

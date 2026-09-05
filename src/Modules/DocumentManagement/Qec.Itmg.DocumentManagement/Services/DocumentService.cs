@@ -12,23 +12,30 @@ public sealed record DocumentDto(
     Guid Id, string DocumentNumber, string Title, string DocumentType, Guid OwnerUserId,
     Guid? DesignatedApproverUserId, string Classification, string Status, Guid? CurrentVersionId,
     DateTimeOffset? EffectiveDate, DateTimeOffset? ReviewDate, bool RequiresAcknowledgement,
+    bool RequireReAcknowledgement,
     string? RetirementReason, DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc, string RowVersion,
     int? DaysToReview, bool ReviewDueSoon, bool ReviewOverdue, int? CurrentVersionNumber,
     Guid? CurrentAttachmentId, Guid? CurrentApprovedByUserId, DateTimeOffset? CurrentApprovedAtUtc,
-    DateTimeOffset? CurrentPublishedAtUtc);
+    DateTimeOffset? CurrentPublishedAtUtc, string? CurrentContentText);
 
 public sealed record DocumentListResult(IReadOnlyList<DocumentDto> Items, int TotalCount, int Page, int PageSize, int ReviewOverdueCount, int ReviewDueSoonCount);
 
 public sealed record DocumentVersionDto(
     Guid Id, Guid ManagedDocumentId, int VersionNumber, Guid CreatedByUserId, DateTimeOffset CreatedAtUtc,
-    string? ChangeSummary, Guid? AttachmentId, Guid? ApprovedByUserId, DateTimeOffset? ApprovedAtUtc,
+    string? ChangeSummary, string? ContentText, Guid? AttachmentId, Guid? ApprovedByUserId, DateTimeOffset? ApprovedAtUtc,
     DateTimeOffset? PublishedAtUtc, Guid? SupersedesVersionId);
 
 public sealed record PolicyAcknowledgementDto(
     Guid Id, Guid ManagedDocumentId, Guid DocumentVersionId, Guid UserId, DateTimeOffset AcknowledgedAtUtc,
-    string? DocumentNumber, string? Title, int? VersionNumber);
+    string? DocumentNumber, string? Title, int? VersionNumber,
+    string? AcknowledgementStatementVersion = null, string? Source = null);
 
-public sealed record AcknowledgementSummary(int OutstandingForUser, int TotalOutstandingVersions);
+public sealed record AcknowledgementSummary(
+    int OutstandingForUser,
+    int TotalOutstandingVersions,
+    int Required = 0,
+    int Acknowledged = 0,
+    int Overdue = 0);
 
 internal static class DocumentAudit
 {
@@ -144,10 +151,10 @@ public sealed class DocumentService(
     public async Task<DocumentDto> UpdateMetadataAsync(
         Guid id, string title, Guid ownerUserId, Guid? designatedApproverUserId,
         DocumentClassification classification, DateTimeOffset? effectiveDate, DateTimeOffset? reviewDate,
-        bool requiresAcknowledgement, CancellationToken ct)
+        bool requiresAcknowledgement, bool requireReAcknowledgement, CancellationToken ct)
     {
         ManagedDocument doc = await LoadAsync(id, ct);
-        doc.UpdateMetadata(title, ownerUserId, designatedApproverUserId, classification, effectiveDate, reviewDate, requiresAcknowledgement, clock.UtcNow);
+        doc.UpdateMetadata(title, ownerUserId, designatedApproverUserId, classification, effectiveDate, reviewDate, requiresAcknowledgement, requireReAcknowledgement, clock.UtcNow);
         await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "Title", null, title), ct);
         await db.SaveChangesAsync(ct);
         return (await GetAsync(id, includeConfidential: true, allowUnpublished: true, ct))!;
@@ -260,8 +267,18 @@ public sealed class DocumentService(
         return (await GetAsync(id, true, true, ct))!;
     }
 
-    public async Task<PolicyAcknowledgementDto> AcknowledgeAsync(Guid documentId, Guid userId, CancellationToken ct)
+    public async Task<PolicyAcknowledgementDto> AcknowledgeAsync(Guid documentId, Guid userId, CancellationToken ct) =>
+        await AcknowledgeAsync(documentId, userId, acceptedStatement: true, clientIp: null, userAgent: null, ct);
+
+    public async Task<PolicyAcknowledgementDto> AcknowledgeAsync(
+        Guid documentId,
+        Guid userId,
+        bool acceptedStatement,
+        string? clientIp,
+        string? userAgent,
+        CancellationToken ct)
     {
+        // Delegated path kept for admin-permission route compatibility; prefer PolicyAcknowledgementService.
         ManagedDocument doc = await db.ManagedDocuments.AsNoTracking().FirstOrDefaultAsync(x => x.Id == documentId, ct)
             ?? throw new InvalidOperationException("Document not found.");
         if (doc.DocumentType != DocumentType.Policy || !doc.RequiresAcknowledgement)
@@ -269,40 +286,79 @@ public sealed class DocumentService(
         if (doc.Status != DocumentStatus.Published || doc.CurrentVersionId is null)
             throw new InvalidOperationException("Only the published current version can be acknowledged.");
 
-        bool exists = await db.PolicyAcknowledgements.AnyAsync(
-            x => x.DocumentVersionId == doc.CurrentVersionId && x.UserId == userId, ct);
-        if (exists) throw new InvalidOperationException("Already acknowledged for this version.");
+        DocumentVersion version = await db.DocumentVersions.AsNoTracking()
+            .FirstAsync(x => x.Id == doc.CurrentVersionId, ct);
 
-        PolicyAcknowledgement ack = PolicyAcknowledgement.Create(documentId, doc.CurrentVersionId.Value, userId, clock.UtcNow);
+        PolicyAcknowledgement? existing = await db.PolicyAcknowledgements
+            .FirstOrDefaultAsync(x => x.DocumentVersionId == version.Id && x.UserId == userId, ct);
+        if (existing is not null)
+        {
+            return new PolicyAcknowledgementDto(
+                existing.Id, existing.ManagedDocumentId, existing.DocumentVersionId, existing.UserId,
+                existing.AcknowledgedAtUtc, existing.PolicyNumberSnapshot ?? doc.DocumentNumber,
+                existing.PolicyTitleSnapshot ?? doc.Title, existing.VersionNumber,
+                existing.AcknowledgementStatementVersion, existing.Source);
+        }
+
+        if (!acceptedStatement)
+            throw new InvalidOperationException("You must confirm that you have read and understood this policy.");
+
+        bool hasAssignment = await db.PolicyAssignments.AnyAsync(
+            x => x.DocumentVersionId == version.Id && (
+                x.AssignmentScope == PolicyAssignmentScope.AllEmployees
+                || (x.AssignmentScope == PolicyAssignmentScope.SpecificUser && x.UserId == userId)), ct);
+        if (!hasAssignment)
+            throw new InvalidOperationException("This policy is not assigned to you.");
+
+        PolicyAssignment assignment = await db.PolicyAssignments
+            .Where(x => x.DocumentVersionId == version.Id && (
+                x.AssignmentScope == PolicyAssignmentScope.AllEmployees
+                || (x.AssignmentScope == PolicyAssignmentScope.SpecificUser && x.UserId == userId)))
+            .OrderByDescending(x => x.AssignedAtUtc)
+            .FirstAsync(ct);
+
+        PolicyAcknowledgement ack = PolicyAcknowledgement.Create(
+            documentId, version.Id, userId, clock.UtcNow, doc.DocumentNumber, doc.Title, version.VersionNumber,
+            assignment.Id, assignment.AssignedAtUtc, assignment.DueAtUtc, clientIp, userAgent);
         db.PolicyAcknowledgements.Add(ack);
         await businessAudit.AppendAsync(DocumentAudit.Field(
-            documentId, doc.DocumentNumber, "Acknowledged", null, userId.ToString()), ct);
+            documentId, doc.DocumentNumber, "PolicyAcknowledged", null, userId.ToString()), ct);
         await db.SaveChangesAsync(ct);
 
-        DocumentVersion? ver = await db.DocumentVersions.AsNoTracking().FirstOrDefaultAsync(x => x.Id == ack.DocumentVersionId, ct);
         return new PolicyAcknowledgementDto(
             ack.Id, ack.ManagedDocumentId, ack.DocumentVersionId, ack.UserId, ack.AcknowledgedAtUtc,
-            doc.DocumentNumber, doc.Title, ver?.VersionNumber);
+            ack.PolicyNumberSnapshot, ack.PolicyTitleSnapshot, ack.VersionNumber,
+            ack.AcknowledgementStatementVersion, ack.Source);
     }
 
     public async Task<IReadOnlyList<DocumentDto>> ListOutstandingAcknowledgementsAsync(Guid userId, CancellationToken ct)
     {
-        DateTimeOffset now = clock.UtcNow;
+        // Prefer assignment-based outstanding; fall back empty when no assignments exist yet.
+        List<PolicyAssignment> assignments = await db.PolicyAssignments.AsNoTracking()
+            .Where(x => x.IsRequired && (
+                x.AssignmentScope == PolicyAssignmentScope.AllEmployees
+                || (x.AssignmentScope == PolicyAssignmentScope.SpecificUser && x.UserId == userId)))
+            .ToListAsync(ct);
+
+        if (assignments.Count == 0) return [];
+
+        HashSet<Guid> versionIds = assignments.Select(x => x.DocumentVersionId).ToHashSet();
         List<ManagedDocument> policies = await db.ManagedDocuments.AsNoTracking()
             .Where(x => x.DocumentType == DocumentType.Policy
                 && x.RequiresAcknowledgement
                 && x.Status == DocumentStatus.Published
                 && x.CurrentVersionId != null
-                && x.Classification == DocumentClassification.Internal)
+                && versionIds.Contains(x.CurrentVersionId.Value))
             .ToListAsync(ct);
 
-        List<Guid> versionIds = policies.Select(x => x.CurrentVersionId!.Value).ToList();
+        HashSet<Guid> currentVersionIds = policies.Select(x => x.CurrentVersionId!.Value).ToHashSet();
         HashSet<Guid> acknowledged = (await db.PolicyAcknowledgements.AsNoTracking()
-            .Where(x => x.UserId == userId && versionIds.Contains(x.DocumentVersionId))
+            .Where(x => x.UserId == userId && currentVersionIds.Contains(x.DocumentVersionId))
             .Select(x => x.DocumentVersionId)
             .ToListAsync(ct)).ToHashSet();
 
-        Dictionary<Guid, DocumentVersion> versions = await LoadVersionsAsync(versionIds, ct);
+        Dictionary<Guid, DocumentVersion> versions = await LoadVersionsAsync(currentVersionIds.ToList(), ct);
+        DateTimeOffset now = clock.UtcNow;
         return policies
             .Where(x => !acknowledged.Contains(x.CurrentVersionId!.Value))
             .Select(x => Map(x, versions.GetValueOrDefault(x.CurrentVersionId!.Value), now))
@@ -312,38 +368,86 @@ public sealed class DocumentService(
     public async Task<AcknowledgementSummary> GetAcknowledgementSummaryAsync(Guid userId, CancellationToken ct)
     {
         IReadOnlyList<DocumentDto> outstanding = await ListOutstandingAcknowledgementsAsync(userId, ct);
-        int totalVersions = await db.ManagedDocuments.AsNoTracking()
-            .CountAsync(x => x.DocumentType == DocumentType.Policy
-                && x.RequiresAcknowledgement
-                && x.Status == DocumentStatus.Published
-                && x.CurrentVersionId != null, ct);
-        return new AcknowledgementSummary(outstanding.Count, totalVersions);
+        int overdue = 0;
+        DateTimeOffset now = clock.UtcNow;
+        foreach (DocumentDto item in outstanding)
+        {
+            if (item.CurrentVersionId is null) continue;
+            DateTimeOffset? due = await db.PolicyAssignments.AsNoTracking()
+                .Where(x => x.DocumentVersionId == item.CurrentVersionId && (
+                    x.AssignmentScope == PolicyAssignmentScope.AllEmployees
+                    || (x.AssignmentScope == PolicyAssignmentScope.SpecificUser && x.UserId == userId)))
+                .Select(x => x.DueAtUtc)
+                .FirstOrDefaultAsync(ct);
+            if (due is DateTimeOffset d && d < now) overdue++;
+        }
+
+        int required = outstanding.Count;
+        // Count acknowledged required current assignments
+        List<PolicyAssignment> assignments = await db.PolicyAssignments.AsNoTracking()
+            .Where(x => x.IsRequired && (
+                x.AssignmentScope == PolicyAssignmentScope.AllEmployees
+                || (x.AssignmentScope == PolicyAssignmentScope.SpecificUser && x.UserId == userId)))
+            .ToListAsync(ct);
+        HashSet<Guid> assignedCurrent = (await db.ManagedDocuments.AsNoTracking()
+            .Where(x => x.Status == DocumentStatus.Published && x.CurrentVersionId != null)
+            .Select(x => x.CurrentVersionId!.Value)
+            .ToListAsync(ct)).ToHashSet();
+        HashSet<Guid> assignedVersions = assignments.Select(x => x.DocumentVersionId).Where(assignedCurrent.Contains).ToHashSet();
+        int acknowledged = await db.PolicyAcknowledgements.AsNoTracking()
+            .CountAsync(x => x.UserId == userId && assignedVersions.Contains(x.DocumentVersionId), ct);
+        int requiredTotal = assignedVersions.Count;
+
+        return new AcknowledgementSummary(
+            outstanding.Count,
+            requiredTotal,
+            requiredTotal,
+            acknowledged,
+            overdue);
     }
 
     public async Task EnsureCatalogSeedAsync(Guid ownerUserId, CancellationToken ct)
     {
-        string[] titles =
+        (string Number, string Title, string Body)[] catalog =
         [
-            "Information Security",
-            "Acceptable Use",
-            "Access Control",
-            "Password",
-            "Change Management",
-            "Backup",
-            "DR/BCP",
-            "Third Party",
+            ("POL-INFOSEC-001", "Information Security Policy",
+                "Purpose\nProtect QEC information assets.\n\nEmployee responsibilities\n- Use QEC systems only for authorized work.\n- Protect accounts and devices.\n- Report suspected security incidents promptly.\n- Follow classification and handling rules.\n\nNote\nStarter template for QEC management, IT, information security, and HR/Legal review before approval or publication."),
+            ("POL-AUP-001", "Acceptable Use Policy",
+                "Purpose\nDefine acceptable use of QEC IT resources.\n\nEmployee responsibilities\n- Do not share credentials.\n- Do not install unauthorized software.\n- Avoid accessing unlawful or inappropriate content.\n- Treat company data confidentially.\n\nNote\nStarter template requiring governance review before publication."),
+            ("POL-AUTH-001", "Password & Authentication Policy",
+                "Purpose\nProtect access to QEC systems through strong authentication.\n\nEmployee responsibilities\n- Use unique, strong passwords or approved authenticators.\n- Never share passwords or MFA codes.\n- Lock screens when away from the desk.\n- Report suspected account compromise immediately.\n\nNote\nStarter template; not automatically approved."),
+            ("POL-DATA-001", "Data Protection & Confidentiality Policy",
+                "Purpose\nProtect personal and business data handled by QEC employees.\n\nEmployee responsibilities\n- Collect and share data only when needed for work.\n- Store data in approved systems.\n- Do not send confidential data to personal accounts.\n- Report possible data loss or exposure quickly.\n\nNote\nStarter template for management and privacy review."),
+            ("POL-COMMS-001", "Email, Internet & Collaboration Policy",
+                "Purpose\nSet expectations for email, internet, and collaboration tools.\n\nEmployee responsibilities\n- Use official QEC accounts for work communication.\n- Be careful with links and attachments.\n- Do not auto-forward mail to personal inboxes.\n- Keep professional tone in company channels.\n\nNote\nStarter template requiring review before publication."),
+            ("POL-REMOTE-001", "Remote Access & Remote Support Policy",
+                "Purpose\nGovern remote access and remote support to QEC devices.\n\nEmployee responsibilities\n- Use only approved remote access methods.\n- Allow remote support only through official ITMG consent.\n- End remote sessions when work is complete.\n- Report unexpected remote access requests.\n\nNote\nStarter template; must be reviewed before assignment."),
+            ("POL-INCIDENT-001", "Information Security Incident Reporting Policy",
+                "Purpose\nEnsure security incidents are reported quickly and clearly.\n\nEmployee responsibilities\n- Report phishing, malware, lost devices, and suspicious access.\n- Do not investigate malware yourself.\n- Preserve evidence when asked by IT/security.\n- Use official IT help channels.\n\nNote\nStarter template for QEC security and management review."),
+            ("POL-CLEARDESK-001", "Clean Desk & Clear Screen Policy",
+                "Purpose\nReduce exposure of sensitive information in workspaces.\n\nEmployee responsibilities\n- Lock screens when leaving the workstation.\n- Store printed sensitive documents securely.\n- Do not leave badges or tokens unattended.\n- Clear whiteboards containing sensitive notes.\n\nNote\nStarter template requiring local policy review before publication."),
         ];
 
-        foreach (string title in titles)
+        foreach ((string number, string title, string body) in catalog)
         {
             bool exists = await db.ManagedDocuments.AnyAsync(
-                x => x.DocumentType == DocumentType.Policy && x.Title == title, ct);
+                x => x.DocumentType == DocumentType.Policy && x.DocumentNumber == number, ct);
             if (exists) continue;
-            await CreateAsync(
-                title, DocumentType.Policy, ownerUserId, DocumentClassification.Internal,
-                null, null, clock.UtcNow.AddYears(1), requiresAcknowledgement: true,
-                ownerUserId, "Initial catalog seed", ct);
+
+            ManagedDocument doc = ManagedDocument.Create(
+                number, title, DocumentType.Policy, ownerUserId, DocumentClassification.Internal, clock.UtcNow,
+                requiresAcknowledgement: true, requireReAcknowledgement: true);
+            db.ManagedDocuments.Add(doc);
+            DocumentVersion version = DocumentVersion.Create(
+                doc.Id, 1, ownerUserId, clock.UtcNow,
+                changeSummary: "Starter policy template — requires QEC management review before approval/publication.",
+                contentText: body);
+            db.DocumentVersions.Add(version);
+            doc.SetCurrentVersion(version.Id, clock.UtcNow);
+            await businessAudit.AppendAsync(DocumentAudit.Created(doc.Id, doc.DocumentNumber), ct);
         }
+
+        await db.SaveChangesAsync(ct);
     }
 
     private async Task<DocumentDto> TransitionAsync(Guid id, DocumentStatus next, CancellationToken ct, string? reason = null)
@@ -373,13 +477,14 @@ public sealed class DocumentService(
     private static DocumentDto Map(ManagedDocument x, DocumentVersion? version, DateTimeOffset now) =>
         new(x.Id, x.DocumentNumber, x.Title, x.DocumentType.ToString(), x.OwnerUserId, x.DesignatedApproverUserId,
             x.Classification.ToString(), x.Status.ToString(), x.CurrentVersionId, x.EffectiveDate, x.ReviewDate,
-            x.RequiresAcknowledgement, x.RetirementReason, x.CreatedAtUtc, x.UpdatedAtUtc,
+            x.RequiresAcknowledgement, x.RequireReAcknowledgement, x.RetirementReason, x.CreatedAtUtc, x.UpdatedAtUtc,
             Convert.ToBase64String(x.RowVersion), x.DaysToReview(now), x.IsReviewDueSoon(now), x.IsReviewOverdue(now),
-            version?.VersionNumber, version?.AttachmentId, version?.ApprovedByUserId, version?.ApprovedAtUtc, version?.PublishedAtUtc);
+            version?.VersionNumber, version?.AttachmentId, version?.ApprovedByUserId, version?.ApprovedAtUtc, version?.PublishedAtUtc,
+            version?.ContentText);
 
     private static DocumentVersionDto Map(DocumentVersion x) =>
         new(x.Id, x.ManagedDocumentId, x.VersionNumber, x.CreatedByUserId, x.CreatedAtUtc, x.ChangeSummary,
-            x.AttachmentId, x.ApprovedByUserId, x.ApprovedAtUtc, x.PublishedAtUtc, x.SupersedesVersionId);
+            x.ContentText, x.AttachmentId, x.ApprovedByUserId, x.ApprovedAtUtc, x.PublishedAtUtc, x.SupersedesVersionId);
 }
 
 public sealed record DocumentReviewCandidate(

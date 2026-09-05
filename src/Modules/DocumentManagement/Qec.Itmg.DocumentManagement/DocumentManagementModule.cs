@@ -23,6 +23,7 @@ public sealed class DocumentManagementModule : IModule
             connectionString,
             DocumentManagementDbContext.SchemaName);
         services.AddScoped<DocumentService>();
+        services.AddScoped<PolicyAcknowledgementService>();
         services.AddScoped<DocumentReviewNotificationService>();
     }
 }

@@ -10,7 +10,9 @@ public sealed class DocumentManagementDbContext(DbContextOptions<DocumentManagem
 
     public DbSet<ManagedDocument> ManagedDocuments => Set<ManagedDocument>();
     public DbSet<DocumentVersion> DocumentVersions => Set<DocumentVersion>();
+    public DbSet<PolicyAssignment> PolicyAssignments => Set<PolicyAssignment>();
     public DbSet<PolicyAcknowledgement> PolicyAcknowledgements => Set<PolicyAcknowledgement>();
+    public DbSet<PolicyAcknowledgementReminderLog> PolicyAcknowledgementReminderLogs => Set<PolicyAcknowledgementReminderLog>();
     public DbSet<DocumentReviewNotificationLog> DocumentReviewNotificationLogs => Set<DocumentReviewNotificationLog>();
     public DbSet<DocumentGovernanceLink> DocumentGovernanceLinks => Set<DocumentGovernanceLink>();
 

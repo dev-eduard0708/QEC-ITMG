@@ -43,6 +43,7 @@ public sealed class ManagedDocument
     public DateTimeOffset? EffectiveDate { get; private set; }
     public DateTimeOffset? ReviewDate { get; private set; }
     public bool RequiresAcknowledgement { get; private set; }
+    public bool RequireReAcknowledgement { get; private set; }
     public string? RetirementReason { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
@@ -70,7 +71,8 @@ public sealed class ManagedDocument
         Guid? designatedApproverUserId = null,
         DateTimeOffset? effectiveDate = null,
         DateTimeOffset? reviewDate = null,
-        bool requiresAcknowledgement = false)
+        bool requiresAcknowledgement = false,
+        bool requireReAcknowledgement = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(documentNumber);
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
@@ -88,6 +90,7 @@ public sealed class ManagedDocument
             EffectiveDate = effectiveDate,
             ReviewDate = reviewDate,
             RequiresAcknowledgement = requiresAcknowledgement,
+            RequireReAcknowledgement = requireReAcknowledgement,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow,
         };
@@ -101,6 +104,7 @@ public sealed class ManagedDocument
         DateTimeOffset? effectiveDate,
         DateTimeOffset? reviewDate,
         bool requiresAcknowledgement,
+        bool requireReAcknowledgement,
         DateTimeOffset utcNow)
     {
         if (Status is DocumentStatus.Retired or DocumentStatus.Superseded)
@@ -114,6 +118,7 @@ public sealed class ManagedDocument
         EffectiveDate = effectiveDate;
         ReviewDate = reviewDate;
         RequiresAcknowledgement = requiresAcknowledgement;
+        RequireReAcknowledgement = requireReAcknowledgement;
         UpdatedAtUtc = utcNow;
     }
 
@@ -172,6 +177,7 @@ public sealed class DocumentVersion
     public Guid CreatedByUserId { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public string? ChangeSummary { get; private set; }
+    public string? ContentText { get; private set; }
     public Guid? AttachmentId { get; private set; }
     public Guid? ApprovedByUserId { get; private set; }
     public DateTimeOffset? ApprovedAtUtc { get; private set; }
@@ -185,7 +191,8 @@ public sealed class DocumentVersion
         DateTimeOffset utcNow,
         string? changeSummary = null,
         Guid? attachmentId = null,
-        Guid? supersedesVersionId = null)
+        Guid? supersedesVersionId = null,
+        string? contentText = null)
     {
         if (managedDocumentId == Guid.Empty) throw new ArgumentException("Document is required.", nameof(managedDocumentId));
         if (versionNumber < 1) throw new ArgumentOutOfRangeException(nameof(versionNumber));
@@ -198,9 +205,17 @@ public sealed class DocumentVersion
             CreatedByUserId = createdByUserId,
             CreatedAtUtc = utcNow,
             ChangeSummary = string.IsNullOrWhiteSpace(changeSummary) ? null : changeSummary.Trim(),
+            ContentText = string.IsNullOrWhiteSpace(contentText) ? null : contentText.Trim(),
             AttachmentId = attachmentId is null || attachmentId == Guid.Empty ? null : attachmentId,
             SupersedesVersionId = supersedesVersionId is null || supersedesVersionId == Guid.Empty ? null : supersedesVersionId,
         };
+    }
+
+    public void SetContentText(string? contentText)
+    {
+        if (ApprovedAtUtc is not null || PublishedAtUtc is not null)
+            throw new InvalidOperationException("Published or approved versions are immutable.");
+        ContentText = string.IsNullOrWhiteSpace(contentText) ? null : contentText.Trim();
     }
 
     public void Attach(Guid attachmentId)
@@ -225,32 +240,173 @@ public sealed class DocumentVersion
     }
 }
 
+public enum PolicyAssignmentScope
+{
+    AllEmployees = 0,
+    SpecificUser = 1,
+}
+
+public sealed class PolicyAssignment
+{
+    private PolicyAssignment() { }
+
+    public Guid Id { get; private set; }
+    public Guid ManagedDocumentId { get; private set; }
+    public Guid DocumentVersionId { get; private set; }
+    public PolicyAssignmentScope AssignmentScope { get; private set; }
+    public Guid? UserId { get; private set; }
+    public Guid? RoleId { get; private set; }
+    public Guid? DepartmentId { get; private set; }
+    public DateTimeOffset AssignedAtUtc { get; private set; }
+    public DateTimeOffset? DueAtUtc { get; private set; }
+    public Guid AssignedByUserId { get; private set; }
+    public bool IsRequired { get; private set; }
+    public DateTimeOffset CreatedAtUtc { get; private set; }
+
+    public static PolicyAssignment Create(
+        Guid managedDocumentId,
+        Guid documentVersionId,
+        PolicyAssignmentScope scope,
+        Guid assignedByUserId,
+        DateTimeOffset utcNow,
+        Guid? userId = null,
+        DateTimeOffset? dueAtUtc = null,
+        bool isRequired = true)
+    {
+        if (managedDocumentId == Guid.Empty) throw new ArgumentException("Document is required.", nameof(managedDocumentId));
+        if (documentVersionId == Guid.Empty) throw new ArgumentException("Version is required.", nameof(documentVersionId));
+        if (assignedByUserId == Guid.Empty) throw new ArgumentException("Assigner is required.", nameof(assignedByUserId));
+        if (scope == PolicyAssignmentScope.SpecificUser && (userId is null || userId == Guid.Empty))
+            throw new ArgumentException("User is required for specific-user assignment.", nameof(userId));
+        if (scope == PolicyAssignmentScope.AllEmployees && userId is not null)
+            throw new ArgumentException("All-employees assignment must not target a user.", nameof(userId));
+
+        return new PolicyAssignment
+        {
+            Id = Guid.CreateVersion7(),
+            ManagedDocumentId = managedDocumentId,
+            DocumentVersionId = documentVersionId,
+            AssignmentScope = scope,
+            UserId = scope == PolicyAssignmentScope.SpecificUser ? userId : null,
+            AssignedAtUtc = utcNow,
+            DueAtUtc = dueAtUtc,
+            AssignedByUserId = assignedByUserId,
+            IsRequired = isRequired,
+            CreatedAtUtc = utcNow,
+        };
+    }
+}
+
 public sealed class PolicyAcknowledgement
 {
+    public const string StatementKeyV1 = "policy.ack.statement.v1";
+    public const string StatementTextV1 =
+        "I acknowledge that I have read and understood this policy and understand my responsibility to follow it.";
+    public const string SourceWeb = "Web";
+
     private PolicyAcknowledgement() { }
 
     public Guid Id { get; private set; }
     public Guid ManagedDocumentId { get; private set; }
     public Guid DocumentVersionId { get; private set; }
+    public Guid? PolicyAssignmentId { get; private set; }
     public Guid UserId { get; private set; }
+    public string? PolicyNumberSnapshot { get; private set; }
+    public string? PolicyTitleSnapshot { get; private set; }
+    public int VersionNumber { get; private set; }
+    public DateTimeOffset? AssignedAtUtc { get; private set; }
+    public DateTimeOffset? DueAtUtc { get; private set; }
     public DateTimeOffset AcknowledgedAtUtc { get; private set; }
+    public string AcknowledgementStatementVersion { get; private set; } = null!;
+    public string AcknowledgementText { get; private set; } = null!;
+    public string Source { get; private set; } = null!;
+    public string? ClientIp { get; private set; }
+    public string? UserAgent { get; private set; }
+    public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public static PolicyAcknowledgement Create(
         Guid managedDocumentId,
         Guid documentVersionId,
         Guid userId,
-        DateTimeOffset utcNow)
+        DateTimeOffset utcNow,
+        string policyNumber,
+        string policyTitle,
+        int versionNumber,
+        Guid? policyAssignmentId = null,
+        DateTimeOffset? assignedAtUtc = null,
+        DateTimeOffset? dueAtUtc = null,
+        string? clientIp = null,
+        string? userAgent = null,
+        string statementVersion = StatementKeyV1,
+        string? acknowledgementText = null,
+        string source = SourceWeb)
     {
         if (managedDocumentId == Guid.Empty) throw new ArgumentException("Document is required.", nameof(managedDocumentId));
         if (documentVersionId == Guid.Empty) throw new ArgumentException("Version is required.", nameof(documentVersionId));
         if (userId == Guid.Empty) throw new ArgumentException("User is required.", nameof(userId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(policyNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(policyTitle);
+        if (versionNumber < 1) throw new ArgumentOutOfRangeException(nameof(versionNumber));
+
         return new PolicyAcknowledgement
         {
             Id = Guid.CreateVersion7(),
             ManagedDocumentId = managedDocumentId,
             DocumentVersionId = documentVersionId,
+            PolicyAssignmentId = policyAssignmentId is null || policyAssignmentId == Guid.Empty ? null : policyAssignmentId,
             UserId = userId,
+            PolicyNumberSnapshot = policyNumber.Trim(),
+            PolicyTitleSnapshot = policyTitle.Trim(),
+            VersionNumber = versionNumber,
+            AssignedAtUtc = assignedAtUtc,
+            DueAtUtc = dueAtUtc,
             AcknowledgedAtUtc = utcNow,
+            AcknowledgementStatementVersion = statementVersion.Trim(),
+            AcknowledgementText = string.IsNullOrWhiteSpace(acknowledgementText)
+                ? StatementTextV1
+                : acknowledgementText.Trim(),
+            Source = string.IsNullOrWhiteSpace(source) ? SourceWeb : source.Trim(),
+            ClientIp = Truncate(clientIp, 64),
+            UserAgent = Truncate(userAgent, 512),
+            CreatedAtUtc = utcNow,
+        };
+    }
+
+    private static string? Truncate(string? value, int max)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        string trimmed = value.Trim();
+        return trimmed.Length <= max ? trimmed : trimmed[..max];
+    }
+}
+
+public sealed class PolicyAcknowledgementReminderLog
+{
+    private PolicyAcknowledgementReminderLog() { }
+
+    public Guid Id { get; private set; }
+    public Guid PolicyAssignmentId { get; private set; }
+    public Guid UserId { get; private set; }
+    public Guid DocumentVersionId { get; private set; }
+    public string ReminderKind { get; private set; } = null!;
+    public DateTimeOffset NotifiedAtUtc { get; private set; }
+
+    public static PolicyAcknowledgementReminderLog Create(
+        Guid policyAssignmentId,
+        Guid userId,
+        Guid documentVersionId,
+        string reminderKind,
+        DateTimeOffset utcNow)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reminderKind);
+        return new PolicyAcknowledgementReminderLog
+        {
+            Id = Guid.CreateVersion7(),
+            PolicyAssignmentId = policyAssignmentId,
+            UserId = userId,
+            DocumentVersionId = documentVersionId,
+            ReminderKind = reminderKind.Trim(),
+            NotifiedAtUtc = utcNow,
         };
     }
 }

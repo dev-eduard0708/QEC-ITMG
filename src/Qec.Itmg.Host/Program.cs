@@ -15,6 +15,7 @@ using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Host.ChangeManagement;
 using Qec.Itmg.Host.AccessManagement;
 using Qec.Itmg.Host.DocumentManagement;
+using Qec.Itmg.DocumentManagement.Services;
 using Qec.Itmg.Host.Governance;
 using Qec.Itmg.Host.Compliance;
 using Qec.Itmg.Host.Evidence;
@@ -75,6 +76,7 @@ try
     builder.Services.AddScoped<ChangeHistoryService>();
     builder.Services.AddScoped<AccessNotificationService>();
     builder.Services.AddScoped<DocumentNotificationService>();
+    builder.Services.AddScoped<IActiveEmployeeLookup, IdentityActiveEmployeeLookup>();
     builder.Services.AddScoped<AuditNotificationService>();
 
     bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
@@ -104,6 +106,7 @@ try
         builder.Services.AddTransient<CertificateExpiryNotificationJob>();
         builder.Services.AddTransient<EventRetentionJob>();
         builder.Services.AddTransient<DocumentReviewReminderJob>();
+        builder.Services.AddTransient<PolicyAcknowledgementReminderJob>();
         builder.Services.AddTransient<EvidenceExpiryJob>();
         builder.Services.AddTransient<ContinuityReminderJob>();
         builder.Services.AddTransient<VendorReminderJob>();
@@ -154,6 +157,10 @@ try
             "document-review-reminders",
             job => job.ExecuteAsync(CancellationToken.None),
             "0 7 * * *");
+        recurringJobs.AddOrUpdate<PolicyAcknowledgementReminderJob>(
+            "policy-acknowledgement-reminders",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "30 7 * * *");
         recurringJobs.AddOrUpdate<EvidenceExpiryJob>(
             "evidence-expiry",
             job => job.ExecuteAsync(CancellationToken.None),
