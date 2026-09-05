@@ -497,7 +497,19 @@ Scanner ingest: stub adapter only (real scanners in P19).
 
 ### Packages
 
-P18-01 Report API package; P18-02 Snapshots Hangfire; P18-03 Exec dashboard; P18-04 Compliance honest tiles; P18-05 Export CSV audited; P18-06 Permissions per report; P18-07 Tests.
+| Package | Status |
+|---------|--------|
+| P18-01 Report API package | Done |
+| P18-02 Snapshots Hangfire | Done |
+| P18-03 Exec dashboard | Done |
+| P18-04 Compliance honest tiles | Done |
+| P18-05 Export CSV audited | Done |
+| P18-06 Permissions per report | Done |
+| P18-07 Tests | Deferred ? dedicated project testing phase |
+
+**Phase 18:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P18-07).
+
+**NEXT:** P19 Integrations / automation.
 
 ---
 
@@ -509,7 +521,7 @@ P18-01 Report API package; P18-02 Snapshots Hangfire; P18-03 Exec dashboard; P18
 
 P19-01 Directory sync/JML; P19-02 Mail/M365; P19-03 Veeam/events; P19-04 vCenter/Hyper-V enrich; P19-05 Vuln scanner; P19-06 SIEM outbound; P19-07 Webhook hardening; P19-08 Tests/secrets.
 
-**Out of scope:** Building those vendors? products.
+**Out of scope:** Building those vendors' products.
 
 ---
 
@@ -527,4 +539,4 @@ P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 K
 
 ## Suggested next coding task
 
-**Phase 0 is complete. Phase 1 (Identity) is complete. Phase 2 (shared platform foundations) is complete. Phase 3 (Asset management / CMDB foundation) is complete. Phase 4 (Service desk) is COMPLETE (P4-01..P4-12).** Phase 5 FEATURE COMPLETE (P5-01..P5-05, P5-07 Done; P5-06 deferred to testing day). Next: **P6 Change Management**.
+**Phases 0?18 are FEATURE COMPLETE** (dedicated package tests deferred to project testing phase where noted). Next: **P19 Integrations / automation**.
