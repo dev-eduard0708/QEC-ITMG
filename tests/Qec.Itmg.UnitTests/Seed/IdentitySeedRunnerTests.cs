@@ -53,7 +53,8 @@ public sealed class IdentitySeedRunnerTests
             .ToListAsync();
 
         Assert.Equal(expectedKeys.OrderBy(key => key), keys);
-        Assert.DoesNotContain(keys, key => key == "remote.unattended");
+        Assert.Contains(keys, key => key == "remote.unattended");
+        Assert.Contains(keys, key => key == "remote.request");
     }
 
     [Fact]

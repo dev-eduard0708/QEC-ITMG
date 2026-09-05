@@ -110,6 +110,11 @@ public static class IdentitySeedCatalog
         ("report.export", "Export authorized reports as CSV"),
         ("ai.use", "Use AI assistance capabilities as the current user"),
         ("ai.admin", "View AI readiness and interaction metadata"),
+        ("remote.request", "Create remote support session requests"),
+        ("remote.attended", "Start attended remote support sessions after consent"),
+        ("remote.unattended", "Authorize and start unattended remote support (policy gated)"),
+        ("remote.audit.read", "View remote support history and audit detail"),
+        ("remote.admin", "Manage remote engine CI mapping and remote-support admin settings"),
     ];
 
     /// <summary>Read-oriented auditor role. Does not include manage/export/admin permissions.</summary>

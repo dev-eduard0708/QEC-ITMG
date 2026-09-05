@@ -37,5 +37,6 @@
     <ProjectReference Include="..\Modules\ThirdParty\Qec.Itmg.ThirdParty\Qec.Itmg.ThirdParty.csproj" />
     <ProjectReference Include="..\Modules\Reporting\Qec.Itmg.Reporting\Qec.Itmg.Reporting.csproj" />
     <ProjectReference Include="..\Modules\Ai\Qec.Itmg.Ai\Qec.Itmg.Ai.csproj" />
+    <ProjectReference Include="..\Modules\RemoteSupport\Qec.Itmg.RemoteSupport\Qec.Itmg.RemoteSupport.csproj" />
   </ItemGroup>
 </Project>

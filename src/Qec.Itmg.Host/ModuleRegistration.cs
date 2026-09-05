@@ -16,6 +16,7 @@ using Qec.Itmg.BusinessContinuity;
 using Qec.Itmg.ThirdParty;
 using Qec.Itmg.Reporting;
 using Qec.Itmg.Ai;
+using Qec.Itmg.RemoteSupport;
 using Qec.Itmg.Operations;
 using Qec.Itmg.Organization;
 using Qec.Itmg.Platform;
@@ -50,6 +51,7 @@ internal static class ModuleRegistration
             new ThirdPartyModule(),
             new ReportingModule(),
             new AiModule(),
+            new RemoteSupportModule(),
         ];
 
         foreach (IModule module in modules)

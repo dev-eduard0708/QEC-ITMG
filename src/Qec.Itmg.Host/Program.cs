@@ -25,10 +25,12 @@ using Qec.Itmg.Host.ThirdParty;
 using Qec.Itmg.Host.Reporting;
 using Qec.Itmg.Host.Integrations;
 using Qec.Itmg.Host.Ai;
+using Qec.Itmg.Host.RemoteSupport;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
+using Qec.Itmg.Contracts.RemoteSupport;
 using Qec.Itmg.Identity.Admin;
 using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.CurrentUser;
@@ -114,6 +116,9 @@ try
     builder.Services.AddScoped<IIntegrationDomainSync, HostIntegrationDomainSync>();
     builder.Services.AddScoped<DirectoryJmlFulfillmentService>();
     builder.Services.AddScoped<AiAssistanceOrchestrator>();
+    builder.Services.AddScoped<IRemoteCiLookup, CmdbRemoteCiLookup>();
+    builder.Services.AddScoped<RemoteSupportNotificationService>();
+    builder.Services.AddTransient<RemoteSessionPollingJob>();
 
     builder.Services
         .AddHealthChecks()
@@ -181,6 +186,10 @@ try
             "integration-polling",
             job => job.ExecuteAsync(CancellationToken.None),
             "20 * * * *");
+        recurringJobs.AddOrUpdate<RemoteSessionPollingJob>(
+            "remote-session-poll",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "*/2 * * * *");
     }
 
     app.UseSerilogRequestLogging();
@@ -232,6 +241,7 @@ try
     app.MapReportEndpoints();
     app.MapIntegrationReadinessEndpoints();
     app.MapAiEndpoints();
+    app.MapRemoteSupportEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))
     {

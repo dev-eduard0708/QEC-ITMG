@@ -21,6 +21,7 @@ public sealed class CmdbSeedRunner(
         ("laptop", "Laptop", "Employee and staff laptops"),
         ("server", "Server", "Physical or virtual servers"),
         ("application", "Application", "Business applications and software systems"),
+        ("kiosk", "Kiosk", "Shared kiosk or IT-managed shared endpoint"),
     ];
 
     public async Task RunAsync(CancellationToken cancellationToken = default)

@@ -1,0 +1,20 @@
+using Microsoft.EntityFrameworkCore;
+using Qec.Itmg.BuildingBlocks.Persistence;
+using Qec.Itmg.RemoteSupport.Domain;
+
+namespace Qec.Itmg.RemoteSupport.Persistence;
+
+public sealed class RemoteSupportDbContext(DbContextOptions<RemoteSupportDbContext> options) : DbContext(options)
+{
+    public const string SchemaName = "rem";
+
+    public DbSet<RemoteSessionRequest> RemoteSessionRequests => Set<RemoteSessionRequest>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.HasDefaultSchema(SchemaName);
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(RemoteSupportDbContext).Assembly);
+        QecEfConventions.Apply(modelBuilder);
+        base.OnModelCreating(modelBuilder);
+    }
+}

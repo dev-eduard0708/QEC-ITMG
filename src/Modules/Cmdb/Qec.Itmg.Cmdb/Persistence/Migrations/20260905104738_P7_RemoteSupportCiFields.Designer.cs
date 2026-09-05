@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Qec.Itmg.Cmdb.Persistence;
 
@@ -11,9 +12,11 @@ using Qec.Itmg.Cmdb.Persistence;
 namespace Qec.Itmg.Cmdb.Persistence.Migrations
 {
     [DbContext(typeof(CmdbDbContext))]
-    partial class CmdbDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260905104738_P7_RemoteSupportCiFields")]
+    partial class P7_RemoteSupportCiFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

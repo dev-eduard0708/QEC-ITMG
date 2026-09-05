@@ -14,6 +14,7 @@ using Qec.Itmg.BusinessContinuity.Persistence;
 using Qec.Itmg.ThirdParty.Persistence;
 using Qec.Itmg.Reporting.Persistence;
 using Qec.Itmg.Ai.Persistence;
+using Qec.Itmg.RemoteSupport.Persistence;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Operations.Persistence;
 using Qec.Itmg.Organization.Persistence;
@@ -225,5 +226,17 @@ public sealed class AiDbContextFactory : IDesignTimeDbContextFactory<AiDbContext
             DesignTimeConnectionString.Resolve(),
             sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", AiDbContext.SchemaName));
         return new AiDbContext(optionsBuilder.Options);
+    }
+}
+
+public sealed class RemoteSupportDbContextFactory : IDesignTimeDbContextFactory<RemoteSupportDbContext>
+{
+    public RemoteSupportDbContext CreateDbContext(string[] args)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<RemoteSupportDbContext>();
+        optionsBuilder.UseSqlServer(
+            DesignTimeConnectionString.Resolve(),
+            sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", RemoteSupportDbContext.SchemaName));
+        return new RemoteSupportDbContext(optionsBuilder.Options);
     }
 }

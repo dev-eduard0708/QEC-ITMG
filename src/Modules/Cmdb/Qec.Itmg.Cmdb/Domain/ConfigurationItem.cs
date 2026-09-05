@@ -61,6 +61,15 @@ public sealed class ConfigurationItem
 
     public Guid? SpofRiskId { get; private set; }
 
+    /// <summary>MeshCentral (or other engine) node id. Required to start a remote session.</summary>
+    public string? RemoteEngineNodeId { get; private set; }
+
+    /// <summary>Provider key, e.g. MeshCentral.</summary>
+    public string? RemoteEngineProvider { get; private set; }
+
+    /// <summary>Explicit opt-in for unattended remote; still gated by policy + permission + MFA.</summary>
+    public bool UnattendedRemotePermitted { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public DateTimeOffset UpdatedAtUtc { get; private set; }
@@ -169,6 +178,18 @@ public sealed class ConfigurationItem
     public void SetVendorId(Guid? vendorId, DateTimeOffset utcNow)
     {
         VendorId = NormalizeGuid(vendorId);
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void SetRemoteEngineMapping(
+        string? remoteEngineNodeId,
+        string? remoteEngineProvider,
+        bool unattendedRemotePermitted,
+        DateTimeOffset utcNow)
+    {
+        RemoteEngineNodeId = NormalizeOptional(remoteEngineNodeId);
+        RemoteEngineProvider = NormalizeOptional(remoteEngineProvider);
+        UnattendedRemotePermitted = unattendedRemotePermitted;
         UpdatedAtUtc = utcNow;
     }
 

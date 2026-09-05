@@ -31,6 +31,9 @@ public sealed record ConfigurationItemDto(
     DateTimeOffset? SpofReviewedAtUtc,
     string? SpofMitigationNotes,
     Guid? SpofRiskId,
+    string? RemoteEngineNodeId,
+    string? RemoteEngineProvider,
+    bool UnattendedRemotePermitted,
     string RowVersion,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
@@ -221,6 +224,9 @@ public sealed class ConfigurationItemService(
                 item.SpofReviewedAtUtc,
                 item.SpofMitigationNotes,
                 item.SpofRiskId,
+                item.RemoteEngineNodeId,
+                item.RemoteEngineProvider,
+                item.UnattendedRemotePermitted,
                 Convert.ToBase64String(item.RowVersion),
                 item.CreatedAtUtc,
                 item.UpdatedAtUtc);
@@ -276,6 +282,23 @@ public sealed class ConfigurationItemService(
         if (!MatchesRowVersion(entity.RowVersion, rowVersion))
             throw new InvalidOperationException("The configuration item was modified by another user.");
         entity.SetVendorId(vendorId, clock.UtcNow);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await MapManyAsync([entity], cancellationToken)).Single();
+    }
+
+    public async Task<ConfigurationItemDto> SetRemoteEngineMappingAsync(
+        Guid id,
+        string? remoteEngineNodeId,
+        string? remoteEngineProvider,
+        bool unattendedRemotePermitted,
+        string rowVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ConfigurationItem entity = await db.ConfigurationItems.FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Configuration item was not found.");
+        if (!MatchesRowVersion(entity.RowVersion, rowVersion))
+            throw new InvalidOperationException("The configuration item was modified by another user.");
+        entity.SetRemoteEngineMapping(remoteEngineNodeId, remoteEngineProvider, unattendedRemotePermitted, clock.UtcNow);
         await db.SaveChangesAsync(cancellationToken);
         return (await MapManyAsync([entity], cancellationToken)).Single();
     }
