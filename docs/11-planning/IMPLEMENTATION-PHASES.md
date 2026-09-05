@@ -444,17 +444,29 @@ Scanner ingest: stub adapter only (real scanners in P19).
 
 **Phase 15:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P15-08).
 
-**NEXT:** P16 Business continuity.
+**NEXT:** P17 Vendor / third-party.
 
 ---
 
 ## Phase 16 ? Business continuity
 
-**Prerequisites:** P3 BusinessService RTO/RPO.
+**Prerequisites:** P3 BusinessService RTO/RPO; P8 RestoreTest; P10 ManagedDocument; P13 Evidence; P14 Audit readiness; P15 Risk.
 
 ### Packages
 
-P16-01 BIA; P16-02 Plans; P16-03 Procedures; P16-04 DR tests + evidence; P16-05 SPOF flag; P16-06 Reports; P16-07 Tests.
+| Package | Status |
+|---------|--------|
+| P16-01 BIA | Done |
+| P16-02 Continuity plans | Done |
+| P16-03 Recovery procedures | Done |
+| P16-04 DR tests + evidence | Done |
+| P16-05 SPOF | Done |
+| P16-06 Reports / dashboard | Done |
+| P16-07 Tests | Deferred ? dedicated project testing phase |
+
+**Phase 16:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P16-07).
+
+**NEXT:** P17 Vendor / third-party.
 
 ---
 
