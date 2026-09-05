@@ -35,6 +35,20 @@ public sealed class RemoteSupportOptions
 
     public int MaxWebhookPayloadBytes { get; set; } = 262144;
 
+    /// <summary>
+    /// Optional HTTPS URL for the endpoint agent installer (admin-configured).
+    /// Never put secrets here — public download link only.
+    /// </summary>
+    public string AgentDownloadUrl { get; set; } = string.Empty;
+
+    /// <summary>Optional employee-facing install instructions (plain text / markdown-lite).</summary>
+    public string AgentInstallInstructions { get; set; } = string.Empty;
+
+    public bool HasAgentDownload =>
+        !string.IsNullOrWhiteSpace(AgentDownloadUrl)
+        && Uri.TryCreate(AgentDownloadUrl.Trim(), UriKind.Absolute, out Uri? uri)
+        && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
+
     public bool IsConfigured =>
         Enabled
         && !string.Equals(ProviderKind, "Disabled", StringComparison.OrdinalIgnoreCase)

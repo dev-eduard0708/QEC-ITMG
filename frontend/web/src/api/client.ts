@@ -3714,6 +3714,55 @@ export type RemoteSessionListResult = {
   pageSize: number
 }
 
+export type RemoteDeviceReadinessStatus =
+  | 'Ready'
+  | 'SetupRequired'
+  | 'WaitingForIt'
+  | 'DeviceNotLinked'
+  | 'Offline'
+  | 'Unavailable'
+
+export type RemoteOnboardingOverallStatus =
+  | 'Ready'
+  | 'SetupRequired'
+  | 'WaitingForIt'
+  | 'EngineUnavailable'
+  | 'AgentNotConfigured'
+  | 'NoDevices'
+
+export type RemoteDeviceReadiness = {
+  assetId: string
+  assetNumber: string
+  assetName: string
+  configurationItemId: string | null
+  configurationItemNumber: string | null
+  readinessStatus: RemoteDeviceReadinessStatus
+  remoteReady: boolean
+  hasEngineMapping: boolean
+  provider: string | null
+}
+
+export type EmployeeRemoteOnboarding = {
+  engineConfigured: boolean
+  engineEnabled: boolean
+  engineStatus: string
+  agentDownloadConfigured: boolean
+  agentDownloadUrl: string | null
+  agentInstallInstructions: string | null
+  devices: RemoteDeviceReadiness[]
+  overallStatus: RemoteOnboardingOverallStatus
+}
+
+export type RemoteSessionMessage = {
+  id: string
+  remoteSessionRequestId: string
+  senderUserId: string | null
+  messageText: string
+  messageType: 'User' | 'System'
+  systemEventKey: string | null
+  sentAtUtc: string
+}
+
 export type CreateAttendedRemotePayload = {
   configurationItemId: string
   targetUserId: string
@@ -3799,6 +3848,15 @@ export const remoteSupportApi = {
     return apiFetch<RemoteSessionListResult>(`/api/v1/me/remote-support${qs ? `?${qs}` : ''}`)
   },
   myGet: (id: string) => apiFetch<RemoteSessionRequest>(`/api/v1/me/remote-support/${id}`),
+  onboarding: () =>
+    apiFetch<EmployeeRemoteOnboarding>('/api/v1/me/remote-support/onboarding'),
+  listMessages: (id: string) =>
+    apiFetch<RemoteSessionMessage[]>(`/api/v1/remote-support/sessions/${id}/messages`),
+  postMessage: (id: string, messageText: string) =>
+    apiFetch<RemoteSessionMessage>(`/api/v1/remote-support/sessions/${id}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ messageText }),
+    }),
   allow: (id: string) =>
     apiFetch<RemoteSessionRequest>(`/api/v1/me/remote-support/${id}/allow`, { method: 'POST' }),
   decline: (id: string) =>

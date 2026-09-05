@@ -77,6 +77,7 @@ import { FoundationHomePage } from '@/features/foundation/foundation-home-page'
 import { RemoteSupportPage } from '@/features/it/remote-support-page'
 import { RemoteSupportDetailPage } from '@/features/it/remote-support-detail-page'
 import { EmployeeRemoteSupportPage } from '@/features/employee/remote-support-page'
+import { EmployeeRemoteSupportSetupPage } from '@/features/employee/remote-support-setup-page'
 import { EmployeeRemoteSupportDetailPage } from '@/features/employee/remote-support-detail-page'
 
 export function AppRouter() {
@@ -105,6 +106,7 @@ export function AppRouter() {
           <Route path="employee/security/awareness/:assignmentId" element={<EmployeeAwarenessDetailPage />} />
           <Route path="employee/security/report" element={<ReportSecurityConcernPage />} />
           <Route path="employee/remote-support" element={<EmployeeRemoteSupportPage />} />
+          <Route path="employee/remote-support/setup" element={<EmployeeRemoteSupportSetupPage />} />
           <Route path="employee/remote-support/:id" element={<EmployeeRemoteSupportDetailPage />} />
           <Route path="it" element={<ItHomePage />} />
           <Route element={<RequirePermission permission="assets.read" />}>

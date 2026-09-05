@@ -85,6 +85,7 @@ function filterByTab(tab: TabKey, session: RemoteSessionRequest): boolean {
 
 function SessionRow({ session }: { session: RemoteSessionRequest }) {
   const { t } = useTranslation()
+  const { can } = useAuth()
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 py-3 last:border-0">
@@ -106,9 +107,18 @@ function SessionRow({ session }: { session: RemoteSessionRequest }) {
           {t('remote.fields.requestedAt')}: {new Date(session.requestedAtUtc).toLocaleString()}
         </p>
       </div>
-      <Button asChild size="sm" variant="outline">
-        <Link to={`/it/remote-support/${session.id}`}>{t('remote.viewDetail')}</Link>
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        {can('remote.admin') ? (
+          <Button asChild size="sm" variant="ghost">
+            <Link to={`/it/cmdb?ci=${session.configurationItemId}`}>
+              {t('remote.openCiMapping')}
+            </Link>
+          </Button>
+        ) : null}
+        <Button asChild size="sm" variant="outline">
+          <Link to={`/it/remote-support/${session.id}`}>{t('remote.viewDetail')}</Link>
+        </Button>
+      </div>
     </li>
   )
 }

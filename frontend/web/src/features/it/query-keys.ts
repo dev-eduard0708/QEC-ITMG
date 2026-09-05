@@ -62,4 +62,6 @@ export const remoteSupportKeys = {
   detail: (id: string) => [...remoteSupportKeys.all, 'detail', id] as const,
   mine: (filters: string) => ['me', 'remote-support', filters] as const,
   mineDetail: (id: string) => ['me', 'remote-support', 'detail', id] as const,
+  onboarding: () => ['me', 'remote-support', 'onboarding'] as const,
+  messages: (id: string) => [...remoteSupportKeys.all, 'messages', id] as const,
 }

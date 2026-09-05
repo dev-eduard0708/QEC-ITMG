@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -61,6 +62,7 @@ export function CmdbPage() {
   const { t } = useTranslation()
   const { can } = useAuth()
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -220,6 +222,16 @@ export function CmdbPage() {
   )
 
   const selectedCi = (listQuery.data ?? []).find((item) => item.id === selectedCiId) ?? null
+
+  // Deep link (e.g. from Remote Support) preselects the CI so its mapping panel opens.
+  useEffect(() => {
+    const requestedCiId = searchParams.get('ci')
+    if (!requestedCiId || selectedCiId) return
+    const match = (listQuery.data ?? []).find((item) => item.id === requestedCiId)
+    if (!match) return
+    setSelectedCiId(match.id)
+    syncRemoteMappingFields(match)
+  }, [searchParams, selectedCiId, listQuery.data])
 
   return (
     <div className="space-y-6">
