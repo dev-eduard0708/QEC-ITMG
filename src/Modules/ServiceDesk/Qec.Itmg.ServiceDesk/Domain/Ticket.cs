@@ -151,6 +151,15 @@ public sealed class Ticket
         };
     }
 
+    /// <summary>Server-only: mark a new Incident as a suspected security concern (employee report).</summary>
+    public void MarkAsSuspectedSecurityIncident(DateTimeOffset utcNow)
+    {
+        if (Type != TicketType.Incident)
+            throw new InvalidOperationException("Only incidents can carry a security classification.");
+        SecurityClassification = SecurityClassification.Suspected;
+        UpdatedAtUtc = utcNow;
+    }
+
     public void UpdateIncidentSpecialization(
         bool isMajorIncident,
         SecurityClassification? securityClassification,

@@ -376,6 +376,54 @@ public sealed class TicketService(
     }
 
     /// <summary>
+    /// Employee security concern: Incident with Suspected classification. Priority never Critical from employee.
+    /// </summary>
+    public async Task<Ticket> CreateSecurityConcernAsync(
+        string title,
+        string description,
+        Guid requesterUserId,
+        string securityCategoryKey,
+        Guid? configurationItemId = null,
+        TicketPriority priority = TicketPriority.High,
+        CancellationToken cancellationToken = default)
+    {
+        if (priority == TicketPriority.Critical)
+            priority = TicketPriority.High;
+
+        ArgumentException.ThrowIfNullOrWhiteSpace(securityCategoryKey);
+        string category = $"security:{securityCategoryKey.Trim().ToLowerInvariant()}";
+
+        string ticketNumber = await numbers.NextAsync(IncidentSequenceKey, IncidentPrefix, cancellationToken);
+        DateTimeOffset utcNow = clock.UtcNow;
+        Ticket ticket = Ticket.Create(
+            ticketNumber,
+            TicketType.Incident,
+            title,
+            description,
+            requesterUserId,
+            priority,
+            utcNow,
+            configurationItemId,
+            category);
+        ticket.MarkAsSuspectedSecurityIncident(utcNow);
+
+        await ApplyMatchingSlaAsync(ticket, utcNow, cancellationToken);
+        db.Tickets.Add(ticket);
+        await businessAudit.AppendAsync(new BusinessAuditEntry
+        {
+            AggregateType = AuditAggregateType.Ticket,
+            AggregateId = ticket.Id,
+            BusinessNumber = ticket.TicketNumber,
+            Action = BusinessAuditAction.Created,
+            FieldName = "SecurityConcernReported",
+            NewValue = category,
+            Source = AuditSource.Api,
+        }, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+        return ticket;
+    }
+
+    /// <summary>
     /// P5 stub only: promote a future Event into an Incident ticket.
     /// P8 will replace/extend this with the real Event aggregate and FK/relationship.
     /// </summary>
