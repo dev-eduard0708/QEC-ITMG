@@ -34,5 +34,7 @@ public sealed class RemoteSupportModule : IModule
             connectionString,
             RemoteSupportDbContext.SchemaName);
         services.AddScoped<RemoteSessionService>();
+        services.AddScoped<RemoteSessionChatService>();
+        services.AddSingleton<IRemoteSupportChatNotifier, NoOpRemoteSupportChatNotifier>();
     }
 }

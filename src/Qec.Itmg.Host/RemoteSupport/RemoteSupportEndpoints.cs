@@ -67,6 +67,7 @@ public static class RemoteSupportEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             RemoteSessionService svc,
+            RemoteSessionChatService chat,
             RemoteSupportNotificationService notifications,
             CancellationToken ct) =>
         {
@@ -85,6 +86,11 @@ public static class RemoteSupportEndpoints
                     req.ChangeRequestId,
                     req.RequestedPrivileges,
                     req.TechnicianUserId ?? session.Id,
+                    ct);
+                await chat.PostSystemMessageAsync(
+                    created.Id,
+                    RemoteSessionChatService.SystemEvents.Requested,
+                    "Remote support requested.",
                     ct);
                 await notifications.NotifyRequestedAsync(created, ct);
                 return Results.Created($"/api/v1/remote-support/sessions/{created.Id}", created);
@@ -130,6 +136,7 @@ public static class RemoteSupportEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             RemoteSessionService svc,
+            RemoteSessionChatService chat,
             RemoteSupportNotificationService notifications,
             CancellationToken ct) =>
         {
@@ -138,6 +145,8 @@ public static class RemoteSupportEndpoints
             bool mfa = HasMfa(principal);
             try
             {
+                await chat.PostSystemMessageAsync(
+                    id, RemoteSessionChatService.SystemEvents.Connecting, "Technician started connecting.", ct);
                 RemoteSessionRequestDto updated = await svc.StartAsync(
                     id,
                     session.Id,
@@ -145,6 +154,8 @@ public static class RemoteSupportEndpoints
                     session.Permissions.Contains(RemoteUnattended),
                     mfa,
                     ct);
+                await chat.PostSystemMessageAsync(
+                    id, RemoteSessionChatService.SystemEvents.Started, "Remote session started.", ct);
                 await notifications.NotifySessionStartedAsync(updated, ct);
                 return Results.Ok(updated);
             }
@@ -152,6 +163,9 @@ public static class RemoteSupportEndpoints
             {
                 if (ex.Message.Contains("engine", StringComparison.OrdinalIgnoreCase))
                 {
+                    await chat.PostSystemMessageAsync(
+                        id, RemoteSessionChatService.SystemEvents.Failed,
+                        "Remote connection is temporarily unavailable. You can continue chatting with IT.", ct);
                     RemoteSessionRequestDto? current = await svc.GetAsync(id, ct);
                     if (current is not null)
                         await notifications.NotifyEngineFailedAsync(current, ex.Message, ct);
@@ -171,6 +185,7 @@ public static class RemoteSupportEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             RemoteSessionService svc,
+            RemoteSessionChatService chat,
             RemoteSupportNotificationService notifications,
             CancellationToken ct) =>
         {
@@ -179,6 +194,8 @@ public static class RemoteSupportEndpoints
             try
             {
                 RemoteSessionRequestDto updated = await svc.EndAsync(id, session.Id, byTechnician: true, req?.Reason, ct);
+                await chat.PostSystemMessageAsync(
+                    id, RemoteSessionChatService.SystemEvents.Ended, "Remote session ended.", ct);
                 await notifications.NotifySessionEndedAsync(updated, ct);
                 return Results.Ok(updated);
             }
@@ -188,7 +205,17 @@ public static class RemoteSupportEndpoints
             }
         }).RequirePermission(RemoteAttended);
 
-        // Employee consent surface
+        endpoints.MapGet("/api/v1/me/remote-support/onboarding", async (
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            EmployeeRemoteOnboardingService onboarding,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            return Results.Ok(await onboarding.GetAsync(session.Id, ct));
+        }).RequireAuthorization();
+
         endpoints.MapGet("/api/v1/me/remote-support", async (
             int? page, int? pageSize, string? status,
             ClaimsPrincipal principal, ICurrentUserService currentUser, RemoteSessionService svc, CancellationToken ct) =>
@@ -215,6 +242,7 @@ public static class RemoteSupportEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             RemoteSessionService svc,
+            RemoteSessionChatService chat,
             RemoteSupportNotificationService notifications,
             CancellationToken ct) =>
         {
@@ -224,6 +252,8 @@ public static class RemoteSupportEndpoints
             {
                 string? ip = http.Connection.RemoteIpAddress?.ToString();
                 RemoteSessionRequestDto updated = await svc.AllowAsync(id, session.Id, ip, ct);
+                await chat.PostSystemMessageAsync(
+                    id, RemoteSessionChatService.SystemEvents.Allowed, "Remote access approved.", ct);
                 await notifications.NotifyAllowedAsync(updated, ct);
                 return Results.Ok(updated);
             }
@@ -239,6 +269,7 @@ public static class RemoteSupportEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             RemoteSessionService svc,
+            RemoteSessionChatService chat,
             RemoteSupportNotificationService notifications,
             CancellationToken ct) =>
         {
@@ -248,6 +279,8 @@ public static class RemoteSupportEndpoints
             {
                 string? ip = http.Connection.RemoteIpAddress?.ToString();
                 RemoteSessionRequestDto updated = await svc.DeclineAsync(id, session.Id, ip, ct);
+                await chat.PostSystemMessageAsync(
+                    id, RemoteSessionChatService.SystemEvents.Declined, "Remote access declined.", ct);
                 await notifications.NotifyDeclinedAsync(updated, ct);
                 return Results.Ok(updated);
             }
@@ -263,6 +296,7 @@ public static class RemoteSupportEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             RemoteSessionService svc,
+            RemoteSessionChatService chat,
             RemoteSupportNotificationService notifications,
             CancellationToken ct) =>
         {
@@ -274,8 +308,55 @@ public static class RemoteSupportEndpoints
             try
             {
                 RemoteSessionRequestDto updated = await svc.EndAsync(id, session.Id, byTechnician: false, req?.Reason, ct);
+                await chat.PostSystemMessageAsync(
+                    id, RemoteSessionChatService.SystemEvents.Ended, "Remote session ended.", ct);
                 await notifications.NotifySessionEndedAsync(updated, ct);
                 return Results.Ok(updated);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return FromEx(ex);
+            }
+        }).RequireAuthorization();
+
+        // Session chat (employee + authorized IT)
+        endpoints.MapGet("/api/v1/remote-support/sessions/{id:guid}/messages", async (
+            Guid id,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteSessionService svc,
+            RemoteSessionChatService chat,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            RemoteSessionRequestDto? item = await svc.GetAsync(id, ct);
+            if (item is null) return Results.NotFound();
+            if (!CanView(session, item)) return Results.Forbid();
+            return Results.Ok(await chat.ListAsync(id, ct));
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/remote-support/sessions/{id:guid}/messages", async (
+            Guid id,
+            PostRemoteChatMessageRequest req,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteSessionService svc,
+            RemoteSessionChatService chat,
+            RemoteSupportNotificationService notifications,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            RemoteSessionRequestDto? item = await svc.GetAsync(id, ct);
+            if (item is null) return Results.NotFound();
+            if (!CanChat(session, item)) return Results.Forbid();
+            try
+            {
+                await chat.EnsureChatStartedAuditAsync(id, ct);
+                RemoteSessionMessageDto created = await chat.PostUserMessageAsync(id, session.Id, req.MessageText, ct);
+                await notifications.NotifyChatMessageAsync(item, session.Id, created.MessageText, ct);
+                return Results.Ok(created);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
@@ -384,6 +465,13 @@ public static class RemoteSupportEndpoints
         || item.TechnicianUserId == session.Id
         || item.RequestedByUserId == session.Id;
 
+    private static bool CanChat(CurrentUserDto session, RemoteSessionRequestDto item) =>
+        item.TargetUserId == session.Id
+        || item.TechnicianUserId == session.Id
+        || item.RequestedByUserId == session.Id
+        || session.Permissions.Contains(RemoteAttended)
+        || session.Permissions.Contains(RemoteAdmin);
+
     private static bool HasMfa(ClaimsPrincipal principal)
     {
         // Prefer amr/acr claims when OIDC provides them; no MFA infra yet means false unless claim present.
@@ -469,6 +557,8 @@ public static class RemoteSupportEndpoints
 
     public sealed record EndRemoteRequest(string? Reason);
 
+    public sealed record PostRemoteChatMessageRequest(string MessageText);
+
     public sealed record SetRemoteMappingRequest(
         string? RemoteEngineNodeId,
         string? RemoteEngineProvider,
@@ -476,12 +566,25 @@ public static class RemoteSupportEndpoints
         string? RowVersion);
 }
 
-public sealed class RemoteSessionPollingJob(RemoteSessionService sessions)
+public sealed class RemoteSessionPollingJob(
+    RemoteSessionService sessions,
+    RemoteSessionChatService chat,
+    RemoteSupportNotificationService notifications)
 {
     [DisableConcurrentExecution(timeoutInSeconds: 60 * 10)]
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
-        await sessions.ExpireDueAsync(cancellationToken);
+        IReadOnlyList<RemoteSessionRequestDto> expired = await sessions.ExpireDueAsync(cancellationToken);
+        foreach (RemoteSessionRequestDto item in expired)
+        {
+            await chat.PostSystemMessageAsync(
+                item.Id,
+                RemoteSessionChatService.SystemEvents.Expired,
+                "Consent expired.",
+                cancellationToken);
+            await notifications.NotifyExpiredAsync(item, cancellationToken);
+        }
+
         await sessions.PollActiveSessionsAsync(cancellationToken);
     }
 }

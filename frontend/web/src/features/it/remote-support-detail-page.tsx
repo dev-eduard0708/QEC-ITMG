@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { remoteSupportKeys } from '@/features/it/query-keys'
+import { RemoteSessionChat } from '@/features/remote-support/remote-session-chat'
+import { isChatOpen } from '@/features/remote-support/chat-window'
 import { useState } from 'react'
 
 function DetailRow({ label, value }: { label: string; value: string }) {
@@ -29,7 +31,7 @@ function formatTime(value: string | null | undefined) {
 export function RemoteSupportDetailPage() {
   const { id = '' } = useParams()
   const { t } = useTranslation()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const queryClient = useQueryClient()
   const [endReason, setEndReason] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
@@ -122,6 +124,13 @@ export function RemoteSupportDetailPage() {
               label={t('remote.fields.configurationItem')}
               value={session.configurationItemId}
             />
+            {can('remote.admin') ? (
+              <Button asChild size="sm" variant="ghost" className="h-auto p-0">
+                <Link to={`/it/cmdb?ci=${session.configurationItemId}`}>
+                  {t('remote.openCiMapping')}
+                </Link>
+              </Button>
+            ) : null}
             {session.ticketId ? (
               <DetailRow label={t('remote.fields.ticket')} value={session.ticketId} />
             ) : null}
@@ -212,6 +221,12 @@ export function RemoteSupportDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <RemoteSessionChat
+        sessionId={session.id}
+        currentUserId={user?.id ?? null}
+        canPost={isChatOpen(session)}
+      />
 
       {(canStart || canEnd) && (
         <Card>

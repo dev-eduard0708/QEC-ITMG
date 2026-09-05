@@ -28,6 +28,7 @@ using Qec.Itmg.Host.Integrations;
 using Qec.Itmg.Host.Ai;
 using Qec.Itmg.Host.RemoteSupport;
 using Qec.Itmg.Host.Operations;
+using Qec.Itmg.RemoteSupport.Services;
 using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -123,6 +124,10 @@ try
     builder.Services.AddScoped<AiAssistanceOrchestrator>();
     builder.Services.AddScoped<IRemoteCiLookup, CmdbRemoteCiLookup>();
     builder.Services.AddScoped<RemoteSupportNotificationService>();
+    builder.Services.AddScoped<EmployeeRemoteOnboardingService>();
+    builder.Services.AddSignalR();
+    builder.Services.RemoveAll<IRemoteSupportChatNotifier>();
+    builder.Services.AddSingleton<IRemoteSupportChatNotifier, SignalRRemoteSupportChatNotifier>();
     builder.Services.AddTransient<RemoteSessionPollingJob>();
 
     builder.Services
@@ -255,6 +260,7 @@ try
     app.MapIntegrationReadinessEndpoints();
     app.MapAiEndpoints();
     app.MapRemoteSupportEndpoints();
+    app.MapHub<RemoteSupportHub>(RemoteSupportHub.HubPath);
 
     if (app.Environment.IsEnvironment("Testing"))
     {

@@ -38,3 +38,21 @@ internal sealed class RemoteSessionRequestConfiguration : IEntityTypeConfigurati
             .HasDatabaseName("IX_RemoteSessionRequest_ActiveLookup");
     }
 }
+
+internal sealed class RemoteSessionMessageConfiguration : IEntityTypeConfiguration<RemoteSessionMessage>
+{
+    public void Configure(EntityTypeBuilder<RemoteSessionMessage> builder)
+    {
+        builder.ToTable("RemoteSessionMessage");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.MessageText).IsRequired().HasMaxLength(4000);
+        builder.Property(x => x.MessageType).IsRequired().HasConversion<string>().HasMaxLength(16);
+        builder.Property(x => x.SystemEventKey).HasMaxLength(64);
+        builder.HasIndex(x => new { x.RemoteSessionRequestId, x.SentAtUtc })
+            .HasDatabaseName("IX_RemoteSessionMessage_Session_Sent");
+        builder.HasOne<RemoteSessionRequest>()
+            .WithMany()
+            .HasForeignKey(x => x.RemoteSessionRequestId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

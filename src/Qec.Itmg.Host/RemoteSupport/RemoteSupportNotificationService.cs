@@ -126,7 +126,83 @@ public sealed class RemoteSupportNotificationService(
                 ct)
             : Task.CompletedTask;
 
+    /// <summary>In-app only — never email chat traffic.</summary>
+    public async Task NotifyChatMessageAsync(
+        RemoteSessionRequestDto request,
+        Guid senderUserId,
+        string messagePreview,
+        CancellationToken ct)
+    {
+        Guid? recipient = null;
+        string actionUrl;
+        if (request.TargetUserId is Guid target && target != senderUserId)
+        {
+            recipient = target;
+            actionUrl = EmployeeActionUrl(request.Id);
+        }
+        else if (request.TechnicianUserId is Guid tech && tech != senderUserId)
+        {
+            recipient = tech;
+            actionUrl = ItActionUrl(request.Id);
+        }
+        else if (request.RequestedByUserId != senderUserId)
+        {
+            recipient = request.RequestedByUserId;
+            actionUrl = ItActionUrl(request.Id);
+        }
+        else
+        {
+            return;
+        }
+
+        await NotifyInAppOnlyAsync(
+            recipient.Value,
+            "remote.chat",
+            NotificationSeverity.Info,
+            $"{request.RemoteNumber} new message",
+            Truncate(messagePreview),
+            request.Id,
+            actionUrl,
+            ct);
+    }
+
     private async Task NotifyUserAsync(
+        Guid recipientUserId,
+        string type,
+        NotificationSeverity severity,
+        string title,
+        string message,
+        Guid resourceId,
+        string actionUrl,
+        CancellationToken cancellationToken)
+    {
+        bool created = await NotifyInAppOnlyAsync(
+            recipientUserId, type, severity, title, message, resourceId, actionUrl, cancellationToken);
+        if (!created) return;
+
+        try
+        {
+            string? email = await identityDb.Users.AsNoTracking()
+                .Where(user => user.Id == recipientUserId && user.Status == UserStatus.Active)
+                .Select(user => user.Upn)
+                .FirstOrDefaultAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(email) || !email.Contains('@', StringComparison.Ordinal))
+                return;
+
+            emailQueue.Enqueue(new EmailMessage
+            {
+                To = email,
+                Subject = title,
+                BodyText = $"{message}\n\nOpen: {actionUrl}",
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to enqueue remote support email for user {UserId}", recipientUserId);
+        }
+    }
+
+    private async Task<bool> NotifyInAppOnlyAsync(
         Guid recipientUserId,
         string type,
         NotificationSeverity severity,
@@ -148,32 +224,12 @@ public sealed class RemoteSupportNotificationService(
                 resourceId,
                 actionUrl,
                 cancellationToken);
+            return true;
         }
         catch (Exception ex)
         {
             logger.LogWarning(ex, "Remote support notification {Type} failed for user {UserId}", type, recipientUserId);
-            return;
-        }
-
-        try
-        {
-            string? email = await identityDb.Users.AsNoTracking()
-                .Where(user => user.Id == recipientUserId && user.Status == UserStatus.Active)
-                .Select(user => user.Upn)
-                .FirstOrDefaultAsync(cancellationToken);
-            if (string.IsNullOrWhiteSpace(email) || !email.Contains('@', StringComparison.Ordinal))
-                return;
-
-            emailQueue.Enqueue(new EmailMessage
-            {
-                To = email,
-                Subject = title,
-                BodyText = $"{message}\n\nOpen: {actionUrl}",
-            });
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Failed to enqueue remote support email for user {UserId}", recipientUserId);
+            return false;
         }
     }
 

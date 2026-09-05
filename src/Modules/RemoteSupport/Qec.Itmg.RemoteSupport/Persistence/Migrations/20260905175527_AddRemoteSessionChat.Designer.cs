@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Qec.Itmg.RemoteSupport.Persistence;
 
@@ -11,9 +12,11 @@ using Qec.Itmg.RemoteSupport.Persistence;
 namespace Qec.Itmg.RemoteSupport.Persistence.Migrations
 {
     [DbContext(typeof(RemoteSupportDbContext))]
-    partial class RemoteSupportDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260905175527_AddRemoteSessionChat")]
+    partial class AddRemoteSessionChat
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

@@ -28,6 +28,8 @@ export default defineConfig({
     proxy: {
       '/api': backendProxy(false),
       '/health': backendProxy(false),
+      // SignalR hubs need websocket upgrade forwarding.
+      '/hubs': { ...backendProxy(false), ws: true },
       // Auth challenge + OIDC callbacks must preserve the Vite origin for redirect_uri / cookies.
       '/auth': backendProxy(true),
       '/signin-oidc': backendProxy(true),

@@ -426,7 +426,7 @@ public sealed class RemoteSessionService(
         return true;
     }
 
-    public async Task ExpireDueAsync(CancellationToken ct)
+    public async Task<IReadOnlyList<RemoteSessionRequestDto>> ExpireDueAsync(CancellationToken ct)
     {
         DateTimeOffset now = clock.UtcNow;
         List<RemoteSessionRequest> due = await db.RemoteSessionRequests
@@ -446,6 +446,8 @@ public sealed class RemoteSessionService(
 
         if (due.Count > 0)
             await db.SaveChangesAsync(ct);
+
+        return due.Select(Map).ToList();
     }
 
     public async Task PollActiveSessionsAsync(CancellationToken ct)

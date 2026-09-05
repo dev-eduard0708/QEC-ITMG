@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMemo, useState } from 'react'
 import { ApiError, meApi, remoteSupportApi } from '@/api/client'
+import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import {
   AlertDialog,
@@ -21,6 +22,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { equipmentKeys, remoteSupportKeys, ticketKeys } from '@/features/it/query-keys'
 import { formatDeviceLabel } from '@/features/employee/employee-request-helpers'
+import { RemoteSessionChat } from '@/features/remote-support/remote-session-chat'
+import {
+  friendlySessionStatusKey,
+  sessionStatusVariant,
+} from '@/features/remote-support/employee-remote-helpers'
+import { isChatOpen } from '@/features/remote-support/chat-window'
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -34,6 +41,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 export function EmployeeRemoteSupportDetailPage() {
   const { id = '' } = useParams()
   const { t } = useTranslation()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -127,42 +135,20 @@ export function EmployeeRemoteSupportDetailPage() {
         }
       />
 
-      <Badge variant="secondary">
-        {t(`remote.status.${session.status}`, { defaultValue: session.status })}
+      <Badge variant={sessionStatusVariant(session.status)}>
+        {t(friendlySessionStatusKey(session.status))}
       </Badge>
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('employee.remote.connectTitle')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <DetailRow label={t('remote.fields.technician')} value={t('employee.remote.itTechnician')} />
-          <DetailRow label={t('remote.fields.reason')} value={session.reason} />
-          <DetailRow label={t('employee.remote.device')} value={deviceLabel} />
-          <DetailRow
-            label={t('employee.remote.relatedRequest')}
-            value={ticketQuery.data?.ticketNumber ?? t('employee.remote.noRelatedRequest')}
-          />
-          <DetailRow
-            label={t('remote.fields.privileges')}
-            value={session.requestedPrivileges ?? t('employee.remote.standardAccess')}
-          />
-          <DetailRow
-            label={t('remote.fields.expiresAt')}
-            value={session.expiresAtUtc ? new Date(session.expiresAtUtc).toLocaleString() : '—'}
-          />
-        </CardContent>
-      </Card>
-
       {awaitingConsent ? (
-        <Card className="border-warning/40">
+        <Card className="border-2 border-amber-400 bg-amber-50/60 dark:bg-amber-950/30">
           <CardHeader>
             <CardTitle className="text-base">{t('employee.remote.consentPrompt')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">{t('remote.consent.warning')}</p>
+            <p className="text-sm">{t('remote.consent.warning')}</p>
+            <p className="text-sm text-muted-foreground">{t('employee.remote.chatNotConsent')}</p>
             <div className="flex flex-wrap gap-2">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
@@ -197,9 +183,39 @@ export function EmployeeRemoteSupportDetailPage() {
         </Card>
       ) : null}
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('employee.remote.connectTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <DetailRow label={t('remote.fields.technician')} value={t('employee.remote.itTechnician')} />
+          <DetailRow label={t('remote.fields.reason')} value={session.reason} />
+          <DetailRow label={t('employee.remote.device')} value={deviceLabel} />
+          <DetailRow
+            label={t('employee.remote.relatedRequest')}
+            value={ticketQuery.data?.ticketNumber ?? t('employee.remote.noRelatedRequest')}
+          />
+          <DetailRow
+            label={t('remote.fields.privileges')}
+            value={session.requestedPrivileges ?? t('employee.remote.standardAccess')}
+          />
+          <DetailRow
+            label={t('remote.fields.expiresAt')}
+            value={session.expiresAtUtc ? new Date(session.expiresAtUtc).toLocaleString() : '—'}
+          />
+        </CardContent>
+      </Card>
+
+      <RemoteSessionChat
+        sessionId={session.id}
+        currentUserId={user?.id ?? null}
+        canPost={isChatOpen(session)}
+      />
+
       {inSession ? (
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="space-y-2 pt-6">
+            <p className="text-sm text-muted-foreground">{t('employee.remote.endHint')}</p>
             <Button
               type="button"
               variant="secondary"

@@ -10,6 +10,8 @@ public sealed class RemoteSupportDbContext(DbContextOptions<RemoteSupportDbConte
 
     public DbSet<RemoteSessionRequest> RemoteSessionRequests => Set<RemoteSessionRequest>();
 
+    public DbSet<RemoteSessionMessage> RemoteSessionMessages => Set<RemoteSessionMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);
