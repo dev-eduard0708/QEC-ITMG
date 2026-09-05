@@ -229,6 +229,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
           can('report.bcm') ||
           can('report.vendor'),
       },
+      {
+        to: '/it/ai',
+        labelKey: 'nav.ai',
+        icon: Shield,
+        end: false,
+        visible: can('ai.use') || can('ai.admin'),
+      },
     ],
     [can],
   )
@@ -406,6 +413,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/continuity')) return t('nav.continuity')
   if (pathname.startsWith('/it/vendors')) return t('nav.vendors')
   if (pathname.startsWith('/it/reports')) return t('nav.reports')
+  if (pathname.startsWith('/it/ai')) return t('nav.ai')
   if (pathname.startsWith('/it/governance') || pathname.startsWith('/governance')) return t('nav.governance')
   return t('nav.foundation')
 }

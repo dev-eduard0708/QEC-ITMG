@@ -40,6 +40,7 @@ import {
 } from '@/features/it/continuity-page'
 import { VendorsPage, VendorNewPage, VendorDetailPage } from '@/features/it/vendors-page'
 import { ReportsPage, ReportsExecutivePage } from '@/features/it/reports-page'
+import { AiAssistantPage } from '@/features/it/ai-page'
 import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
@@ -242,6 +243,9 @@ export function AppRouter() {
           >
             <Route path="it/reports" element={<ReportsPage />} />
             <Route path="it/reports/executive" element={<ReportsExecutivePage />} />
+          </Route>
+          <Route element={<RequireAnyPermission permissions={['ai.use', 'ai.admin']} />}>
+            <Route path="it/ai" element={<AiAssistantPage />} />
           </Route>
           <Route path="unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

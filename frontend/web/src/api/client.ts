@@ -3227,6 +3227,61 @@ export const reportsApi = {
     })}`,
 }
 
+export type AiReadiness = {
+  enabled: boolean
+  configured: boolean
+  providerKind: string
+  modelName: string | null
+  status: string
+  lastSuccessUtc: string | null
+  lastFailureUtc: string | null
+  lastErrorSummary: string | null
+  credentialReferenceConfigured: boolean
+  note: string
+}
+
+export const aiApi = {
+  readiness: () => apiFetch<AiReadiness>('/api/v1/ai/readiness'),
+  ask: (question: string) =>
+    apiFetch<Record<string, unknown>>('/api/v1/ai/ask', {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    }),
+  suggestClassification: (payload: { title?: string; description?: string; ticketId?: string }) =>
+    apiFetch<Record<string, unknown>>('/api/v1/ai/suggest/classification', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  suggestKb: (payload: { query: string; ticketId?: string }) =>
+    apiFetch<Record<string, unknown>>('/api/v1/ai/suggest/kb', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  summarize: (payload: { recordType: string; recordId: string }) =>
+    apiFetch<Record<string, unknown>>('/api/v1/ai/summarize', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  reportQuery: (question: string) =>
+    apiFetch<Record<string, unknown>>('/api/v1/ai/reports/query', {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    }),
+  acceptSuggestion: (
+    suggestionId: string,
+    payload: { ticketId?: string; category?: string; priority?: string; rowVersion?: string },
+  ) =>
+    apiFetch(`/api/v1/ai/suggestions/${encodeURIComponent(suggestionId)}/accept`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  rejectSuggestion: (suggestionId: string, ticketId?: string) =>
+    apiFetch(`/api/v1/ai/suggestions/${encodeURIComponent(suggestionId)}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ ticketId }),
+    }),
+}
+
 export type IntegrationReadinessItem = {
   provider: string
   enabled: boolean
