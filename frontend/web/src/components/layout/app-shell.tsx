@@ -470,22 +470,21 @@ function SidebarContent({
     for (const group of groups) {
       const visible = group.items.filter((item) => item.visible)
       if (visible.length === 0) continue
+      // Respect an explicit user toggle; only auto-open when unset.
+      if (next[group.id] !== undefined) continue
+
       const active = visible.some((item) => pathMatches(location.pathname, item.to, item.end))
       if (active) {
         next[group.id] = true
-        continue
-      }
-      if (next[group.id] === undefined) {
-        if (group.id === 'my-workspace' && location.pathname.startsWith('/employee')) {
-          next[group.id] = true
-        } else if (
-          group.id === 'it-operations' &&
-          (location.pathname === '/it' || location.pathname.startsWith('/it/'))
-        ) {
-          next[group.id] = true
-        } else {
-          next[group.id] = false
-        }
+      } else if (group.id === 'my-workspace' && location.pathname.startsWith('/employee')) {
+        next[group.id] = true
+      } else if (
+        group.id === 'it-operations' &&
+        (location.pathname === '/it' || location.pathname.startsWith('/it/'))
+      ) {
+        next[group.id] = true
+      } else {
+        next[group.id] = false
       }
     }
     return next
@@ -505,11 +504,14 @@ function SidebarContent({
   }
 
   return (
-    <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
+    <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
       <BrandBlock collapsed={collapsed} />
       <Separator className="bg-white/10" />
       <nav
-        className={cn('flex flex-1 flex-col gap-3 overflow-y-auto p-2', collapsed && 'px-1.5')}
+        className={cn(
+          'flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-2',
+          collapsed && 'px-1.5',
+        )}
         aria-label={t('nav.workspaces')}
       >
         {groups.map((group) => (
@@ -524,7 +526,12 @@ function SidebarContent({
         ))}
       </nav>
 
-      <div className={cn('mt-auto space-y-2 border-t border-white/10 p-2', collapsed && 'px-1.5')}>
+      <div
+        className={cn(
+          'mt-auto shrink-0 space-y-2 border-t border-white/10 bg-sidebar p-2',
+          collapsed && 'px-1.5',
+        )}
+      >
         {import.meta.env.DEV ? (
           <div className={cn('px-1', collapsed && 'flex justify-center')}>
             {collapsed ? (
@@ -542,7 +549,7 @@ function SidebarContent({
             variant="ghost"
             size={collapsed ? 'icon' : 'sm'}
             className={cn(
-              'w-full text-sidebar-muted hover:bg-white/10 hover:text-sidebar-foreground',
+              'w-full shrink-0 text-sidebar-muted hover:bg-white/10 hover:text-sidebar-foreground',
               collapsed && 'mx-auto',
             )}
             onClick={onToggleCollapsed}
@@ -814,10 +821,10 @@ export function AppShell() {
   }
 
   return (
-    <div className="flex min-h-svh bg-background">
+    <div className="flex h-svh overflow-hidden bg-background">
       <aside
         className={cn(
-          'hidden shrink-0 border-e border-border transition-[width] duration-200 ease-out motion-reduce:transition-none lg:block',
+          'hidden h-svh shrink-0 border-e border-border transition-[width] duration-200 ease-out motion-reduce:transition-none lg:block',
           collapsed ? 'w-[4.5rem]' : 'w-64',
         )}
       >
@@ -828,8 +835,8 @@ export function AppShell() {
         />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 border-b border-border bg-card/95 backdrop-blur">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="sticky top-0 z-40 shrink-0 border-b border-border bg-card/95 backdrop-blur">
           <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
@@ -842,7 +849,7 @@ export function AppShell() {
                   <Menu className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent className="w-[min(20rem,100vw)] p-0">
+              <SheetContent className="flex h-full w-[min(20rem,100vw)] flex-col p-0">
                 <SidebarContent
                   collapsed={false}
                   onNavigate={() => setMobileOpen(false)}
@@ -871,7 +878,7 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-6 sm:px-6 lg:px-8">
           <Outlet />
         </main>
       </div>
