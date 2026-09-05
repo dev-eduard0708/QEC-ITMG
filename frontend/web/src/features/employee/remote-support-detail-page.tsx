@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next'
 import { useState } from 'react'
 import {
   ApiError,
+  isRemoteEndpointReady,
   meApi,
   remoteSupportApi,
-  type EnrollmentIssueResult,
 } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
@@ -49,7 +49,6 @@ export function EmployeeRemoteSupportDetailPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [formError, setFormError] = useState<string | null>(null)
-  const [enrollment, setEnrollment] = useState<EnrollmentIssueResult | null>(null)
 
   const sessionQuery = useQuery({
     queryKey: remoteSupportKeys.mineDetail(id),
@@ -61,7 +60,8 @@ export function EmployeeRemoteSupportDetailPage() {
     queryKey: [...remoteSupportKeys.mineDetail(id), 'endpoint'],
     queryFn: () => remoteSupportApi.getMyEndpoint(id),
     enabled: Boolean(id),
-    refetchInterval: (query) => (query.state.data ? false : 5_000),
+    refetchInterval: (query) =>
+      isRemoteEndpointReady(query.state.data) ? false : 5_000,
   })
 
   const ticketId = sessionQuery.data?.ticketId
@@ -109,14 +109,19 @@ export function EmployeeRemoteSupportDetailPage() {
     },
   })
 
-  const enrollmentMutation = useMutation({
-    mutationFn: () => remoteSupportApi.issueEnrollment(id),
-    onSuccess: (issued) => {
-      setEnrollment(issued)
+  const helperDownloadMutation = useMutation({
+    mutationFn: () => remoteSupportApi.downloadHelperPackage(id),
+    onSuccess: () => {
       setFormError(null)
     },
     onError: (error) => {
-      setFormError(error instanceof ApiError ? error.message : t('remote.error.generic'))
+      setFormError(
+        error instanceof ApiError && (error.status === 404 || error.status === 503)
+          ? t('employee.remote.prepare.unavailable')
+          : error instanceof ApiError
+            ? error.message
+            : t('remote.error.generic'),
+      )
     },
   })
 
@@ -177,39 +182,13 @@ export function EmployeeRemoteSupportDetailPage() {
             <p className="text-sm text-muted-foreground">
               {t('employee.remote.prepare.oneTimeWarning')}
             </p>
-            <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
-              {t('employee.remote.prepare.doNotShare')}
-            </p>
-            {!enrollment ? (
-              <Button
-                type="button"
-                onClick={() => enrollmentMutation.mutate()}
-                disabled={enrollmentMutation.isPending}
-              >
-                {t('employee.remote.prepare.download')}
-              </Button>
-            ) : enrollment.helperDownloadConfigured && enrollment.helperDownloadUrl ? (
-              <>
-                <Button asChild>
-                  <a
-                    href={enrollment.helperDownloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {t('employee.remote.prepare.download')}
-                  </a>
-                </Button>
-                {enrollment.helperInstallInstructions ? (
-                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-                    {enrollment.helperInstallInstructions}
-                  </p>
-                ) : null}
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {t('employee.remote.prepare.unavailable')}
-              </p>
-            )}
+            <Button
+              type="button"
+              onClick={() => helperDownloadMutation.mutate()}
+              disabled={helperDownloadMutation.isPending}
+            >
+              {t('employee.remote.prepare.download')}
+            </Button>
             {import.meta.env.DEV ? (
               <Button
                 type="button"

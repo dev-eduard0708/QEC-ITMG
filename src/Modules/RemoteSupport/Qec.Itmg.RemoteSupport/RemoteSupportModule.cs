@@ -36,7 +36,18 @@ public sealed class RemoteSupportModule : IModule
         services.AddScoped<RemoteSessionService>();
         services.AddScoped<RemoteSessionChatService>();
         services.AddScoped<RemoteEndpointService>();
-        services.AddSingleton<IRemoteEndpointEnrollmentEngine, DeferredRemoteEndpointEnrollmentEngine>();
+        services.AddSingleton<IRemoteEndpointEnrollmentEngine>(sp =>
+        {
+            RemoteSupportOptions opts = sp.GetRequiredService<IOptions<RemoteSupportOptions>>().Value;
+            if (opts.Enabled
+                && string.Equals(opts.ProviderKind, "MeshCentral", StringComparison.OrdinalIgnoreCase)
+                && opts.IsConfigured)
+            {
+                return ActivatorUtilities.CreateInstance<MeshCentralEndpointEnrollmentEngine>(sp);
+            }
+
+            return ActivatorUtilities.CreateInstance<DeferredRemoteEndpointEnrollmentEngine>(sp);
+        });
         services.AddSingleton<IRemoteSupportChatNotifier, NoOpRemoteSupportChatNotifier>();
     }
 }

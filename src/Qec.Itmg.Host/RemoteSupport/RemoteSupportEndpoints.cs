@@ -36,11 +36,30 @@ public static class RemoteSupportEndpoints
     {
         endpoints.MapGet("/api/v1/remote-support/readiness", (
             RemoteSessionService svc,
-            ClaimsPrincipal principal,
-            ICurrentUserService currentUser) =>
+            IRemoteEndpointEnrollmentEngine enrollment,
+            IOptions<RemoteSupportOptions> options,
+            RemoteSupportHelperPackageService helperPackage) =>
         {
-            // readiness visible to remote.request or remote.admin
-            return Results.Ok(svc.GetEngineStatus());
+            RemoteEngineStatus engine = svc.GetEngineStatus();
+            RemoteSupportOptions cfg = options.Value;
+            AgentBootstrapInfo bootstrap = enrollment.GetAgentBootstrap();
+            return Results.Ok(new
+            {
+                engine.Enabled,
+                engine.Configured,
+                engine.ProviderKind,
+                engine.Status,
+                engine.LastSuccessUtc,
+                engine.LastFailureUtc,
+                engine.LastErrorSummary,
+                engine.UnattendedEnabled,
+                agentEnrollmentAvailable = bootstrap.Available,
+                sessionCreationAvailable = engine.Configured && (
+                    string.Equals(engine.Status, "Healthy", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(engine.Status, "Configured", StringComparison.OrdinalIgnoreCase)),
+                helperArtifactAvailable = helperPackage.IsAvailable,
+                meshDeviceGroupConfigured = cfg.HasMeshDeviceGroup,
+            });
         }).RequireAuthorization();
 
         RouteGroupBuilder it = endpoints.MapGroup("/api/v1/remote-support/sessions");
@@ -141,6 +160,7 @@ public static class RemoteSupportEndpoints
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             RemoteSessionService svc,
+            RemoteEndpointService endpointsSvc,
             RemoteSessionChatService chat,
             RemoteSupportNotificationService notifications,
             CancellationToken ct) =>
@@ -150,8 +170,20 @@ public static class RemoteSupportEndpoints
             bool mfa = HasMfa(principal);
             try
             {
+                RemoteSessionRequestDto? before = await svc.GetAsync(id, ct);
+                string deviceLabel = "device";
+                if (before?.RemoteEndpointId is Guid epId)
+                {
+                    RemoteEndpointDto? ep = await endpointsSvc.GetAsync(epId, ct);
+                    if (!string.IsNullOrWhiteSpace(ep?.DeviceName))
+                        deviceLabel = ep.DeviceName;
+                }
+
                 await chat.PostSystemMessageAsync(
-                    id, RemoteSessionChatService.SystemEvents.Connecting, "Technician started connecting.", ct);
+                    id,
+                    RemoteSessionChatService.SystemEvents.Connecting,
+                    $"Connecting to {deviceLabel}",
+                    ct);
                 RemoteSessionRequestDto updated = await svc.StartAsync(
                     id,
                     session.Id,
@@ -351,6 +383,126 @@ public static class RemoteSupportEndpoints
                 return FromEx(ex);
             }
         }).RequireAuthorization();
+
+        endpoints.MapGet("/api/v1/me/remote-support/{id:guid}/helper-package", async (
+            Guid id,
+            HttpContext http,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteEndpointService endpointsSvc,
+            RemoteSupportHelperPackageService helperPackage,
+            IOptions<RemoteSupportOptions> options,
+            RemoteSessionChatService chat,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            if (!helperPackage.IsAvailable)
+            {
+                return Results.Json(
+                    new { error = "helper_unavailable", message = "Support Helper is not available on this environment." },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            try
+            {
+                string? ip = http.Connection.RemoteIpAddress?.ToString();
+                EnrollmentIssueResult issued = await endpointsSvc.IssueEnrollmentAsync(id, session.Id, ip, ct);
+                string publicBase = options.Value.PublicAppBaseUrl;
+                if (string.IsNullOrWhiteSpace(publicBase))
+                {
+                    publicBase = $"{http.Request.Scheme}://{http.Request.Host.Value}";
+                }
+
+                (byte[] content, string fileName) = await helperPackage.BuildPackageAsync(issued, publicBase, ct);
+                await chat.PostSystemMessageAsync(
+                    id,
+                    RemoteSessionChatService.SystemEvents.HelperDownloaded,
+                    "Support Helper downloaded.",
+                    ct);
+                http.Response.Headers.CacheControl = "no-store";
+                return Results.File(content, "application/zip", fileName);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return FromEx(ex);
+            }
+        }).RequireAuthorization();
+
+        endpoints.MapGet("/api/v1/remote-support/sessions/{id:guid}/endpoints", async (
+            Guid id,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteSessionService svc,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            RemoteSessionRequestDto? item = await svc.GetAsync(id, ct);
+            if (item is null) return Results.NotFound();
+            if (!CanView(session, item)) return Results.Forbid();
+            return Results.Ok(await endpointsSvc.ListForSessionAsync(id, item.TargetUserId, ct));
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/remote-support/sessions/{id:guid}/select-endpoint", async (
+            Guid id,
+            SelectEndpointRequest req,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteSessionService svc,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            RemoteSessionRequestDto? item = await svc.GetAsync(id, ct);
+            if (item is null) return Results.NotFound();
+            bool isSupport = session.Permissions.Contains(RemoteRequest)
+                || session.Permissions.Contains(RemoteAttended)
+                || session.Permissions.Contains(RemoteAdmin);
+            if (!CanView(session, item)) return Results.Forbid();
+            if (req.EndpointId == Guid.Empty) return Validation("EndpointId is required.");
+            try
+            {
+                await endpointsSvc.BindEndpointToSessionAsync(id, req.EndpointId, session.Id, isSupport, ct);
+                return Results.Ok(await svc.GetAsync(id, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return FromEx(ex);
+            }
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/remote-support/endpoints/{id:guid}/status", async (
+            Guid id,
+            ReportEndpointStatusRequest req,
+            RemoteEndpointService endpointsSvc,
+            RemoteSessionChatService chat,
+            CancellationToken ct) =>
+        {
+            if (!endpointsSvc.ValidateReportSecret(id, req.ReportSecret))
+                return Results.Json(new { error = "forbidden" }, statusCode: StatusCodes.Status403Forbidden);
+            try
+            {
+                await endpointsSvc.ReportEndpointStatusAsync(id, req.EngineNodeId, req.ConnectionStatus, req.AgentVersion, ct);
+                RemoteEndpointDto? ep = await endpointsSvc.GetAsync(id, ct);
+                if (ep?.CurrentRemoteSessionRequestId is Guid sid && ep.IsReadyForRemote)
+                {
+                    await chat.PostSystemMessageAsync(
+                        sid,
+                        RemoteSessionChatService.SystemEvents.DeviceReady,
+                        $"Computer ready: {ep.DeviceName}",
+                        ct);
+                }
+
+                return Results.Ok(ep);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                return FromEx(ex);
+            }
+        }).AllowAnonymous();
 
         endpoints.MapPost("/api/v1/me/remote-support/{id:guid}/select-managed-device", async (
             Guid id,
@@ -778,7 +930,8 @@ public static class RemoteSupportEndpoints
                         req.OperatingSystemVersion,
                         req.Architecture,
                         req.HelperVersion,
-                        req.ReportedEngineNodeId),
+                        req.ReportedEngineNodeId,
+                        req.AgentStatus),
                     ip,
                     ct);
                 await chat.PostSystemMessageAsync(
@@ -840,7 +993,8 @@ public static class RemoteSupportEndpoints
                         req.OperatingSystemVersion,
                         req.Architecture ?? "x64",
                         "dev-mock",
-                        req.ReportedEngineNodeId),
+                        req.ReportedEngineNodeId,
+                        "installing"),
                     "dev-mock",
                     ct);
                 await chat.PostSystemMessageAsync(
@@ -1039,7 +1193,8 @@ public static class RemoteSupportEndpoints
         string? OperatingSystemVersion,
         string? Architecture,
         string? HelperVersion,
-        string? ReportedEngineNodeId);
+        string? ReportedEngineNodeId,
+        string? AgentStatus);
 
     public sealed record DevMockEndpointRequest(
         string? DeviceName,
@@ -1047,6 +1202,14 @@ public static class RemoteSupportEndpoints
         string? OperatingSystemVersion,
         string? Architecture,
         string? ReportedEngineNodeId);
+
+    public sealed record SelectEndpointRequest(Guid EndpointId);
+
+    public sealed record ReportEndpointStatusRequest(
+        string ReportSecret,
+        string? EngineNodeId,
+        string? ConnectionStatus,
+        string? AgentVersion);
 
     public sealed record CreateUnattendedRemoteRequest(
         Guid ConfigurationItemId,
@@ -1088,6 +1251,7 @@ public sealed class RemoteSessionPollingJob(
         }
 
         await endpoints.ExpireDueTemporaryEndpointsAsync(cancellationToken);
+        await endpoints.SynchronizeActiveEndpointsAsync(cancellationToken);
         await sessions.PollActiveSessionsAsync(cancellationToken);
     }
 }

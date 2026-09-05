@@ -42,7 +42,8 @@ public sealed record EnrollmentIssueResult(
     string? HelperInstallInstructions,
     bool AgentDownloadConfigured,
     string? AgentDownloadUrl,
-    string? AgentInstallInstructions);
+    string? AgentInstallInstructions,
+    bool SessionBoundHelperPackageAvailable);
 
 public sealed record EnrollmentRedeemRequest(
     string Token,
@@ -51,7 +52,8 @@ public sealed record EnrollmentRedeemRequest(
     string? OperatingSystemVersion,
     string? Architecture,
     string? HelperVersion,
-    string? ReportedEngineNodeId);
+    string? ReportedEngineNodeId,
+    string? AgentStatus);
 
 public sealed record EnrollmentRedeemResult(
     Guid EndpointId,
@@ -60,36 +62,162 @@ public sealed record EnrollmentRedeemResult(
     string ConnectionStatus,
     bool WaitingForRemoteAgent,
     string? AgentDownloadUrl,
-    string? AgentInstallInstructions);
+    string? AgentInstallInstructions,
+    string? AgentBootstrapUrl,
+    string ReportSecret);
+
+public sealed record AgentBootstrapInfo(
+    bool Available,
+    string? AgentDownloadUrl,
+    string? AgentInstallInstructions,
+    string? InviteUrl,
+    string MeshDeviceGroupId);
 
 /// <summary>
-/// Optional MeshCentral enrollment hooks. Current MeshCentral adapter does not expose
-/// documented agent-provision APIs — implementations may return deferred.
+/// Real MeshCentral enrollment: agent URLs + node presence resolution via control.ashx.
 /// </summary>
 public interface IRemoteEndpointEnrollmentEngine
 {
+    AgentBootstrapInfo GetAgentBootstrap();
+
     Task<string?> TryResolveOrProvisionNodeAsync(
         Guid endpointId,
         string deviceName,
         string? reportedEngineNodeId,
         CancellationToken cancellationToken = default);
+
+    Task SynchronizePresenceAsync(
+        RemoteEndpoint endpoint,
+        CancellationToken cancellationToken = default);
 }
 
-public sealed class DeferredRemoteEndpointEnrollmentEngine : IRemoteEndpointEnrollmentEngine
+public sealed class DeferredRemoteEndpointEnrollmentEngine(IOptions<RemoteSupportOptions> options)
+    : IRemoteEndpointEnrollmentEngine
 {
+    public AgentBootstrapInfo GetAgentBootstrap()
+    {
+        RemoteSupportOptions cfg = options.Value;
+        string? url = cfg.HasAgentDownload ? cfg.AgentDownloadUrl.Trim() : null;
+        return new AgentBootstrapInfo(
+            url is not null,
+            url,
+            string.IsNullOrWhiteSpace(cfg.AgentInstallInstructions) ? null : cfg.AgentInstallInstructions.Trim(),
+            null,
+            cfg.MeshDeviceGroupId);
+    }
+
     public Task<string?> TryResolveOrProvisionNodeAsync(
         Guid endpointId,
         string deviceName,
         string? reportedEngineNodeId,
         CancellationToken cancellationToken = default)
     {
-        // Prefer an explicitly reported node id from a configured agent install path;
-        // never invent MeshCentral node identifiers.
         if (!string.IsNullOrWhiteSpace(reportedEngineNodeId))
             return Task.FromResult<string?>(reportedEngineNodeId.Trim());
         return Task.FromResult<string?>(null);
     }
+
+    public Task SynchronizePresenceAsync(RemoteEndpoint endpoint, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
 }
+
+public sealed class MeshCentralEndpointEnrollmentEngine(
+    IOptions<RemoteSupportOptions> options,
+    MeshCentralRemoteSupportEngine meshEngine,
+    ILogger<MeshCentralEndpointEnrollmentEngine> logger) : IRemoteEndpointEnrollmentEngine
+{
+    public AgentBootstrapInfo GetAgentBootstrap()
+    {
+        RemoteSupportOptions cfg = options.Value;
+        if (!cfg.IsConfigured || !cfg.HasMeshDeviceGroup)
+        {
+            string? fallback = cfg.HasAgentDownload ? cfg.AgentDownloadUrl.Trim() : null;
+            return new AgentBootstrapInfo(
+                fallback is not null,
+                fallback,
+                string.IsNullOrWhiteSpace(cfg.AgentInstallInstructions) ? null : cfg.AgentInstallInstructions.Trim(),
+                null,
+                cfg.MeshDeviceGroupId);
+        }
+
+        // Native MeshCentral agent download (MeshCtrl AgentDownload equivalent).
+        string agentUrl =
+            $"{cfg.BaseUrl.TrimEnd('/')}/meshagents?id={cfg.WindowsAgentTypeId}&meshid={Uri.EscapeDataString(cfg.MeshDeviceGroupId.Trim())}";
+        string instructions =
+            "Run the MeshCentral agent installer. When installation finishes, return to Remote Support — the device status updates automatically.";
+        if (!string.IsNullOrWhiteSpace(cfg.AgentInstallInstructions))
+            instructions = cfg.AgentInstallInstructions.Trim();
+
+        return new AgentBootstrapInfo(true, agentUrl, instructions, null, cfg.MeshDeviceGroupId.Trim());
+    }
+
+    public async Task<string?> TryResolveOrProvisionNodeAsync(
+        Guid endpointId,
+        string deviceName,
+        string? reportedEngineNodeId,
+        CancellationToken cancellationToken = default)
+    {
+        RemoteSupportOptions cfg = options.Value;
+        if (!cfg.IsConfigured)
+            return null;
+
+        try
+        {
+            IReadOnlyList<MeshCentral.MeshCentralNode> nodes = await meshEngine.ListNodesAsync(cancellationToken);
+            MeshCentral.MeshCentralNode? match = null;
+            if (!string.IsNullOrWhiteSpace(reportedEngineNodeId))
+            {
+                string reported = reportedEngineNodeId.Trim();
+                match = nodes.FirstOrDefault(n =>
+                    string.Equals(n.NodeId, reported, StringComparison.OrdinalIgnoreCase)
+                    || n.NodeId.EndsWith(reported, StringComparison.OrdinalIgnoreCase)
+                    || reported.EndsWith(n.NodeId, StringComparison.OrdinalIgnoreCase));
+            }
+
+            match ??= nodes.FirstOrDefault(n =>
+                string.Equals(n.Name, deviceName, StringComparison.OrdinalIgnoreCase));
+
+            // Ready requires a real, currently online MeshCentral node.
+            return match is { Online: true } ? match.NodeId : null;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "MeshCentral node resolve failed for endpoint {EndpointId}", endpointId);
+            return null;
+        }
+    }
+
+    public async Task SynchronizePresenceAsync(RemoteEndpoint endpoint, CancellationToken cancellationToken = default)
+    {
+        RemoteSupportOptions cfg = options.Value;
+        if (!cfg.IsConfigured || string.IsNullOrWhiteSpace(endpoint.EngineNodeId))
+            return;
+
+        try
+        {
+            IReadOnlyList<MeshCentral.MeshCentralNode> nodes = await meshEngine.ListNodesAsync(cancellationToken);
+            MeshCentral.MeshCentralNode? match = nodes.FirstOrDefault(n =>
+                string.Equals(n.NodeId, endpoint.EngineNodeId, StringComparison.OrdinalIgnoreCase)
+                || n.NodeId.EndsWith(endpoint.EngineNodeId!, StringComparison.OrdinalIgnoreCase));
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            if (match is null)
+            {
+                endpoint.MarkOffline(now);
+                return;
+            }
+
+            if (match.Online)
+                endpoint.MarkReady(match.NodeId, now);
+            else
+                endpoint.MarkOffline(now);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Presence sync failed for endpoint {EndpointId}", endpoint.Id);
+        }
+    }
+}
+
 
 public sealed class RemoteEndpointService(
     RemoteSupportDbContext db,
@@ -100,6 +228,12 @@ public sealed class RemoteEndpointService(
     ILogger<RemoteEndpointService> logger)
 {
     private static readonly ConcurrentDictionary<string, (int Count, DateTimeOffset WindowStart)> RedeemAttempts = new();
+    private static readonly ConcurrentDictionary<Guid, string> ReportSecrets = new();
+
+    public bool ValidateReportSecret(Guid endpointId, string? secret) =>
+        !string.IsNullOrWhiteSpace(secret)
+        && ReportSecrets.TryGetValue(endpointId, out string? expected)
+        && CryptographicEquals(expected, secret);
 
     public async Task<RemoteEndpointDto?> GetAsync(Guid id, CancellationToken ct)
     {
@@ -186,16 +320,19 @@ public sealed class RemoteEndpointService(
         }, ct);
 
         RemoteSupportOptions cfg = options.Value;
+        AgentBootstrapInfo bootstrap = enrollmentEngine.GetAgentBootstrap();
+        bool helperConfigured = cfg.HasHelperDownload || cfg.HasHelperArtifact;
         return new EnrollmentIssueResult(
             enrollment.Id,
             plain,
             enrollment.ExpiresAtUtc,
-            cfg.HasHelperDownload,
+            helperConfigured,
             cfg.HasHelperDownload ? cfg.HelperDownloadUrl.Trim() : null,
             string.IsNullOrWhiteSpace(cfg.HelperInstallInstructions) ? null : cfg.HelperInstallInstructions.Trim(),
-            cfg.HasAgentDownload,
-            cfg.HasAgentDownload ? cfg.AgentDownloadUrl.Trim() : null,
-            string.IsNullOrWhiteSpace(cfg.AgentInstallInstructions) ? null : cfg.AgentInstallInstructions.Trim());
+            bootstrap.Available,
+            bootstrap.AgentDownloadUrl,
+            bootstrap.AgentInstallInstructions,
+            cfg.HasHelperArtifact);
     }
 
     public async Task<EnrollmentRedeemResult> RedeemEnrollmentAsync(
@@ -247,10 +384,27 @@ public sealed class RemoteEndpointService(
             request.HelperVersion,
             nodeId);
 
+        if (string.Equals(request.AgentStatus, "installing", StringComparison.OrdinalIgnoreCase))
+            endpoint.MarkAgentInstalling(now);
+        else if (nodeId is null)
+            endpoint.MarkWaitingForAgent(now);
+
         enrollment.Redeem(endpoint.Id, now);
         session.BindRemoteEndpoint(endpoint.Id, now);
         db.RemoteEndpoints.Add(endpoint);
         await db.SaveChangesAsync(ct);
+
+        // Re-resolve after registration window if MeshCentral already knows the hostname.
+        if (!endpoint.HasEngineNode)
+        {
+            string? resolved = await enrollmentEngine.TryResolveOrProvisionNodeAsync(
+                endpoint.Id, request.DeviceName, null, ct);
+            if (!string.IsNullOrWhiteSpace(resolved))
+            {
+                endpoint.MarkReady(resolved, clock.UtcNow);
+                await db.SaveChangesAsync(ct);
+            }
+        }
 
         await businessAudit.AppendAsync(new BusinessAuditEntry
         {
@@ -278,15 +432,167 @@ public sealed class RemoteEndpointService(
             session.RemoteNumber,
             endpoint.HasEngineNode);
 
-        RemoteSupportOptions cfg = options.Value;
+        AgentBootstrapInfo bootstrap = enrollmentEngine.GetAgentBootstrap();
+        string reportSecret = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        ReportSecrets[endpoint.Id] = reportSecret;
+
         return new EnrollmentRedeemResult(
             endpoint.Id,
             session.Id,
             endpoint.DeviceName,
             endpoint.ConnectionStatus.ToString(),
-            !endpoint.HasEngineNode,
-            cfg.HasAgentDownload ? cfg.AgentDownloadUrl.Trim() : null,
-            string.IsNullOrWhiteSpace(cfg.AgentInstallInstructions) ? null : cfg.AgentInstallInstructions.Trim());
+            !endpoint.IsReadyForRemote,
+            bootstrap.AgentDownloadUrl,
+            bootstrap.AgentInstallInstructions,
+            bootstrap.AgentDownloadUrl,
+            reportSecret);
+    }
+
+    public async Task<IReadOnlyList<RemoteEndpointDto>> ListForSessionAsync(
+        Guid sessionId,
+        Guid? ownerUserId,
+        CancellationToken ct)
+    {
+        RemoteSessionRequest session = await db.RemoteSessionRequests.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == sessionId, ct)
+            ?? throw new InvalidOperationException("Remote session not found.");
+
+        Guid owner = ownerUserId ?? session.TargetUserId ?? session.RequestedByUserId;
+        // Tracked entities so presence sync persists.
+        List<RemoteEndpoint> items = await db.RemoteEndpoints
+            .Where(x => x.ConnectionStatus != RemoteEndpointConnectionStatus.Expired
+                && (x.CurrentRemoteSessionRequestId == sessionId
+                    || (x.OwnerUserId == owner && x.EndpointKind == RemoteEndpointKind.Temporary)
+                    || (x.OwnerUserId == owner && x.EndpointKind == RemoteEndpointKind.Managed)))
+            .OrderByDescending(x => x.LastSeenAtUtc)
+            .ToListAsync(ct);
+
+        bool dirty = false;
+        foreach (RemoteEndpoint endpoint in items)
+        {
+            if (!endpoint.HasEngineNode)
+            {
+                string? resolved = await enrollmentEngine.TryResolveOrProvisionNodeAsync(
+                    endpoint.Id, endpoint.DeviceName, null, ct);
+                if (!string.IsNullOrWhiteSpace(resolved))
+                {
+                    endpoint.MarkReady(resolved, clock.UtcNow);
+                    dirty = true;
+                }
+            }
+            else
+            {
+                await enrollmentEngine.SynchronizePresenceAsync(endpoint, ct);
+                dirty = true;
+            }
+        }
+
+        if (dirty)
+            await db.SaveChangesAsync(ct);
+
+        return items
+            .OrderByDescending(x => x.IsReadyForRemote)
+            .ThenByDescending(x => x.LastSeenAtUtc)
+            .Select(Map)
+            .ToList();
+    }
+
+    public async Task BindEndpointToSessionAsync(
+        Guid sessionId,
+        Guid endpointId,
+        Guid actorUserId,
+        bool actorIsSupport,
+        CancellationToken ct)
+    {
+        RemoteSessionRequest session = await db.RemoteSessionRequests
+            .FirstOrDefaultAsync(x => x.Id == sessionId, ct)
+            ?? throw new InvalidOperationException("Remote session not found.");
+        RemoteEndpoint endpoint = await db.RemoteEndpoints
+            .FirstOrDefaultAsync(x => x.Id == endpointId, ct)
+            ?? throw new InvalidOperationException("Endpoint not found.");
+
+        if (!actorIsSupport && session.TargetUserId != actorUserId)
+            throw new InvalidOperationException("Forbidden.");
+        if (endpoint.OwnerUserId != session.TargetUserId && endpoint.OwnerUserId != session.RequestedByUserId)
+            throw new InvalidOperationException("Endpoint does not belong to this employee.");
+
+        DateTimeOffset now = clock.UtcNow;
+        endpoint.BindSession(sessionId, now);
+        session.BindRemoteEndpoint(endpointId, now);
+        if (endpoint.ConfigurationItemId is Guid ci)
+            session.BindConfigurationItem(ci, now);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task ReportEndpointStatusAsync(
+        Guid endpointId,
+        string? engineNodeId,
+        string? connectionStatus,
+        string? agentVersion,
+        CancellationToken ct)
+    {
+        RemoteEndpoint endpoint = await db.RemoteEndpoints.FirstOrDefaultAsync(x => x.Id == endpointId, ct)
+            ?? throw new InvalidOperationException("Endpoint not found.");
+        DateTimeOffset now = clock.UtcNow;
+        if (!string.IsNullOrWhiteSpace(agentVersion))
+            endpoint.TouchHeartbeat(now);
+
+        // Never mark Ready from helper-reported node alone — confirm via MeshCentral.
+        string? confirmed = await enrollmentEngine.TryResolveOrProvisionNodeAsync(
+            endpoint.Id,
+            endpoint.DeviceName,
+            engineNodeId,
+            ct);
+        if (!string.IsNullOrWhiteSpace(confirmed))
+        {
+            endpoint.MarkReady(confirmed, now);
+        }
+        else if (!string.IsNullOrWhiteSpace(connectionStatus)
+                 && !string.Equals(connectionStatus, "Ready", StringComparison.OrdinalIgnoreCase)
+                 && !string.Equals(connectionStatus, "Online", StringComparison.OrdinalIgnoreCase))
+        {
+            endpoint.TouchHeartbeat(now, connectionStatus);
+        }
+        else
+        {
+            endpoint.TouchHeartbeat(now);
+        }
+
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Polling: resolve waiting agents and refresh presence for active temporary/managed endpoints.
+    /// </summary>
+    public async Task SynchronizeActiveEndpointsAsync(CancellationToken ct)
+    {
+        List<RemoteEndpoint> items = await db.RemoteEndpoints
+            .Where(x => x.ConnectionStatus != RemoteEndpointConnectionStatus.Expired
+                && x.ConnectionStatus != RemoteEndpointConnectionStatus.Failed
+                && x.CurrentRemoteSessionRequestId != null)
+            .Take(50)
+            .ToListAsync(ct);
+
+        foreach (RemoteEndpoint endpoint in items)
+        {
+            if (!endpoint.HasEngineNode)
+            {
+                string? resolved = await enrollmentEngine.TryResolveOrProvisionNodeAsync(
+                    endpoint.Id, endpoint.DeviceName, null, ct);
+                if (!string.IsNullOrWhiteSpace(resolved))
+                    endpoint.MarkReady(resolved, clock.UtcNow);
+            }
+            else
+            {
+                await enrollmentEngine.SynchronizePresenceAsync(endpoint, ct);
+            }
+        }
+
+        if (items.Count > 0)
+            await db.SaveChangesAsync(ct);
     }
 
     public async Task<RemoteEndpointDto> AttachManagedDeviceAsync(
@@ -386,6 +692,14 @@ public sealed class RemoteEndpointService(
             });
         if (state.Count > 30)
             throw new InvalidOperationException("Too many enrollment attempts. Try again later.");
+    }
+
+    private static bool CryptographicEquals(string a, string b)
+    {
+        byte[] left = System.Text.Encoding.UTF8.GetBytes(a);
+        byte[] right = System.Text.Encoding.UTF8.GetBytes(b);
+        return left.Length == right.Length
+            && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(left, right);
     }
 
     private static RemoteEndpointDto Map(RemoteEndpoint x) =>

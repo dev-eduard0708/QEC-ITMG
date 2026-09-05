@@ -3660,7 +3660,7 @@ export const integrationsApi = {
     }>(`/api/v1/admin/integrations/${encodeURIComponent(provider)}/sync`, { method: 'POST' }),
 }
 
-export type RemoteEngineStatus = {
+export type EngineHealthDetail = {
   enabled: boolean
   configured: boolean
   providerKind: string
@@ -3669,7 +3669,21 @@ export type RemoteEngineStatus = {
   lastFailureUtc: string | null
   lastErrorSummary: string | null
   unattendedEnabled: boolean
+  agentEnrollmentAvailable: boolean
+  sessionCreationAvailable: boolean
+  helperArtifactAvailable: boolean
 }
+
+export type RemoteEngineStatus = Omit<
+  EngineHealthDetail,
+  'agentEnrollmentAvailable' | 'sessionCreationAvailable' | 'helperArtifactAvailable'
+> &
+  Partial<
+    Pick<
+      EngineHealthDetail,
+      'agentEnrollmentAvailable' | 'sessionCreationAvailable' | 'helperArtifactAvailable'
+    >
+  >
 
 export type RemoteSessionRequest = {
   id: string
@@ -3777,7 +3791,16 @@ export type RemoteEndpoint = {
   architecture: string | null
   helperVersion: string | null
   agentVersion: string | null
-  connectionStatus: string
+  connectionStatus:
+    | 'Registering'
+    | 'WaitingForAgent'
+    | 'AgentInstalling'
+    | 'AgentOnline'
+    | 'Ready'
+    | 'Offline'
+    | 'Failed'
+    | 'Expired'
+    | 'Online'
   isReadyForRemote: boolean
   hasEngineNode: boolean
   firstSeenAtUtc: string
@@ -3786,6 +3809,18 @@ export type RemoteEndpoint = {
   createdAtUtc: string
   updatedAtUtc: string
   rowVersion: string
+}
+
+export function isRemoteEndpointReady(endpoint: RemoteEndpoint | null | undefined): boolean {
+  return Boolean(
+    endpoint &&
+      (endpoint.connectionStatus === 'Ready' ||
+        (endpoint.connectionStatus === 'Online' && endpoint.hasEngineNode)),
+  )
+}
+
+function normalizeRemoteEndpoint(endpoint: RemoteEndpoint): RemoteEndpoint {
+  return { ...endpoint, isReadyForRemote: isRemoteEndpointReady(endpoint) }
 }
 
 export type EnrollmentIssueResult = {
@@ -3877,6 +3912,18 @@ export const remoteSupportApi = {
     ),
   getSession: (id: string) =>
     apiFetch<RemoteSessionRequest>(`/api/v1/remote-support/sessions/${id}`),
+  listSessionEndpoints: (id: string) =>
+    apiFetch<RemoteEndpoint[]>(`/api/v1/remote-support/sessions/${id}/endpoints`).then(
+      (endpoints) => endpoints.map(normalizeRemoteEndpoint),
+    ),
+  selectEndpoint: (sessionId: string, endpointId: string) =>
+    apiFetch<RemoteSessionRequest>(
+      `/api/v1/remote-support/sessions/${sessionId}/select-endpoint`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ endpointId }),
+      },
+    ),
   createSelfHelp: (payload: { reason: string; configurationItemId?: string | null }) =>
     apiFetch<RemoteSessionRequest>('/api/v1/me/remote-support', {
       method: 'POST',
@@ -3886,6 +3933,36 @@ export const remoteSupportApi = {
     apiFetch<EnrollmentIssueResult>(`/api/v1/me/remote-support/${sessionId}/enrollment`, {
       method: 'POST',
     }),
+  async downloadHelperPackage(id: string) {
+    const response = await fetch(`/api/v1/me/remote-support/${id}/helper-package`, {
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      let message = response.statusText || 'Support Helper is not available'
+      let code: string | undefined
+      try {
+        const payload = (await response.json()) as {
+          error?: { message?: string; code?: string }
+          message?: string
+        }
+        message = payload.error?.message ?? payload.message ?? message
+        code = payload.error?.code
+      } catch {
+        // Ignore non-JSON error bodies.
+      }
+      throw new ApiError(response.status, message, code)
+    }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'QecRemoteSupportHelper.zip'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  },
   selectManagedDevice: (sessionId: string, configurationItemId: string) =>
     apiFetch<RemoteEndpoint>(
       `/api/v1/me/remote-support/${sessionId}/select-managed-device`,
@@ -3893,11 +3970,15 @@ export const remoteSupportApi = {
         method: 'POST',
         body: JSON.stringify({ configurationItemId }),
       },
-    ),
+    ).then(normalizeRemoteEndpoint),
   getMyEndpoint: (sessionId: string) =>
-    apiFetch<RemoteEndpoint | null>(`/api/v1/me/remote-support/${sessionId}/endpoint`),
+    apiFetch<RemoteEndpoint | null>(`/api/v1/me/remote-support/${sessionId}/endpoint`).then(
+      (endpoint) => (endpoint ? normalizeRemoteEndpoint(endpoint) : null),
+    ),
   getSessionEndpoint: (sessionId: string) =>
-    apiFetch<RemoteEndpoint | null>(`/api/v1/remote-support/sessions/${sessionId}/endpoint`),
+    apiFetch<RemoteEndpoint | null>(
+      `/api/v1/remote-support/sessions/${sessionId}/endpoint`,
+    ).then((endpoint) => (endpoint ? normalizeRemoteEndpoint(endpoint) : null)),
   takeSession: (id: string) =>
     apiFetch<RemoteSessionRequest>(`/api/v1/remote-support/sessions/${id}/take`, {
       method: 'POST',
@@ -3925,13 +4006,15 @@ export const remoteSupportApi = {
     }
     if (params?.take) query.set('take', String(params.take))
     const qs = query.toString()
-    return apiFetch<RemoteEndpoint[]>(`/api/v1/remote-support/endpoints${qs ? `?${qs}` : ''}`)
+    return apiFetch<RemoteEndpoint[]>(
+      `/api/v1/remote-support/endpoints${qs ? `?${qs}` : ''}`,
+    ).then((endpoints) => endpoints.map(normalizeRemoteEndpoint))
   },
   linkEndpointCi: (id: string, configurationItemId: string) =>
     apiFetch<RemoteEndpoint>(`/api/v1/remote-support/endpoints/${id}/link-ci`, {
       method: 'POST',
       body: JSON.stringify({ configurationItemId }),
-    }),
+    }).then(normalizeRemoteEndpoint),
   expireEndpoint: (id: string) =>
     apiFetch<{ expired: boolean }>(`/api/v1/remote-support/endpoints/${id}/expire`, {
       method: 'POST',

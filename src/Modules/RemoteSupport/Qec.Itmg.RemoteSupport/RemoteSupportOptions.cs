@@ -36,7 +36,36 @@ public sealed class RemoteSupportOptions
     public int MaxWebhookPayloadBytes { get; set; } = 262144;
 
     /// <summary>
+    /// MeshCentral device group id used for on-demand agent enrollment
+    /// (MeshCtrl --id / meshid query value). Not a secret.
+    /// </summary>
+    public string MeshDeviceGroupId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// MeshCentral agent type id for Windows x64 downloads (<c>/meshagents?id=</c>).
+    /// MeshCtrl AgentDownload --type; default 4 is the common Win64 agent.
+    /// </summary>
+    public int WindowsAgentTypeId { get; set; } = 4;
+
+    /// <summary>
+    /// Local path to published self-contained helper EXE (or folder containing it)
+    /// used to assemble session-bound helper packages. Never commit binaries.
+    /// </summary>
+    public string HelperArtifactPath { get; set; } = string.Empty;
+
+    /// <summary>Public HTTPS origin of the ITMG app (used inside helper bootstrap config).</summary>
+    public string PublicAppBaseUrl { get; set; } = string.Empty;
+
+    public bool HasMeshDeviceGroup => !string.IsNullOrWhiteSpace(MeshDeviceGroupId);
+
+    public bool HasHelperArtifact =>
+        !string.IsNullOrWhiteSpace(HelperArtifactPath)
+        && (File.Exists(HelperArtifactPath.Trim())
+            || Directory.Exists(HelperArtifactPath.Trim()));
+
+    /// <summary>
     /// Optional HTTPS URL for the endpoint agent installer (admin-configured).
+    /// Prefer MeshDeviceGroupId + live MeshCentral agent URL when configured.
     /// Never put secrets here — public download link only.
     /// </summary>
     public string AgentDownloadUrl { get; set; } = string.Empty;

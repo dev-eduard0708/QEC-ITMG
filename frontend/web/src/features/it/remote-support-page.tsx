@@ -266,16 +266,35 @@ export function RemoteSupportPage() {
           <Skeleton className="h-6 w-32" />
         ) : readiness ? (
           <>
-            <span className="text-sm text-muted-foreground">{t('remote.engineStatus')}</span>
+            <span className="text-sm text-muted-foreground">{t('remote.engine.provider')}</span>
+            <Badge variant="outline">{readiness.providerKind || '—'}</Badge>
+            <span className="text-sm text-muted-foreground">{t('remote.engine.configured')}</span>
+            <Badge variant={readiness.configured ? 'success' : 'warning'}>
+              {readiness.configured ? t('remote.yes') : t('remote.no')}
+            </Badge>
+            <span className="text-sm text-muted-foreground">{t('remote.engine.health')}</span>
             <Badge variant={engineStatusVariant(readiness.status)}>
               {t(`remote.engine.${readiness.status}`, { defaultValue: readiness.status })}
             </Badge>
-            <span className="text-sm text-muted-foreground">{t('remote.unattendedEnabled')}</span>
-            <Badge variant={readiness.unattendedEnabled ? 'success' : 'warning'}>
-              {readiness.unattendedEnabled ? t('remote.on') : t('remote.off')}
-            </Badge>
-            {!readiness.unattendedEnabled ? (
-              <span className="text-xs text-muted-foreground">{t('remote.unattendedOffHint')}</span>
+            {readiness.agentEnrollmentAvailable != null ? (
+              <>
+                <span className="text-sm text-muted-foreground">
+                  {t('remote.engine.agentEnrollment')}
+                </span>
+                <Badge variant={readiness.agentEnrollmentAvailable ? 'success' : 'warning'}>
+                  {readiness.agentEnrollmentAvailable ? t('remote.yes') : t('remote.no')}
+                </Badge>
+              </>
+            ) : null}
+            {readiness.sessionCreationAvailable != null ? (
+              <>
+                <span className="text-sm text-muted-foreground">
+                  {t('remote.engine.sessionCreation')}
+                </span>
+                <Badge variant={readiness.sessionCreationAvailable ? 'success' : 'warning'}>
+                  {readiness.sessionCreationAvailable ? t('remote.yes') : t('remote.no')}
+                </Badge>
+              </>
             ) : null}
           </>
         ) : null}

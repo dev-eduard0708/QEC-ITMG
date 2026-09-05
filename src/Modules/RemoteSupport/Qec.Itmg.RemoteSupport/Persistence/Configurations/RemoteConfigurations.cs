@@ -52,7 +52,7 @@ internal sealed class RemoteEndpointConfiguration : IEntityTypeConfiguration<Rem
         builder.Property(x => x.Architecture).HasMaxLength(32);
         builder.Property(x => x.HelperVersion).HasMaxLength(32);
         builder.Property(x => x.AgentVersion).HasMaxLength(64);
-        builder.Property(x => x.EngineNodeId).HasMaxLength(128);
+        builder.Property(x => x.EngineNodeId).HasMaxLength(256);
         builder.Property(x => x.EndpointKind).IsRequired().HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.ConnectionStatus).IsRequired().HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();

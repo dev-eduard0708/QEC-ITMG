@@ -37,6 +37,9 @@ Guacamole is the planned **complement** for SSH/RDP to systems that will not run
 - Dedicated engine host, isolated admin UI
 - Device id mapping: `cmdb` CI ↔ engine node id
 - Session start only after ITMG issues a short-lived authorization token/record
+- ITMG integrates via MeshCtrl-compatible **control.ashx** WebSocket and native **/meshagents** URLs — not invented REST such as `api/mesh/sessions`
+- Desktop join uses MeshCentral UI: `/?viewmode=11&gotonode={nodeId}`
+- See [MESHCENTRAL-REMOTE-SUPPORT.md](../10-deployment/MESHCENTRAL-REMOTE-SUPPORT.md)
 
 ## Alternatives considered
 

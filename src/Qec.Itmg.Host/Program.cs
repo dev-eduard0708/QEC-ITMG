@@ -125,6 +125,7 @@ try
     builder.Services.AddScoped<IRemoteCiLookup, CmdbRemoteCiLookup>();
     builder.Services.AddScoped<RemoteSupportNotificationService>();
     builder.Services.AddScoped<EmployeeRemoteOnboardingService>();
+    builder.Services.AddScoped<RemoteSupportHelperPackageService>();
     builder.Services.AddSignalR();
     builder.Services.RemoveAll<IRemoteSupportChatNotifier>();
     builder.Services.AddSingleton<IRemoteSupportChatNotifier, SignalRRemoteSupportChatNotifier>();

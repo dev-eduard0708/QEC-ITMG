@@ -1,4 +1,5 @@
-﻿using System.Net.Http.Json;
+﻿using System.Diagnostics;
+using System.Net.Http.Json;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -6,9 +7,7 @@ using System.Text.Json.Serialization;
 namespace Qec.Itmg.RemoteSupport.Helper;
 
 /// <summary>
-/// QEC Remote Support Helper — bootstrap only.
-/// Redeems a one-time ITMG enrollment token, reports minimal device identity,
-/// and surfaces configured MeshCentral agent download instructions.
+/// QEC Remote Support Helper — enrollment + MeshCentral agent bootstrap orchestration.
 /// Does NOT implement remote desktop / screen transport (MeshCentral owns that).
 /// </summary>
 internal static class Program
@@ -26,26 +25,30 @@ internal static class Program
         Console.WriteLine("You will still be asked before remote control begins.");
         Console.WriteLine();
 
-        string? baseUrl = GetArg(args, "--base-url") ?? Environment.GetEnvironmentVariable("QEC_ITMG_BASE_URL");
-        string? token = GetArg(args, "--token") ?? Environment.GetEnvironmentVariable("QEC_REMOTE_ENROLLMENT_TOKEN");
+        BootstrapConfig? bootstrap = TryLoadBootstrap();
+        string? baseUrl = GetArg(args, "--base-url")
+            ?? bootstrap?.BaseUrl
+            ?? Environment.GetEnvironmentVariable("QEC_ITMG_BASE_URL");
+        string? token = GetArg(args, "--token")
+            ?? bootstrap?.Token
+            ?? Environment.GetEnvironmentVariable("QEC_REMOTE_ENROLLMENT_TOKEN");
         string? tokenFile = GetArg(args, "--token-file");
 
         if (string.IsNullOrWhiteSpace(token) && !string.IsNullOrWhiteSpace(tokenFile) && File.Exists(tokenFile))
         {
             token = (await File.ReadAllTextAsync(tokenFile)).Trim();
-            try { File.Delete(tokenFile); } catch { /* best-effort wipe */ }
+            TryDelete(tokenFile);
         }
 
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
-            Console.Error.WriteLine("Missing --base-url or QEC_ITMG_BASE_URL (e.g. https://itmg.example).");
+            Console.Error.WriteLine("Missing ITMG base URL. Re-download Support Helper from the Remote Support page.");
             return 2;
         }
 
         if (string.IsNullOrWhiteSpace(token))
         {
-            Console.Error.WriteLine("Missing enrollment token (--token / --token-file / QEC_REMOTE_ENROLLMENT_TOKEN).");
-            Console.Error.WriteLine("Do not share enrollment tokens. Obtain a fresh one from the Remote Support page.");
+            Console.Error.WriteLine("Missing enrollment token. Re-download Support Helper from the Remote Support page.");
             return 2;
         }
 
@@ -56,7 +59,7 @@ internal static class Program
         Console.WriteLine();
 
         string apiRoot = baseUrl.TrimEnd('/');
-        using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(60) };
+        using HttpClient client = new() { Timeout = TimeSpan.FromSeconds(120) };
         client.DefaultRequestHeaders.UserAgent.ParseAdd($"Qec.Itmg.RemoteSupport.Helper/{device.HelperVersion}");
 
         var body = new RedeemRequest(
@@ -66,11 +69,13 @@ internal static class Program
             device.OperatingSystemVersion,
             device.Architecture,
             device.HelperVersion,
-            ReportedEngineNodeId: null);
+            ReportedEngineNodeId: null,
+            AgentStatus: "installing");
 
-        // Clear local token reference ASAP — never log it.
         token = null;
+        TryDeleteBootstrap();
 
+        Console.WriteLine("Registering this computer with IT Support...");
         HttpResponseMessage response;
         try
         {
@@ -100,22 +105,73 @@ internal static class Program
             return 5;
         }
 
-        Console.WriteLine($"Registered with IT Support. Status: {result.ConnectionStatus}");
-        if (result.WaitingForRemoteAgent)
-        {
-            Console.WriteLine("Waiting for remote agent.");
-            if (!string.IsNullOrWhiteSpace(result.AgentDownloadUrl))
-            {
-                Console.WriteLine("Install the configured remote support agent:");
-                Console.WriteLine(result.AgentDownloadUrl);
-            }
-            else
-            {
-                Console.WriteLine("No agent download is configured yet. Return to the Remote Support page and continue chatting with IT.");
-            }
+        Console.WriteLine($"Registered. Status: {result.ConnectionStatus}");
 
+        if (!string.IsNullOrWhiteSpace(result.AgentDownloadUrl) || !string.IsNullOrWhiteSpace(result.AgentBootstrapUrl))
+        {
+            string agentUrl = result.AgentBootstrapUrl ?? result.AgentDownloadUrl!;
+            Console.WriteLine("Downloading remote support agent...");
             if (!string.IsNullOrWhiteSpace(result.AgentInstallInstructions))
                 Console.WriteLine(result.AgentInstallInstructions);
+
+            string agentPath = Path.Combine(Path.GetTempPath(), "QecMeshAgent-" + Guid.NewGuid().ToString("N") + ".exe");
+            try
+            {
+                await using Stream agentStream = await client.GetStreamAsync(agentUrl);
+                await using FileStream file = File.Create(agentPath);
+                await agentStream.CopyToAsync(file);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Agent download failed: {ex.Message}");
+                Console.WriteLine("You can continue chatting with IT. Return to the Remote Support page.");
+                return 6;
+            }
+
+            Console.WriteLine("Starting agent installer (administrator approval may be required)...");
+            try
+            {
+                using Process? proc = Process.Start(new ProcessStartInfo
+                {
+                    FileName = agentPath,
+                    UseShellExecute = true,
+                });
+                proc?.WaitForExit(120_000);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Could not start agent installer: {ex.Message}");
+            }
+
+            try { File.Delete(agentPath); } catch { /* ignore */ }
+
+            Console.WriteLine("Waiting for remote agent registration...");
+            await Task.Delay(TimeSpan.FromSeconds(8));
+
+            if (!string.IsNullOrWhiteSpace(result.ReportSecret))
+            {
+                try
+                {
+                    await client.PostAsJsonAsync(
+                        $"{apiRoot}/api/v1/remote-support/endpoints/{result.EndpointId}/status",
+                        new
+                        {
+                            reportSecret = result.ReportSecret,
+                            connectionStatus = "AgentInstalling",
+                            agentVersion = device.HelperVersion,
+                        },
+                        JsonOpts);
+                }
+                catch
+                {
+                    // best-effort
+                }
+            }
+        }
+        else if (result.WaitingForRemoteAgent)
+        {
+            Console.WriteLine("Remote agent package is not configured yet.");
+            Console.WriteLine("Your computer was detected. Continue chatting with IT.");
         }
         else
         {
@@ -125,6 +181,31 @@ internal static class Program
         Console.WriteLine();
         Console.WriteLine("You can close this window.");
         return 0;
+    }
+
+    private static BootstrapConfig? TryLoadBootstrap()
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, "enrollment.bootstrap.json");
+        if (!File.Exists(path))
+            return null;
+        try
+        {
+            return JsonSerializer.Deserialize<BootstrapConfig>(File.ReadAllText(path), JsonOpts);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void TryDeleteBootstrap()
+    {
+        TryDelete(Path.Combine(AppContext.BaseDirectory, "enrollment.bootstrap.json"));
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch { /* ignore */ }
     }
 
     private static DeviceIdentity DetectDevice()
@@ -140,7 +221,7 @@ internal static class Program
 
         string? version = RuntimeInformation.OSDescription;
         string arch = RuntimeInformation.OSArchitecture.ToString();
-        const string helperVersion = "1.0.0";
+        const string helperVersion = "1.1.0";
         return new DeviceIdentity(name, os, version, arch, helperVersion);
     }
 
@@ -172,6 +253,8 @@ internal static class Program
         return "Request failed.";
     }
 
+    private sealed record BootstrapConfig(string? BaseUrl, string? Token, DateTimeOffset? ExpiresAtUtc, Guid? EnrollmentId);
+
     private sealed record DeviceIdentity(
         string DeviceName,
         string OperatingSystem,
@@ -186,7 +269,8 @@ internal static class Program
         string? OperatingSystemVersion,
         string? Architecture,
         string? HelperVersion,
-        string? ReportedEngineNodeId);
+        string? ReportedEngineNodeId,
+        string? AgentStatus);
 
     private sealed record RedeemResponse(
         Guid EndpointId,
@@ -195,5 +279,7 @@ internal static class Program
         string ConnectionStatus,
         bool WaitingForRemoteAgent,
         string? AgentDownloadUrl,
-        string? AgentInstallInstructions);
+        string? AgentInstallInstructions,
+        string? AgentBootstrapUrl,
+        string? ReportSecret);
 }

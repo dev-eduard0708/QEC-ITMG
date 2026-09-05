@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ApiError, remoteSupportApi } from '@/api/client'
+import { ApiError, isRemoteEndpointReady, remoteSupportApi } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -14,7 +14,7 @@ import { remoteSupportKeys } from '@/features/it/query-keys'
 import { RemoteSessionChat } from '@/features/remote-support/remote-session-chat'
 import { RemoteDeviceCard } from '@/features/remote-support/remote-device-card'
 import { isChatOpen } from '@/features/remote-support/chat-window'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
@@ -48,9 +48,9 @@ export function RemoteSupportDetailPage() {
     queryFn: () => remoteSupportApi.readiness(),
   })
 
-  const endpointQuery = useQuery({
-    queryKey: [...remoteSupportKeys.detail(id), 'endpoint'],
-    queryFn: () => remoteSupportApi.getSessionEndpoint(id),
+  const endpointsQuery = useQuery({
+    queryKey: [...remoteSupportKeys.detail(id), 'endpoints'],
+    queryFn: () => remoteSupportApi.listSessionEndpoints(id),
     enabled: Boolean(id),
     refetchInterval: 5_000,
   })
@@ -62,9 +62,12 @@ export function RemoteSupportDetailPage() {
 
   const startMutation = useMutation({
     mutationFn: () => remoteSupportApi.start(id),
-    onSuccess: async () => {
+    onSuccess: async (started) => {
       setFormError(null)
       await invalidate()
+      if (started.engineJoinUrl) {
+        window.open(started.engineJoinUrl, '_blank', 'noopener,noreferrer')
+      }
     },
     onError: (error) => {
       setFormError(error instanceof ApiError ? error.message : t('remote.error.generic'))
@@ -99,6 +102,41 @@ export function RemoteSupportDetailPage() {
     },
   })
 
+  const selectEndpointMutation = useMutation({
+    mutationFn: (endpointId: string) => remoteSupportApi.selectEndpoint(id, endpointId),
+    onSuccess: async () => {
+      setFormError(null)
+      await invalidate()
+    },
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : t('remote.error.generic'))
+    },
+  })
+  const {
+    mutate: selectEndpoint,
+    isPending: isSelectingEndpoint,
+  } = selectEndpointMutation
+
+  const endpoints = endpointsQuery.data ?? []
+  const readyEndpoints = endpoints.filter(isRemoteEndpointReady)
+  const soleReadyEndpointId = readyEndpoints.length === 1 ? readyEndpoints[0].id : null
+  const selectedEndpointId = sessionQuery.data?.remoteEndpointId
+
+  useEffect(() => {
+    if (
+      !selectedEndpointId &&
+      soleReadyEndpointId &&
+      !isSelectingEndpoint
+    ) {
+      selectEndpoint(soleReadyEndpointId)
+    }
+  }, [
+    isSelectingEndpoint,
+    selectEndpoint,
+    selectedEndpointId,
+    soleReadyEndpointId,
+  ])
+
   if (sessionQuery.isLoading) {
     return <Skeleton className="h-40 w-full" />
   }
@@ -108,9 +146,10 @@ export function RemoteSupportDetailPage() {
     return <p className="text-sm text-muted-foreground">{t('remote.notFound')}</p>
   }
 
-  const endpoint = endpointQuery.data
+  const endpoint = endpoints.find((item) => item.id === session.remoteEndpointId) ?? null
+  const selectedEndpointReady = isRemoteEndpointReady(endpoint)
   const canStart =
-    session.status === 'Allowed' && Boolean(endpoint?.isReadyForRemote) && can('remote.attended')
+    session.status === 'Allowed' && selectedEndpointReady && can('remote.attended')
   const canEnd = session.status === 'InSession' && can('remote.attended')
   const canRequestAccess =
     session.status === 'Requested' &&
@@ -144,15 +183,57 @@ export function RemoteSupportDetailPage() {
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
-      {endpoint ? (
-        <RemoteDeviceCard endpoint={endpoint} variant="technician" />
-      ) : (
-        <Card>
-          <CardContent className="pt-6 text-sm text-muted-foreground">
-            {t('remote.device.notPrepared')}
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('remote.device.select')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {endpointsQuery.isLoading ? (
+            <Skeleton className="h-20 w-full" />
+          ) : endpoints.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('remote.device.waitingForAgent')}</p>
+          ) : (
+            endpoints.map((item) => (
+              <label
+                key={item.id}
+                className="flex cursor-pointer items-center gap-3 rounded-md border p-3"
+              >
+                <input
+                  type="radio"
+                  name="remote-endpoint"
+                  value={item.id}
+                  checked={session.remoteEndpointId === item.id}
+                  onChange={() => selectEndpoint(item.id)}
+                  disabled={isSelectingEndpoint}
+                />
+                <span className="flex-1">
+                  <span className="block font-medium">{item.deviceName}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {t(`remote.device.connection.${item.connectionStatus}`, {
+                      defaultValue: item.connectionStatus,
+                    })}
+                  </span>
+                </span>
+                <Badge variant={isRemoteEndpointReady(item) ? 'success' : 'outline'}>
+                  {isRemoteEndpointReady(item)
+                    ? t('remote.device.ready')
+                    : t('remote.device.waiting')}
+                </Badge>
+              </label>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {endpoint ? <RemoteDeviceCard endpoint={endpoint} variant="technician" /> : null}
+
+      {readiness && !readiness.configured ? (
+        <p className="text-sm font-medium text-destructive">
+          {t('remote.engineNotConfigured')}
+        </p>
+      ) : endpoint && !selectedEndpointReady ? (
+        <p className="text-sm text-muted-foreground">{t('remote.device.waitingForAgent')}</p>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -287,14 +368,14 @@ export function RemoteSupportDetailPage() {
               <Button
                 type="button"
                 onClick={() => requestAccessMutation.mutate()}
-                disabled={requestAccessMutation.isPending}
+                disabled={requestAccessMutation.isPending || !selectedEndpointReady}
               >
                 {t('remote.actions.requestAccess')}
               </Button>
             ) : null}
             {canStart ? (
               <Button type="button" onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
-                {t('remote.actions.start')}
+                {t('remote.actions.openSession')}
               </Button>
             ) : null}
             {canEnd ? (

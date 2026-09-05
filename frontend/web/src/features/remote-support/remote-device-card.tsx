@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { RemoteEndpoint } from '@/api/client'
+import { isRemoteEndpointReady, type RemoteEndpoint } from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -19,6 +19,15 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export function RemoteDeviceCard({ endpoint, variant }: RemoteDeviceCardProps) {
   const { t } = useTranslation()
+  const ready = isRemoteEndpointReady(endpoint)
+  const state =
+    ready
+      ? 'ready'
+      : endpoint.connectionStatus === 'Offline' || endpoint.connectionStatus === 'Expired'
+        ? 'offline'
+        : endpoint.connectionStatus === 'Failed'
+          ? 'failed'
+          : 'waiting'
   const os = [endpoint.operatingSystem, endpoint.operatingSystemVersion]
     .filter(Boolean)
     .join(' ')
@@ -29,11 +38,22 @@ export function RemoteDeviceCard({ endpoint, variant }: RemoteDeviceCardProps) {
         <div>
           <CardTitle className="text-base">{t('remote.device.title')}</CardTitle>
           <p className="mt-1 font-medium">{endpoint.deviceName}</p>
+          {variant === 'employee' && ready ? (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {t('remote.device.computerReady')}
+            </p>
+          ) : null}
         </div>
-        <Badge variant={endpoint.isReadyForRemote ? 'success' : 'warning'}>
-          {endpoint.isReadyForRemote
-            ? t('remote.device.ready')
-            : t('remote.device.waiting')}
+        <Badge
+          variant={
+            state === 'ready'
+              ? 'success'
+              : state === 'failed' || state === 'offline'
+                ? 'outline'
+                : 'warning'
+          }
+        >
+          {t(`remote.device.simpleStatus.${state}`)}
         </Badge>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -47,11 +67,16 @@ export function RemoteDeviceCard({ endpoint, variant }: RemoteDeviceCardProps) {
         ) : null}
         <Row label={t('remote.device.operatingSystem')} value={os || '—'} />
         <Row label={t('remote.device.architecture')} value={endpoint.architecture ?? '—'} />
-        <Row label={t('remote.device.connectionStatus')} value={endpoint.connectionStatus} />
+        <Row
+          label={t('remote.device.connectionStatus')}
+          value={t(`remote.device.connection.${endpoint.connectionStatus}`, {
+            defaultValue: endpoint.connectionStatus,
+          })}
+        />
         {variant === 'technician' ? (
           <Row
             label={t('remote.device.engine')}
-            value={endpoint.hasEngineNode ? t('remote.device.ready') : t('remote.device.waiting')}
+            value={t(`remote.device.engineStatus.${state}`)}
           />
         ) : null}
         <Row

@@ -9,9 +9,15 @@ public enum RemoteEndpointKind
 public enum RemoteEndpointConnectionStatus
 {
     Registering = 0,
-    Online = 1,
-    Offline = 2,
-    Expired = 3,
+    WaitingForAgent = 1,
+    AgentInstalling = 2,
+    AgentOnline = 3,
+    Ready = 4,
+    Offline = 5,
+    Failed = 6,
+    Expired = 7,
+    /// <summary>Legacy synonym retained for existing rows; treat like Ready when engine node present.</summary>
+    Online = 8,
 }
 
 public sealed class RemoteEndpoint
@@ -41,8 +47,10 @@ public sealed class RemoteEndpoint
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     public bool IsReadyForRemote =>
-        ConnectionStatus == RemoteEndpointConnectionStatus.Online
-        && !string.IsNullOrWhiteSpace(EngineNodeId);
+        !string.IsNullOrWhiteSpace(EngineNodeId)
+        && ConnectionStatus is RemoteEndpointConnectionStatus.Ready
+            or RemoteEndpointConnectionStatus.Online
+            or RemoteEndpointConnectionStatus.AgentOnline;
 
     /// <summary>Temporary endpoints are never ready for unattended; attended needs engine node.</summary>
     public bool HasEngineNode => !string.IsNullOrWhiteSpace(EngineNodeId);
@@ -78,10 +86,10 @@ public sealed class RemoteEndpoint
             OperatingSystemVersion = NormalizeOptional(operatingSystemVersion, 64),
             Architecture = NormalizeOptional(architecture, 32),
             HelperVersion = NormalizeOptional(helperVersion, 32),
-            EngineNodeId = NormalizeOptional(engineNodeId, 128),
+            EngineNodeId = NormalizeOptional(engineNodeId, 256),
             ConnectionStatus = string.IsNullOrWhiteSpace(engineNodeId)
-                ? RemoteEndpointConnectionStatus.Registering
-                : RemoteEndpointConnectionStatus.Online,
+                ? RemoteEndpointConnectionStatus.WaitingForAgent
+                : RemoteEndpointConnectionStatus.Ready,
             FirstSeenAtUtc = now,
             LastSeenAtUtc = now,
             ExpiresAtUtc = retention is TimeSpan r ? now.Add(r) : now.AddHours(72),
@@ -111,13 +119,13 @@ public sealed class RemoteEndpoint
             OwnerUserId = ownerUserId,
             CurrentRemoteSessionRequestId = sessionRequestId,
             ConfigurationItemId = configurationItemId,
-            EngineNodeId = NormalizeOptional(engineNodeId, 128),
+            EngineNodeId = NormalizeOptional(engineNodeId, 256),
             EndpointKind = RemoteEndpointKind.Managed,
             DeviceName = Truncate(deviceName.Trim(), 128),
             OperatingSystem = "Managed",
             ConnectionStatus = online
-                ? RemoteEndpointConnectionStatus.Online
-                : RemoteEndpointConnectionStatus.Registering,
+                ? RemoteEndpointConnectionStatus.Ready
+                : RemoteEndpointConnectionStatus.WaitingForAgent,
             FirstSeenAtUtc = utcNow,
             LastSeenAtUtc = utcNow,
             CreatedAtUtc = utcNow,
@@ -135,19 +143,65 @@ public sealed class RemoteEndpoint
         {
             ConnectionStatus = st;
         }
-        else if (ConnectionStatus == RemoteEndpointConnectionStatus.Registering && HasEngineNode)
-        {
-            ConnectionStatus = RemoteEndpointConnectionStatus.Online;
-        }
+    }
+
+    public void MarkWaitingForAgent(DateTimeOffset utcNow)
+    {
+        ConnectionStatus = RemoteEndpointConnectionStatus.WaitingForAgent;
+        UpdatedAtUtc = utcNow;
+        LastSeenAtUtc = utcNow;
+    }
+
+    public void MarkAgentInstalling(DateTimeOffset utcNow)
+    {
+        ConnectionStatus = RemoteEndpointConnectionStatus.AgentInstalling;
+        UpdatedAtUtc = utcNow;
+        LastSeenAtUtc = utcNow;
+    }
+
+    public void MarkAgentOnline(DateTimeOffset utcNow)
+    {
+        ConnectionStatus = RemoteEndpointConnectionStatus.AgentOnline;
+        UpdatedAtUtc = utcNow;
+        LastSeenAtUtc = utcNow;
+    }
+
+    public void MarkReady(string engineNodeId, DateTimeOffset utcNow)
+    {
+        EngineNodeId = NormalizeOptional(engineNodeId, 256)
+            ?? throw new ArgumentException("Engine node is required for Ready.", nameof(engineNodeId));
+        ConnectionStatus = RemoteEndpointConnectionStatus.Ready;
+        UpdatedAtUtc = utcNow;
+        LastSeenAtUtc = utcNow;
+    }
+
+    public void MarkOffline(DateTimeOffset utcNow)
+    {
+        ConnectionStatus = RemoteEndpointConnectionStatus.Offline;
+        UpdatedAtUtc = utcNow;
+        LastSeenAtUtc = utcNow;
+    }
+
+    public void MarkFailed(DateTimeOffset utcNow)
+    {
+        ConnectionStatus = RemoteEndpointConnectionStatus.Failed;
+        UpdatedAtUtc = utcNow;
+        LastSeenAtUtc = utcNow;
     }
 
     public void SetEngineNode(string? engineNodeId, DateTimeOffset utcNow)
     {
-        EngineNodeId = NormalizeOptional(engineNodeId, 128);
+        EngineNodeId = NormalizeOptional(engineNodeId, 256);
         LastSeenAtUtc = utcNow;
         UpdatedAtUtc = utcNow;
-        if (HasEngineNode && ConnectionStatus == RemoteEndpointConnectionStatus.Registering)
-            ConnectionStatus = RemoteEndpointConnectionStatus.Online;
+        if (HasEngineNode
+            && ConnectionStatus is RemoteEndpointConnectionStatus.Registering
+                or RemoteEndpointConnectionStatus.WaitingForAgent
+                or RemoteEndpointConnectionStatus.AgentInstalling
+                or RemoteEndpointConnectionStatus.AgentOnline)
+        {
+            ConnectionStatus = RemoteEndpointConnectionStatus.Ready;
+        }
     }
 
     public void BindSession(Guid sessionRequestId, DateTimeOffset utcNow)
