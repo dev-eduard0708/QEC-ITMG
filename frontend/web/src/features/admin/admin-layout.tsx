@@ -7,6 +7,7 @@ const adminLinks = [
   { to: '/it/admin/users', labelKey: 'admin.nav.users', permission: 'admin.users' },
   { to: '/it/admin/roles', labelKey: 'admin.nav.roles', permission: 'admin.roles' },
   { to: '/it/admin/lookups', labelKey: 'admin.nav.lookups', permission: 'admin.lookups' },
+  { to: '/it/admin/integrations', labelKey: 'admin.nav.integrations', permission: 'admin.integrations' },
 ] as const
 
 export function AdminLayout() {

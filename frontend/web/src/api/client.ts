@@ -3227,5 +3227,53 @@ export const reportsApi = {
     })}`,
 }
 
+export type IntegrationReadinessItem = {
+  provider: string
+  enabled: boolean
+  configured: boolean
+  runtimeMode: string
+  status: string
+  approvalRequired: boolean
+  lastSuccessfulSyncUtc: string | null
+  lastFailureUtc: string | null
+  lastErrorSummary: string | null
+  lastProcessedCount: number | null
+  lastUnmatchedCount: number | null
+}
+
+export type IntegrationRunItem = {
+  id: string
+  provider: string
+  operation: string
+  startedAtUtc: string
+  completedAtUtc: string | null
+  status: string
+  processedCount: number
+  succeededCount: number
+  failedCount: number
+  unmatchedCount: number
+  errorSummary: string | null
+  correlationId: string
+}
+
+export const integrationsApi = {
+  readiness: () => apiFetch<IntegrationReadinessItem[]>('/api/v1/admin/integrations/readiness'),
+  runs: (provider?: string, take?: number) =>
+    apiFetch<IntegrationRunItem[]>(
+      `/api/v1/admin/integrations/runs${opsQuery({ provider, take })}`,
+    ),
+  sync: (provider: string) =>
+    apiFetch<{
+      provider: string
+      status: string
+      processed: number
+      succeeded: number
+      failed: number
+      unmatched: number
+      message: string | null
+      correlationId: string
+    }>(`/api/v1/admin/integrations/${encodeURIComponent(provider)}/sync`, { method: 'POST' }),
+}
+
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''

@@ -6,6 +6,7 @@ import { AdminLayout } from '@/features/admin/admin-layout'
 import { AdminLookupsPage } from '@/features/admin/lookups-page'
 import { AdminRolesPage } from '@/features/admin/roles-page'
 import { AdminUsersPage } from '@/features/admin/users-page'
+import { IntegrationsAdminPage } from '@/features/admin/integrations-page'
 import { BreakGlassPage } from '@/features/auth/break-glass-page'
 import { LoginPage } from '@/features/auth/login-page'
 import { UnauthorizedPage } from '@/features/auth/unauthorized-page'
@@ -139,7 +140,14 @@ export function AppRouter() {
           <Route element={<RequirePermission permission="kb.read" />}>
             <Route path="it/knowledge" element={<ItKnowledgePage />} />
           </Route>
-          <Route path="it/admin" element={<RequireAnyPermission permissions={['admin.users', 'admin.roles', 'admin.lookups']} />}>
+          <Route
+            path="it/admin"
+            element={
+              <RequireAnyPermission
+                permissions={['admin.users', 'admin.roles', 'admin.lookups', 'admin.integrations']}
+              />
+            }
+          >
             <Route element={<AdminLayout />}>
               <Route index element={<AdminIndexRedirect />} />
               <Route element={<RequirePermission permission="admin.users" />}>
@@ -150,6 +158,9 @@ export function AppRouter() {
               </Route>
               <Route element={<RequirePermission permission="admin.lookups" />}>
                 <Route path="lookups" element={<AdminLookupsPage />} />
+              </Route>
+              <Route element={<RequirePermission permission="admin.integrations" />}>
+                <Route path="integrations" element={<IntegrationsAdminPage />} />
               </Route>
             </Route>
           </Route>

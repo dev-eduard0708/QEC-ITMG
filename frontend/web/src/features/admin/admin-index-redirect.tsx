@@ -12,5 +12,8 @@ export function AdminIndexRedirect() {
   if (can('admin.lookups')) {
     return <Navigate to="lookups" replace />
   }
+  if (can('admin.integrations')) {
+    return <Navigate to="integrations" replace />
+  }
   return <Navigate to="/unauthorized" replace />
 }
