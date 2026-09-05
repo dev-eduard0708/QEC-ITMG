@@ -27,6 +27,12 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<Notification> Notifications => Set<Notification>();
 
+    public DbSet<IntegrationRun> IntegrationRuns => Set<IntegrationRun>();
+
+    public DbSet<IntegrationWebhookReceipt> IntegrationWebhookReceipts => Set<IntegrationWebhookReceipt>();
+
+    public DbSet<IntegrationCorrelation> IntegrationCorrelations => Set<IntegrationCorrelation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);

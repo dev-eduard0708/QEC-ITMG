@@ -2,7 +2,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.Contracts.Modules;
-using Qec.Itmg.Contracts.Security;
 using Qec.Itmg.Security.Persistence;
 using Qec.Itmg.Security.Services;
 
@@ -21,6 +20,6 @@ public sealed class SecurityModule : IModule
 
         services.AddQecSqlServerDbContext<SecurityDbContext>(connectionString, SecurityDbContext.SchemaName);
         services.AddScoped<SecurityService>();
-        services.AddSingleton<IVulnerabilityScannerIngestClient, DisabledVulnerabilityScannerIngestClient>();
+        // IVulnerabilityScannerIngestClient registered by PlatformModule (real adapter; disabled by default).
     }
 }

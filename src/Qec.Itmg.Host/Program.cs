@@ -23,7 +23,9 @@ using Qec.Itmg.Host.Security;
 using Qec.Itmg.Host.BusinessContinuity;
 using Qec.Itmg.Host.ThirdParty;
 using Qec.Itmg.Host.Reporting;
+using Qec.Itmg.Host.Integrations;
 using Qec.Itmg.Host.Operations;
+using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Identity.Admin;
@@ -33,7 +35,6 @@ using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Identity.Seed;
 using Qec.Itmg.Cmdb.Persistence;
 using Qec.Itmg.Organization.Persistence;
-using Qec.Itmg.Platform.Integrations;
 using Qec.Itmg.Platform.Persistence;
 using Qec.Itmg.ServiceDesk.Persistence;
 using Serilog;
@@ -104,9 +105,13 @@ try
         builder.Services.AddTransient<ContinuityReminderJob>();
         builder.Services.AddTransient<VendorReminderJob>();
         builder.Services.AddTransient<ReportSnapshotJob>();
+        builder.Services.AddTransient<IntegrationPollingJob>();
         builder.Services.RemoveAll<IEmailQueue>();
         builder.Services.AddSingleton<IEmailQueue, HangfireEmailQueue>();
     }
+
+    builder.Services.AddScoped<IIntegrationDomainSync, HostIntegrationDomainSync>();
+    builder.Services.AddScoped<DirectoryJmlFulfillmentService>();
 
     builder.Services
         .AddHealthChecks()
@@ -170,6 +175,10 @@ try
             "report-executive-snapshots",
             job => job.ExecuteAsync(CancellationToken.None),
             "0 2 * * *");
+        recurringJobs.AddOrUpdate<IntegrationPollingJob>(
+            "integration-polling",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "20 * * * *");
     }
 
     app.UseSerilogRequestLogging();

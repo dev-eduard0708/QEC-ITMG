@@ -210,17 +210,24 @@ public sealed class SecurityService(
         int created = 0;
         foreach (ScannerVulnerabilityIngestItem item in items)
         {
-            bool exists = await db.Vulnerabilities.AnyAsync(x => x.ExternalReference == item.ExternalReference, ct);
-            if (exists) continue;
-            if (!Enum.TryParse(item.Severity, true, out VulnerabilitySeverity severity))
-                severity = VulnerabilitySeverity.Medium;
-            await CreateVulnerabilityAsync(
-                item.Title, item.ConfigurationItemId, item.Source, severity, item.DetectedAtUtc,
-                item.Description, item.ExternalReference, item.DueAtUtc, null, ct);
-            created++;
+            if (await IngestScannerItemAsync(item, ct))
+                created++;
         }
 
         return created;
+    }
+
+    /// <summary>Idempotent single-finding ingest keyed by ExternalReference.</summary>
+    public async Task<bool> IngestScannerItemAsync(ScannerVulnerabilityIngestItem item, CancellationToken ct)
+    {
+        bool exists = await db.Vulnerabilities.AnyAsync(x => x.ExternalReference == item.ExternalReference, ct);
+        if (exists) return false;
+        if (!Enum.TryParse(item.Severity, true, out VulnerabilitySeverity severity))
+            severity = VulnerabilitySeverity.Medium;
+        await CreateVulnerabilityAsync(
+            item.Title, item.ConfigurationItemId, item.Source, severity, item.DetectedAtUtc,
+            item.Description, item.ExternalReference, item.DueAtUtc, null, ct);
+        return true;
     }
 
     // ——— Risks ———

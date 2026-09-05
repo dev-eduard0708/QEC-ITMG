@@ -28,6 +28,7 @@ public enum AuditAggregateType
     VendorAssessment = 24,
     ReportExport = 25,
     ReportSnapshot = 26,
+    IntegrationRun = 27,
 }
 
 public enum AuditActorType
