@@ -81,6 +81,17 @@ public sealed record ChangeCatalogItemDto(
     DateTimeOffset UpdatedAtUtc,
     string RowVersion);
 
+public sealed record ChangeReportDto(
+    DateTimeOffset GeneratedAtUtc,
+    int VolumeInPeriod,
+    int Successful,
+    int Failed,
+    int RolledBack,
+    int Emergency,
+    int Retrospective,
+    int InFlight,
+    string Note);
+
 internal static class ChangeAuditComposer
 {
     public static BusinessAuditEntry Field(
@@ -627,6 +638,30 @@ public sealed class ChangeService(
             .Select(item => new ChangeHistoryDto(
                 item.Id, item.FromStatus.ToString(), item.ToStatus.ToString(), item.ChangedByUserId, item.Comment, item.ChangedAtUtc))
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<ChangeReportDto> GetChangeReportAsync(
+        DateTimeOffset? periodStartUtc, DateTimeOffset? periodEndUtc, CancellationToken ct = default)
+    {
+        DateTimeOffset now = clock.UtcNow;
+        DateTimeOffset start = periodStartUtc ?? now.AddDays(-30);
+        DateTimeOffset end = periodEndUtc ?? now;
+        List<ChangeRequest> all = await db.ChangeRequests.AsNoTracking().ToListAsync(ct);
+        List<ChangeRequest> period = all
+            .Where(x => x.CreatedAtUtc >= start && x.CreatedAtUtc <= end)
+            .ToList();
+        return new ChangeReportDto(
+            now,
+            period.Count,
+            period.Count(x => x.Result == ChangeResult.Successful),
+            period.Count(x => x.Result == ChangeResult.Failed),
+            period.Count(x => x.Result == ChangeResult.RolledBack),
+            period.Count(x => x.Type == ChangeType.Emergency),
+            period.Count(x => x.IsRetrospective),
+            all.Count(x => x.Status is ChangeStatus.Draft or ChangeStatus.Assessment or ChangeStatus.Approval
+                or ChangeStatus.Scheduled or ChangeStatus.Implementation or ChangeStatus.Validation
+                or ChangeStatus.PostImplementationReview or ChangeStatus.RequiresFollowUp),
+            "Outcome counts use ChangeResult; unauthorized proxy uses IsRetrospective. No invented success rate.");
     }
 
     public async Task<IReadOnlyList<ChangeCatalogItemDto>> ListCatalogAsync(

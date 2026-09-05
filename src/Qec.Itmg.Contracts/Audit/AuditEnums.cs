@@ -26,6 +26,8 @@ public enum AuditAggregateType
     Vendor = 22,
     Contract = 23,
     VendorAssessment = 24,
+    ReportExport = 25,
+    ReportSnapshot = 26,
 }
 
 public enum AuditActorType

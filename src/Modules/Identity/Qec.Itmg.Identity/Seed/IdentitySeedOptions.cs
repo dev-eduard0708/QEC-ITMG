@@ -97,6 +97,17 @@ public static class IdentitySeedCatalog
         ("vendor.manage", "Manage vendors, contacts, and CI/access vendor links"),
         ("contract.manage", "Manage vendor contracts and contractual SLA references"),
         ("vendor.assess", "Schedule and complete vendor assessments"),
+        ("report.servicedesk", "View service desk reports"),
+        ("report.incident", "View incident reports"),
+        ("report.change", "View change reports"),
+        ("report.cmdb", "View CMDB reports"),
+        ("report.security", "View security reports"),
+        ("report.compliance", "View governance/compliance reports"),
+        ("report.audit", "View audit reports"),
+        ("report.bcm", "View business continuity reports"),
+        ("report.vendor", "View vendor reports"),
+        ("report.executive", "View executive reporting dashboard"),
+        ("report.export", "Export authorized reports as CSV"),
     ];
 
     /// <summary>Read-oriented auditor role. Does not include manage/export/admin permissions.</summary>

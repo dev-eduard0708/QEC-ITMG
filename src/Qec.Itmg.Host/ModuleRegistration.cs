@@ -14,6 +14,7 @@ using Qec.Itmg.Audit;
 using Qec.Itmg.Security;
 using Qec.Itmg.BusinessContinuity;
 using Qec.Itmg.ThirdParty;
+using Qec.Itmg.Reporting;
 using Qec.Itmg.Operations;
 using Qec.Itmg.Organization;
 using Qec.Itmg.Platform;
@@ -46,6 +47,7 @@ internal static class ModuleRegistration
             new SecurityModule(),
             new ContinuityModule(),
             new ThirdPartyModule(),
+            new ReportingModule(),
         ];
 
         foreach (IModule module in modules)

@@ -12,6 +12,7 @@ using Qec.Itmg.Audit.Persistence;
 using Qec.Itmg.Security.Persistence;
 using Qec.Itmg.BusinessContinuity.Persistence;
 using Qec.Itmg.ThirdParty.Persistence;
+using Qec.Itmg.Reporting.Persistence;
 using Qec.Itmg.Identity.Persistence;
 using Qec.Itmg.Operations.Persistence;
 using Qec.Itmg.Organization.Persistence;
@@ -199,5 +200,17 @@ public sealed class ThirdPartyDbContextFactory : IDesignTimeDbContextFactory<Thi
             DesignTimeConnectionString.Resolve(),
             sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", ThirdPartyDbContext.SchemaName));
         return new ThirdPartyDbContext(optionsBuilder.Options);
+    }
+}
+
+public sealed class ReportingDbContextFactory : IDesignTimeDbContextFactory<ReportingDbContext>
+{
+    public ReportingDbContext CreateDbContext(string[] args)
+    {
+        var optionsBuilder = new DbContextOptionsBuilder<ReportingDbContext>();
+        optionsBuilder.UseSqlServer(
+            DesignTimeConnectionString.Resolve(),
+            sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", ReportingDbContext.SchemaName));
+        return new ReportingDbContext(optionsBuilder.Options);
     }
 }

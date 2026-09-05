@@ -22,6 +22,7 @@ using Qec.Itmg.Host.Audit;
 using Qec.Itmg.Host.Security;
 using Qec.Itmg.Host.BusinessContinuity;
 using Qec.Itmg.Host.ThirdParty;
+using Qec.Itmg.Host.Reporting;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -100,6 +101,9 @@ try
         builder.Services.AddTransient<EventRetentionJob>();
         builder.Services.AddTransient<DocumentReviewReminderJob>();
         builder.Services.AddTransient<EvidenceExpiryJob>();
+        builder.Services.AddTransient<ContinuityReminderJob>();
+        builder.Services.AddTransient<VendorReminderJob>();
+        builder.Services.AddTransient<ReportSnapshotJob>();
         builder.Services.RemoveAll<IEmailQueue>();
         builder.Services.AddSingleton<IEmailQueue, HangfireEmailQueue>();
     }
@@ -162,6 +166,10 @@ try
             "vendor-reminders",
             job => job.ExecuteAsync(CancellationToken.None),
             "15 9 * * *");
+        recurringJobs.AddOrUpdate<ReportSnapshotJob>(
+            "report-executive-snapshots",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "0 2 * * *");
     }
 
     app.UseSerilogRequestLogging();
@@ -210,6 +218,7 @@ try
     app.MapSecurityEndpoints();
     app.MapContinuityEndpoints();
     app.MapVendorEndpoints();
+    app.MapReportEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

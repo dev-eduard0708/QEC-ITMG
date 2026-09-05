@@ -83,6 +83,31 @@ public sealed record TicketDashboardDto(
     IReadOnlyDictionary<string, int> ByStatus,
     IReadOnlyDictionary<string, int> ByPriority);
 
+public sealed record ServiceDeskReportDto(
+    DateTimeOffset GeneratedAtUtc,
+    int OpenTickets,
+    int Backlog,
+    int SlaBreachedOpen,
+    int ResponseBreachedOpen,
+    int ResolutionBreachedOpen,
+    IReadOnlyDictionary<string, int> OpenByPriority,
+    IReadOnlyDictionary<string, int> OpenByStatus,
+    IReadOnlyDictionary<string, int> WorkloadByAssignee,
+    double? MedianFirstResponseMinutes,
+    double? MedianResolutionMinutes,
+    string Note);
+
+public sealed record IncidentReportDto(
+    DateTimeOffset GeneratedAtUtc,
+    int OpenIncidents,
+    int MajorIncidentsOpen,
+    int MajorIncidentsPeriod,
+    double? MedianMttaMinutes,
+    double? MedianMttrMinutes,
+    int CreatedInPeriod,
+    int ResolvedInPeriod,
+    string Note);
+
 public sealed class TicketService(
     ServiceDeskDbContext db,
     INumberSequenceService numbers,
@@ -142,6 +167,91 @@ public sealed class TicketService(
                 && ActiveStatuses.Contains(item.Status)
                 && item.SecurityClassification != SecurityClassification.None,
             cancellationToken);
+    }
+
+    public async Task<ServiceDeskReportDto> GetServiceDeskReportAsync(
+        DateTimeOffset? periodStartUtc, DateTimeOffset? periodEndUtc, CancellationToken ct = default)
+    {
+        DateTimeOffset now = clock.UtcNow;
+        List<Ticket> tickets = await db.Tickets.AsNoTracking().ToListAsync(ct);
+        List<Ticket> open = tickets.Where(x => ActiveStatuses.Contains(x.Status)).ToList();
+        IEnumerable<Ticket> period = tickets.Where(x =>
+            (!periodStartUtc.HasValue || x.CreatedAtUtc >= periodStartUtc) &&
+            (!periodEndUtc.HasValue || x.CreatedAtUtc <= periodEndUtc));
+
+        List<double> frt = tickets
+            .Where(x => x.RespondedAtUtc is not null)
+            .Select(x => (x.RespondedAtUtc!.Value - x.CreatedAtUtc).TotalMinutes)
+            .Where(m => m >= 0)
+            .OrderBy(m => m)
+            .ToList();
+        List<double> res = tickets
+            .Where(x => x.ResolvedAtUtc is not null)
+            .Select(x => (x.ResolvedAtUtc!.Value - x.CreatedAtUtc).TotalMinutes)
+            .Where(m => m >= 0)
+            .OrderBy(m => m)
+            .ToList();
+
+        return new ServiceDeskReportDto(
+            now,
+            open.Count,
+            open.Count,
+            open.Count(x => x.ResponseBreached || x.ResolutionBreached),
+            open.Count(x => x.ResponseBreached),
+            open.Count(x => x.ResolutionBreached),
+            open.GroupBy(x => x.Priority.ToString()).ToDictionary(g => g.Key, g => g.Count()),
+            open.GroupBy(x => x.Status.ToString()).ToDictionary(g => g.Key, g => g.Count()),
+            open.Where(x => x.AssignedUserId is not null)
+                .GroupBy(x => x.AssignedUserId!.Value.ToString())
+                .ToDictionary(g => g.Key, g => g.Count()),
+            Median(frt),
+            Median(res),
+            "Live aggregates. Median FRT/resolution only where RespondedAt/ResolvedAt exist.");
+    }
+
+    public async Task<IncidentReportDto> GetIncidentReportAsync(
+        DateTimeOffset? periodStartUtc, DateTimeOffset? periodEndUtc, CancellationToken ct = default)
+    {
+        DateTimeOffset now = clock.UtcNow;
+        DateTimeOffset start = periodStartUtc ?? now.AddDays(-30);
+        DateTimeOffset end = periodEndUtc ?? now;
+        List<Ticket> incidents = await db.Tickets.AsNoTracking()
+            .Where(x => x.Type == TicketType.Incident)
+            .ToListAsync(ct);
+        List<Ticket> open = incidents.Where(x => ActiveStatuses.Contains(x.Status)).ToList();
+        List<Ticket> periodCreated = incidents.Where(x => x.CreatedAtUtc >= start && x.CreatedAtUtc <= end).ToList();
+        List<Ticket> periodResolved = incidents
+            .Where(x => x.ResolvedAtUtc is DateTimeOffset r && r >= start && r <= end)
+            .ToList();
+
+        List<double> mtta = incidents
+            .Where(x => x.RespondedAtUtc is not null)
+            .Select(x => (x.RespondedAtUtc!.Value - x.CreatedAtUtc).TotalMinutes)
+            .Where(m => m >= 0).OrderBy(m => m).ToList();
+        List<double> mttr = incidents
+            .Where(x => x.ResolvedAtUtc is not null)
+            .Select(x => (x.ResolvedAtUtc!.Value - x.CreatedAtUtc).TotalMinutes)
+            .Where(m => m >= 0).OrderBy(m => m).ToList();
+
+        return new IncidentReportDto(
+            now,
+            open.Count,
+            open.Count(x => x.IsMajorIncident),
+            periodCreated.Count(x => x.IsMajorIncident),
+            Median(mtta),
+            Median(mttr),
+            periodCreated.Count,
+            periodResolved.Count,
+            "MTTA/MTTR are median minutes only when RespondedAt/ResolvedAt timestamps exist; otherwise null.");
+    }
+
+    private static double? Median(IReadOnlyList<double> ordered)
+    {
+        if (ordered.Count == 0) return null;
+        int mid = ordered.Count / 2;
+        return ordered.Count % 2 == 0
+            ? (ordered[mid - 1] + ordered[mid]) / 2.0
+            : ordered[mid];
     }
 
     public async Task<TicketListResult> ListAsync(
