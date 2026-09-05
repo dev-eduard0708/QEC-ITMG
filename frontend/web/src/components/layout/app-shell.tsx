@@ -212,6 +212,23 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         end: false,
         visible: can('vendor.read'),
       },
+      {
+        to: '/it/reports',
+        labelKey: 'nav.reports',
+        icon: Shield,
+        end: false,
+        visible:
+          can('report.executive') ||
+          can('report.servicedesk') ||
+          can('report.incident') ||
+          can('report.change') ||
+          can('report.cmdb') ||
+          can('report.security') ||
+          can('report.compliance') ||
+          can('report.audit') ||
+          can('report.bcm') ||
+          can('report.vendor'),
+      },
     ],
     [can],
   )
@@ -388,6 +405,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/security')) return t('nav.security')
   if (pathname.startsWith('/it/continuity')) return t('nav.continuity')
   if (pathname.startsWith('/it/vendors')) return t('nav.vendors')
+  if (pathname.startsWith('/it/reports')) return t('nav.reports')
   if (pathname.startsWith('/it/governance') || pathname.startsWith('/governance')) return t('nav.governance')
   return t('nav.foundation')
 }

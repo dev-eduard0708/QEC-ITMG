@@ -52,6 +52,19 @@ export function GovernanceHomePage() {
             </CardContent>
           </Card>
         ) : null}
+        {can('report.compliance') || can('report.executive') ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t('nav.reports')}</CardTitle>
+              <CardDescription>{t('reports.description')}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="secondary">
+                <Link to="/it/reports">{t('governance.nav.open')}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   )

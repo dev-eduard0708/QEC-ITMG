@@ -38,6 +38,7 @@ import {
   DrTestDetailPage,
 } from '@/features/it/continuity-page'
 import { VendorsPage, VendorNewPage, VendorDetailPage } from '@/features/it/vendors-page'
+import { ReportsPage, ReportsExecutivePage } from '@/features/it/reports-page'
 import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
@@ -209,6 +210,27 @@ export function AppRouter() {
           <Route element={<RequirePermission permission="vendor.read" />}>
             <Route path="it/vendors" element={<VendorsPage />} />
             <Route path="it/vendors/:id" element={<VendorDetailPage />} />
+          </Route>
+          <Route
+            element={
+              <RequireAnyPermission
+                permissions={[
+                  'report.executive',
+                  'report.servicedesk',
+                  'report.incident',
+                  'report.change',
+                  'report.cmdb',
+                  'report.security',
+                  'report.compliance',
+                  'report.audit',
+                  'report.bcm',
+                  'report.vendor',
+                ]}
+              />
+            }
+          >
+            <Route path="it/reports" element={<ReportsPage />} />
+            <Route path="it/reports/executive" element={<ReportsExecutivePage />} />
           </Route>
           <Route path="unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

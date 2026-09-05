@@ -3177,5 +3177,55 @@ export const vendorsApi = {
     apiFetch(`/api/v1/vendors/${id}/access/accounts/${accountId}`, { method: 'POST' }),
 }
 
+export type ReportSnapshotItem = {
+  id: string
+  snapshotKey: string
+  snapshotDateUtc: string
+  periodStartUtc: string | null
+  periodEndUtc: string | null
+  payloadJson: string
+  createdAtUtc: string
+}
+
+export type ExecutiveReport = {
+  generatedAtUtc: string
+  asOfUtc: string
+  source: string
+  note: string
+  tiles: Record<string, Record<string, unknown>>
+}
+
+export const reportsApi = {
+  executive: () => apiFetch<ExecutiveReport>('/api/v1/reports/executive'),
+  executiveSnapshots: (take?: number) =>
+    apiFetch<ReportSnapshotItem[]>(`/api/v1/reports/executive/snapshots${opsQuery({ take })}`),
+  serviceDesk: (params?: { from?: string; to?: string }) =>
+    apiFetch<Record<string, unknown>>(
+      `/api/v1/reports/servicedesk${opsQuery({ from: params?.from, to: params?.to })}`,
+    ),
+  incidents: (params?: { from?: string; to?: string }) =>
+    apiFetch<Record<string, unknown>>(
+      `/api/v1/reports/incidents${opsQuery({ from: params?.from, to: params?.to })}`,
+    ),
+  changes: (params?: { from?: string; to?: string }) =>
+    apiFetch<Record<string, unknown>>(
+      `/api/v1/reports/changes${opsQuery({ from: params?.from, to: params?.to })}`,
+    ),
+  cmdb: () => apiFetch<Record<string, unknown>>('/api/v1/reports/cmdb'),
+  security: () => apiFetch<Record<string, unknown>>('/api/v1/reports/security'),
+  compliance: () => apiFetch<Record<string, unknown>>('/api/v1/reports/compliance'),
+  audit: () => apiFetch<Record<string, unknown>>('/api/v1/reports/audit'),
+  bcm: () =>
+    apiFetch<{ dashboard: Record<string, unknown>; serviceReadiness: unknown[] }>(
+      '/api/v1/reports/bcm',
+    ),
+  vendors: () => apiFetch<{ dashboard: Record<string, unknown> }>('/api/v1/reports/vendors'),
+  exportUrl: (reportKey: string, params?: { from?: string; to?: string }) =>
+    `/api/v1/reports/${encodeURIComponent(reportKey)}/export.csv${opsQuery({
+      from: params?.from,
+      to: params?.to,
+    })}`,
+}
+
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
