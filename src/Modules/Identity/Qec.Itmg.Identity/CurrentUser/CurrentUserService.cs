@@ -69,7 +69,8 @@ public sealed class CurrentUserService(
             return null;
         }
 
-        return await MapSessionAsync(user, authMethod, cancellationToken);
+        string? avatarUrl = principal.FindFirstValue(OidcPrincipalMapper.AvatarUrlClaimType);
+        return await MapSessionAsync(user, authMethod, avatarUrl, cancellationToken);
     }
 
     private bool AllowGoogleJitProvisioning(bool isBreakGlass)
@@ -199,6 +200,7 @@ public sealed class CurrentUserService(
     private async Task<CurrentUserDto> MapSessionAsync(
         User user,
         string authMethod,
+        string? avatarUrl,
         CancellationToken cancellationToken)
     {
         List<CurrentUserRoleDto> roles = await (
@@ -226,6 +228,7 @@ public sealed class CurrentUserService(
             user.TimeZone,
             authMethod,
             roles,
-            permissions);
+            permissions,
+            avatarUrl);
     }
 }

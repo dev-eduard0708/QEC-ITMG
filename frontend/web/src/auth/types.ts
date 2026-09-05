@@ -12,6 +12,7 @@ export type CurrentUser = {
   authMethod: string
   roles: CurrentUserRole[]
   permissions: string[]
+  avatarUrl?: string | null
 }
 
 export type AuthSession = {

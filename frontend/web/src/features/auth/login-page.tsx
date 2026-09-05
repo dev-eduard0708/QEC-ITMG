@@ -184,9 +184,21 @@ export function LoginPage() {
           />
 
           <div className="relative space-y-5 lg:max-w-md">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              {t('brand.organization')}
-            </p>
+            <div className="flex items-center gap-3">
+              <img
+                src="/qec-mark.svg"
+                alt=""
+                className="h-12 w-12 shrink-0 rounded-xl shadow-sm"
+                width={48}
+                height={48}
+              />
+              <div className="min-w-0">
+                <p className="text-[0.7rem] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  {t('brand.organization')}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">{t('brand.website')}</p>
+              </div>
+            </div>
             <div className="space-y-2">
               <h1
                 id="login-brand-heading"
@@ -198,6 +210,9 @@ export function LoginPage() {
             </div>
             <p className="max-w-md text-pretty text-sm leading-relaxed text-muted-foreground sm:text-[0.95rem]">
               {t('login.brandMessage')}
+            </p>
+            <p className="max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
+              {t('brand.tagline')}
             </p>
             <ul className="hidden gap-2 pt-2 text-sm text-muted-foreground lg:grid">
               <li className="flex items-start gap-2">
@@ -224,6 +239,7 @@ export function LoginPage() {
           <div className="w-full max-w-[26rem] space-y-5 rounded-2xl border border-border/80 bg-card p-6 shadow-sm sm:p-8">
             <div className="space-y-3">
               <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                <img src="/qec-mark.svg" alt="" className="h-5 w-5 rounded" width={20} height={20} />
                 <span className="font-semibold text-foreground">{t('brand.name')}</span>
                 <span aria-hidden>·</span>
                 <span>{t('login.secureAccessBadge')}</span>

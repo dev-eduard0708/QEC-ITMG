@@ -91,6 +91,37 @@ public sealed class GoogleOidcPrincipalMapperTests
         Assert.DoesNotContain(mapped.Claims, claim => claim.Value is "entra-object-id" or "ms-oid" or "entra@qehc.edu.sa");
     }
 
+    [Fact]
+    public void Map_KeepsHttpsPictureClaim_AsAvatarUrl()
+    {
+        ClaimsIdentity inbound = new("oidc");
+        inbound.AddClaim(new Claim("sub", "google-sub-pic"));
+        inbound.AddClaim(new Claim("email", "pic@qehc.edu.sa"));
+        inbound.AddClaim(new Claim("email_verified", "true"));
+        inbound.AddClaim(new Claim("name", "Pic User"));
+        inbound.AddClaim(new Claim("picture", "https://lh3.googleusercontent.com/a/test=s96-c"));
+
+        ClaimsPrincipal mapped = OidcPrincipalMapper.MapAuthenticatedPrincipal(new ClaimsPrincipal(inbound));
+
+        Assert.Equal(
+            "https://lh3.googleusercontent.com/a/test=s96-c",
+            mapped.FindFirst(OidcPrincipalMapper.AvatarUrlClaimType)?.Value);
+    }
+
+    [Fact]
+    public void Map_DropsNonHttpsPictureClaim()
+    {
+        ClaimsIdentity inbound = new("oidc");
+        inbound.AddClaim(new Claim("sub", "google-sub-badpic"));
+        inbound.AddClaim(new Claim("email", "badpic@qehc.edu.sa"));
+        inbound.AddClaim(new Claim("email_verified", "true"));
+        inbound.AddClaim(new Claim("picture", "javascript:alert(1)"));
+
+        ClaimsPrincipal mapped = OidcPrincipalMapper.MapAuthenticatedPrincipal(new ClaimsPrincipal(inbound));
+
+        Assert.Null(mapped.FindFirst(OidcPrincipalMapper.AvatarUrlClaimType));
+    }
+
     private static ClaimsPrincipal CreateGooglePrincipal(
         string sub,
         string email,

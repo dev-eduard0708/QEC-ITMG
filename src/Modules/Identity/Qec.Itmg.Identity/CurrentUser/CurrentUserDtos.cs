@@ -10,4 +10,5 @@ public sealed record CurrentUserDto(
     string? TimeZone,
     string AuthMethod,
     IReadOnlyList<CurrentUserRoleDto> Roles,
-    IReadOnlyList<string> Permissions);
+    IReadOnlyList<string> Permissions,
+    string? AvatarUrl = null);

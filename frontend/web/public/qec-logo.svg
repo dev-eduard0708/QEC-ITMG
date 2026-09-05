@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 96" role="img" aria-label="Quality Education Company">
+  <defs>
+    <linearGradient id="qecMark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0EA5E9"/>
+      <stop offset="100%" stop-color="#0369A1"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="8" width="80" height="80" rx="18" fill="#0F172A"/>
+  <path d="M22 62V34l18-10 18 10v28l-18 10-18-10Z" fill="none" stroke="url(#qecMark)" stroke-width="4.5" stroke-linejoin="round"/>
+  <path d="M40 28v40" stroke="#7DD3FC" stroke-width="4" stroke-linecap="round"/>
+  <g fill="#0F172A" font-family="Segoe UI, system-ui, sans-serif">
+    <text x="100" y="42" font-size="28" font-weight="700" letter-spacing="0.02em">QEC</text>
+    <text x="100" y="68" font-size="13" font-weight="600" fill="#0369A1">Quality Education Company</text>
+  </g>
+</svg>

@@ -10,6 +10,7 @@ public static class OidcPrincipalMapper
 {
     public const string ExternalIdClaimType = "qec_external_id";
     public const string UpnClaimType = "upn";
+    public const string AvatarUrlClaimType = "qec_avatar_url";
 
     public static ClaimsPrincipal MapAuthenticatedPrincipal(
         ClaimsPrincipal inbound,
@@ -27,6 +28,7 @@ public static class OidcPrincipalMapper
         string email = ResolveEmail(source);
         EnsureAllowedDomain(email, allowedDomains);
         string? displayName = ResolveDisplayName(source);
+        string? avatarUrl = ResolveAvatarUrl(source);
 
         ClaimsIdentity mapped = new(
             authenticationType: source.AuthenticationType ?? "oidc",
@@ -42,6 +44,11 @@ public static class OidcPrincipalMapper
         if (!string.IsNullOrWhiteSpace(displayName))
         {
             mapped.AddClaim(new Claim(ClaimTypes.Name, displayName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(avatarUrl))
+        {
+            mapped.AddClaim(new Claim(AvatarUrlClaimType, avatarUrl));
         }
 
         return new ClaimsPrincipal(mapped);
@@ -92,6 +99,27 @@ public static class OidcPrincipalMapper
     private static string? ResolveDisplayName(ClaimsIdentity identity) =>
         identity.FindFirst("name")?.Value
         ?? identity.FindFirst(ClaimTypes.Name)?.Value;
+
+    private static string? ResolveAvatarUrl(ClaimsIdentity identity)
+    {
+        string? value = identity.FindFirst("picture")?.Value
+            ?? identity.FindFirst("profile")?.Value
+            ?? identity.FindFirst(AvatarUrlClaimType)?.Value;
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string trimmed = value.Trim();
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri)
+            || uri.Scheme != Uri.UriSchemeHttps)
+        {
+            return null;
+        }
+
+        return trimmed;
+    }
 
     private static void EnsureAllowedDomain(string email, IReadOnlyList<string>? allowedDomains)
     {

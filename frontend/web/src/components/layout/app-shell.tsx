@@ -40,10 +40,20 @@ import { isAppLanguage, type AppLanguage } from '@/i18n'
 import { useTheme } from '@/app/theme-provider'
 import type { ThemeOption } from '@/app/theme'
 import { NotificationBell } from '@/components/layout/notification-bell'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import type { CurrentUser, CurrentUserRole } from '@/auth/types'
 import { cn } from '@/lib/utils'
 
 type IconType = ComponentType<SVGProps<SVGSVGElement> & { className?: string }>
@@ -402,22 +412,37 @@ function BrandBlock({ collapsed }: { collapsed: boolean }) {
   if (collapsed) {
     return (
       <div className="flex items-center justify-center px-2 py-4" title={t('brand.name')}>
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-accent/90 text-xs font-bold text-white">
-          QEC
-        </div>
+        <img
+          src="/qec-mark.svg"
+          alt={t('brand.name')}
+          className="h-9 w-9 rounded-lg"
+          width={36}
+          height={36}
+        />
       </div>
     )
   }
 
   return (
     <div className="px-4 py-4">
-      <div className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-sidebar-muted">
-        {t('brand.organization')}
+      <div className="flex items-center gap-3">
+        <img
+          src="/qec-mark.svg"
+          alt=""
+          className="h-10 w-10 shrink-0 rounded-lg"
+          width={40}
+          height={40}
+        />
+        <div className="min-w-0">
+          <div className="text-[0.65rem] font-semibold uppercase tracking-[0.18em] text-sidebar-muted">
+            {t('brand.organization')}
+          </div>
+          <div className="mt-0.5 truncate text-lg font-semibold leading-tight text-sidebar-foreground">
+            {t('brand.name')}
+          </div>
+        </div>
       </div>
-      <div className="mt-1 text-lg font-semibold leading-tight text-sidebar-foreground">
-        {t('brand.name')}
-      </div>
-      <p className="mt-1 text-xs leading-snug text-sidebar-muted">{t('brand.product')}</p>
+      <p className="mt-2 text-xs leading-snug text-sidebar-muted">{t('brand.product')}</p>
     </div>
   )
 }
@@ -592,35 +617,141 @@ function PreferenceControls() {
   )
 }
 
+const ROLE_PRIORITY = ['Platform Administrator', 'Auditor', 'Employee'] as const
+
+function resolveRoleContext(roles: CurrentUserRole[], fallbackLabel: string): string {
+  if (!roles.length) return fallbackLabel
+  for (const preferred of ROLE_PRIORITY) {
+    const match = roles.find((role) => role.name === preferred)
+    if (match) return match.name
+  }
+  return roles[0]?.name?.trim() || fallbackLabel
+}
+
+function firstName(displayName: string): string {
+  const parts = displayName.trim().split(/\s+/).filter(Boolean)
+  return parts[0] ?? displayName
+}
+
+function userInitials(displayName: string, upn: string): string {
+  const parts = displayName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return `${parts[0]![0] ?? ''}${parts[1]![0] ?? ''}`.toUpperCase()
+  }
+  if (parts.length === 1 && parts[0]!.length > 0) {
+    return parts[0]!.slice(0, 1).toUpperCase()
+  }
+  const local = upn.split('@')[0] ?? 'U'
+  return local.slice(0, 1).toUpperCase()
+}
+
+function UserAvatar({
+  user,
+  className,
+  fallbackClassName,
+}: {
+  user: CurrentUser
+  className?: string
+  fallbackClassName?: string
+}) {
+  const initials = userInitials(user.displayName, user.upn)
+  return (
+    <Avatar className={className} aria-hidden>
+      {user.avatarUrl ? (
+        <AvatarImage key={user.avatarUrl} src={user.avatarUrl} alt="" />
+      ) : null}
+      <AvatarFallback className={fallbackClassName}>{initials}</AvatarFallback>
+    </Avatar>
+  )
+}
+
 function UserSessionControls() {
   const { t } = useTranslation()
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [busy, setBusy] = useState(false)
+  const [open, setOpen] = useState(false)
 
   if (!user) return null
 
+  const roleContext = resolveRoleContext(user.roles, t('shell.itmgUser'))
+  const abbreviatedName = firstName(user.displayName)
+
+  async function handleSignOut() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await logout()
+      navigate('/login', { replace: true })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <div className="hidden min-w-0 text-end md:block">
-        <div className="truncate text-sm font-medium">{user.displayName}</div>
-        <div className="truncate text-xs text-muted-foreground">{user.upn}</div>
-      </div>
-      <Button
-        variant="outline"
-        size="sm"
-        disabled={busy}
-        onClick={() => {
-          setBusy(true)
-          void logout()
-            .then(() => navigate('/login', { replace: true }))
-            .finally(() => setBusy(false))
-        }}
-      >
-        <LogOut className="h-4 w-4" />
-        <span className="ms-1 hidden sm:inline">{t('shell.logout')}</span>
-      </Button>
-    </div>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            'group flex max-w-[14rem] items-center gap-2 rounded-lg border border-transparent px-1.5 py-1 text-start transition-colors',
+            'hover:border-border hover:bg-accent/60',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            'data-[state=open]:border-border data-[state=open]:bg-accent/60',
+          )}
+          aria-label={t('shell.profileMenu')}
+          disabled={busy}
+        >
+          <UserAvatar user={user} className="h-9 w-9" />
+          <span className="hidden min-w-0 flex-1 sm:block">
+            <span className="block truncate text-sm font-medium leading-tight text-foreground">
+              <span className="md:hidden">{abbreviatedName}</span>
+              <span className="hidden md:inline">{user.displayName}</span>
+            </span>
+            <span className="mt-0.5 hidden truncate text-xs leading-tight text-muted-foreground md:block">
+              {roleContext}
+            </span>
+          </span>
+          <ChevronDown
+            className="hidden h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180 sm:block"
+            aria-hidden
+          />
+        </button>
+      </DropdownMenuTrigger>
+
+      <DropdownMenuContent align="end" className="w-72 p-0" sideOffset={8}>
+        <DropdownMenuLabel className="p-0 font-normal">
+          <div className="flex items-start gap-3 px-3 py-3">
+            <UserAvatar
+              user={user}
+              className="h-10 w-10"
+              fallbackClassName="text-sm"
+            />
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <p className="truncate text-sm font-semibold text-foreground">{user.displayName}</p>
+              <p className="truncate text-xs text-muted-foreground" title={user.upn}>
+                {user.upn}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">{roleContext}</p>
+            </div>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator className="my-0" />
+        <div className="p-1">
+          <DropdownMenuItem
+            disabled={busy}
+            className="cursor-pointer"
+            onSelect={(event) => {
+              event.preventDefault()
+              void handleSignOut()
+            }}
+          >
+            <LogOut className="h-4 w-4 text-muted-foreground" aria-hidden />
+            <span>{busy ? t('shell.signingOut') : t('shell.logout')}</span>
+          </DropdownMenuItem>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -727,11 +858,13 @@ export function AppShell() {
               </div>
             </div>
 
-            <div className="hidden sm:block">
-              <PreferenceControls />
+            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <div className="hidden sm:block">
+                <PreferenceControls />
+              </div>
+              <NotificationBell />
+              <UserSessionControls />
             </div>
-            <NotificationBell />
-            <UserSessionControls />
           </div>
           <div className="border-t border-border px-4 py-2 sm:hidden">
             <PreferenceControls />
