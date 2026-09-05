@@ -144,6 +144,11 @@ export function EmployeeRemoteSupportPage() {
       <PageHeader
         title={t('employee.remote.listTitle')}
         description={t('employee.remote.listHint')}
+        actions={
+          <Button asChild>
+            <Link to="/employee/remote-support/new">{t('employee.remote.getHelp')}</Link>
+          </Button>
+        }
       />
 
       {onboardingQuery.isLoading ? (

@@ -30,6 +30,42 @@ public sealed class RemoteSupportNotificationService(
                 ct)
             : Task.CompletedTask;
 
+    public async Task NotifySelfRequestedAsync(
+        RemoteSessionRequestDto request,
+        string employeeDisplayName,
+        CancellationToken ct)
+    {
+        // Queue signal for support staff is in-app via their list refresh; notify assigned tech if any.
+        if (request.TechnicianUserId is Guid tech)
+        {
+            await NotifyInAppOnlyAsync(
+                tech,
+                "remote.self_requested",
+                NotificationSeverity.Warning,
+                $"{request.RemoteNumber} new remote help",
+                $"{employeeDisplayName}: {Truncate(request.Reason)}",
+                request.Id,
+                ItActionUrl(request.Id),
+                ct);
+        }
+    }
+
+    public Task NotifyTechnicianAssignedAsync(
+        RemoteSessionRequestDto request,
+        string technicianDisplayName,
+        CancellationToken ct) =>
+        request.TargetUserId is Guid target
+            ? NotifyInAppOnlyAsync(
+                target,
+                "remote.technician_joined",
+                NotificationSeverity.Info,
+                $"{request.RemoteNumber} technician joined",
+                $"{technicianDisplayName} joined your remote support request.",
+                request.Id,
+                EmployeeActionUrl(request.Id),
+                ct)
+            : Task.CompletedTask;
+
     public Task NotifyAllowedAsync(RemoteSessionRequestDto request, CancellationToken ct) =>
         request.TechnicianUserId is Guid tech
             ? NotifyUserAsync(

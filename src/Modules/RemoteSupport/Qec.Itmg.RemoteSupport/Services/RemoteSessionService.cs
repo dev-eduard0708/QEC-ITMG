@@ -13,7 +13,8 @@ namespace Qec.Itmg.RemoteSupport.Services;
 public sealed record RemoteSessionRequestDto(
     Guid Id,
     string RemoteNumber,
-    Guid ConfigurationItemId,
+    Guid? ConfigurationItemId,
+    Guid? RemoteEndpointId,
     Guid? TicketId,
     Guid? ChangeRequestId,
     Guid RequestedByUserId,
@@ -179,6 +180,94 @@ public sealed class RemoteSessionService(
         return Map(entity);
     }
 
+    public async Task<RemoteSessionRequestDto> CreateEmployeeSelfRequestAsync(
+        Guid employeeUserId,
+        string reason,
+        Guid? ticketId,
+        Guid? configurationItemId,
+        CancellationToken ct)
+    {
+        if (configurationItemId is Guid ciId)
+            await EnsureCiExistsAsync(ciId, ct);
+
+        string number = await numbers.NextAsync(SequenceKey, Prefix, ct);
+        RemoteSessionRequest entity = RemoteSessionRequest.CreateEmployeeSelfRequest(
+            number,
+            employeeUserId,
+            reason,
+            clock.UtcNow,
+            ticketId,
+            configurationItemId);
+
+        await sharedDbTransaction.ExecuteAsync(async innerCt =>
+        {
+            db.RemoteSessionRequests.Add(entity);
+            await db.SaveChangesAsync(innerCt);
+            await businessAudit.AppendAsync(RemoteAudit.Created(entity.Id, entity.RemoteNumber), innerCt);
+            await businessAudit.AppendAsync(
+                RemoteAudit.Field(
+                    entity.Id,
+                    entity.RemoteNumber,
+                    "RemoteSupportSelfRequested",
+                    null,
+                    "true",
+                    BusinessAuditAction.Created), innerCt);
+            await businessAudit.AppendAsync(
+                RemoteAudit.Field(entity.Id, entity.RemoteNumber, "Status", null, entity.Status.ToString()), innerCt);
+        }, ct);
+
+        return Map(entity);
+    }
+
+    public async Task<RemoteSessionRequestDto> AssignTechnicianAsync(
+        Guid id,
+        Guid technicianUserId,
+        CancellationToken ct)
+    {
+        RemoteSessionRequest entity = await LoadTrackedAsync(id, ct);
+        string? previousTech = entity.TechnicianUserId?.ToString("N");
+        entity.AssignTechnician(technicianUserId, clock.UtcNow);
+        await sharedDbTransaction.ExecuteAsync(async innerCt =>
+        {
+            await db.SaveChangesAsync(innerCt);
+            await businessAudit.AppendAsync(
+                RemoteAudit.Field(
+                    entity.Id,
+                    entity.RemoteNumber,
+                    "RemoteTechnicianAssigned",
+                    previousTech,
+                    technicianUserId.ToString("N"),
+                    BusinessAuditAction.Updated), innerCt);
+        }, ct);
+        return Map(entity);
+    }
+
+    public async Task<RemoteSessionRequestDto> RequestEmployeeAccessAsync(
+        Guid id,
+        Guid actorUserId,
+        CancellationToken ct)
+    {
+        RemoteSessionRequest entity = await LoadTrackedAsync(id, ct);
+        if (entity.TechnicianUserId is Guid tech && tech != actorUserId && entity.RequestedByUserId != actorUserId)
+            throw new InvalidOperationException("Only the assigned technician may request remote access.");
+        if (entity.TechnicianUserId is null)
+            throw new InvalidOperationException("Assign a technician before requesting remote access.");
+        if (!entity.HasConnectTarget)
+            throw new InvalidOperationException("A device must be ready before requesting remote access.");
+
+        string previous = entity.Status.ToString();
+        entity.RequestEmployeeAccess(
+            clock.UtcNow,
+            TimeSpan.FromMinutes(Math.Max(5, options.Value.DefaultConsentExpiryMinutes)));
+        await sharedDbTransaction.ExecuteAsync(async innerCt =>
+        {
+            await db.SaveChangesAsync(innerCt);
+            await businessAudit.AppendAsync(
+                RemoteAudit.Field(entity.Id, entity.RemoteNumber, "Status", previous, entity.Status.ToString(), reason: "Remote access requested"), innerCt);
+        }, ct);
+        return Map(entity);
+    }
+
     public async Task<RemoteSessionRequestDto> CreateUnattendedAsync(
         Guid configurationItemId,
         Guid requestedByUserId,
@@ -275,10 +364,7 @@ public sealed class RemoteSessionService(
         CancellationToken ct)
     {
         RemoteSessionRequest entity = await LoadTrackedAsync(id, ct);
-        RemoteCiProjection ci = await EnsureCiExistsAsync(entity.ConfigurationItemId, ct);
-
-        if (string.IsNullOrWhiteSpace(ci.RemoteEngineNodeId))
-            throw new InvalidOperationException("Configuration item has no RemoteEngineNodeId mapping; connection cannot start.");
+        string engineNodeId = await ResolveEngineNodeIdAsync(entity, ct);
 
         if (entity.SessionType == RemoteSessionType.Attended)
         {
@@ -297,11 +383,22 @@ public sealed class RemoteSessionService(
         {
             if (!actorHasUnattended)
                 throw new InvalidOperationException("remote.unattended permission is required.");
+            if (entity.ConfigurationItemId is not Guid ciId)
+                throw new InvalidOperationException("Unattended remote requires a managed configuration item.");
+            RemoteCiProjection ci = await EnsureCiExistsAsync(ciId, ct);
             ValidateUnattendedPolicy(ci, entity.TicketId, entity.ChangeRequestId, mfaSatisfied, options.Value);
+            if (entity.RemoteEndpointId is Guid epId)
+            {
+                RemoteEndpoint? ep = await db.RemoteEndpoints.AsNoTracking().FirstOrDefaultAsync(x => x.Id == epId, ct);
+                if (ep is not null && ep.EndpointKind == RemoteEndpointKind.Temporary)
+                    throw new InvalidOperationException("Temporary endpoints cannot be used for unattended support.");
+            }
         }
 
         if (entity.TechnicianUserId is Guid tech && tech != actorUserId && entity.RequestedByUserId != actorUserId)
             throw new InvalidOperationException("Only the assigned technician may start this session.");
+        if (entity.TechnicianUserId is null)
+            throw new InvalidOperationException("Assign a technician before connecting.");
 
         RemoteEngineStatus engineStatus = engine.GetStatus();
         if (!engineStatus.Enabled || !engineStatus.Configured)
@@ -316,7 +413,7 @@ public sealed class RemoteSessionService(
         var engineRequest = new CreateRemoteEngineSessionRequest(
             entity.Id,
             entity.RemoteNumber,
-            ci.RemoteEngineNodeId!,
+            engineNodeId,
             entity.SessionType.ToString(),
             entity.TechnicianUserId ?? actorUserId,
             entity.TargetUserId,
@@ -358,6 +455,43 @@ public sealed class RemoteSessionService(
         }, ct);
 
         return Map(entity);
+    }
+
+    private async Task<string> ResolveEngineNodeIdAsync(RemoteSessionRequest entity, CancellationToken ct)
+    {
+        if (entity.RemoteEndpointId is Guid endpointId)
+        {
+            RemoteEndpoint? endpoint = await db.RemoteEndpoints.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == endpointId, ct);
+            if (endpoint is null)
+                throw new InvalidOperationException("Remote endpoint was not found.");
+            if (endpoint.ConnectionStatus == RemoteEndpointConnectionStatus.Expired)
+                throw new InvalidOperationException("Remote endpoint has expired.");
+            if (endpoint.EndpointKind == RemoteEndpointKind.Temporary
+                && entity.SessionType == RemoteSessionType.Unattended)
+                throw new InvalidOperationException("Temporary endpoints cannot be used for unattended support.");
+            if (!string.IsNullOrWhiteSpace(endpoint.EngineNodeId))
+                return endpoint.EngineNodeId!;
+            if (endpoint.ConfigurationItemId is Guid linkedCi)
+            {
+                RemoteCiProjection linked = await EnsureCiExistsAsync(linkedCi, ct);
+                if (!string.IsNullOrWhiteSpace(linked.RemoteEngineNodeId))
+                    return linked.RemoteEngineNodeId!;
+            }
+
+            throw new InvalidOperationException(
+                "Device was detected, but remote connection is not ready yet. You can continue chatting with IT.");
+        }
+
+        if (entity.ConfigurationItemId is Guid ciId)
+        {
+            RemoteCiProjection ci = await EnsureCiExistsAsync(ciId, ct);
+            if (string.IsNullOrWhiteSpace(ci.RemoteEngineNodeId))
+                throw new InvalidOperationException("Configuration item has no remote engine mapping; connection cannot start.");
+            return ci.RemoteEngineNodeId!;
+        }
+
+        throw new InvalidOperationException("A ready device target is required before connecting.");
     }
 
     public async Task<RemoteSessionRequestDto> EndAsync(
@@ -543,6 +677,7 @@ public sealed class RemoteSessionService(
             x.Id,
             x.RemoteNumber,
             x.ConfigurationItemId,
+            x.RemoteEndpointId,
             x.TicketId,
             x.ChangeRequestId,
             x.RequestedByUserId,

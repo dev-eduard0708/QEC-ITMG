@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { remoteSupportKeys } from '@/features/it/query-keys'
 import { RemoteSessionChat } from '@/features/remote-support/remote-session-chat'
+import { RemoteDeviceCard } from '@/features/remote-support/remote-device-card'
 import { isChatOpen } from '@/features/remote-support/chat-window'
 import { useState } from 'react'
 
@@ -47,6 +48,13 @@ export function RemoteSupportDetailPage() {
     queryFn: () => remoteSupportApi.readiness(),
   })
 
+  const endpointQuery = useQuery({
+    queryKey: [...remoteSupportKeys.detail(id), 'endpoint'],
+    queryFn: () => remoteSupportApi.getSessionEndpoint(id),
+    enabled: Boolean(id),
+    refetchInterval: 5_000,
+  })
+
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: remoteSupportKeys.detail(id) })
     await queryClient.invalidateQueries({ queryKey: remoteSupportKeys.all })
@@ -75,6 +83,22 @@ export function RemoteSupportDetailPage() {
     },
   })
 
+  const takeMutation = useMutation({
+    mutationFn: () => remoteSupportApi.takeSession(id),
+    onSuccess: invalidate,
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : t('remote.error.generic'))
+    },
+  })
+
+  const requestAccessMutation = useMutation({
+    mutationFn: () => remoteSupportApi.requestAccess(id),
+    onSuccess: invalidate,
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : t('remote.error.generic'))
+    },
+  })
+
   if (sessionQuery.isLoading) {
     return <Skeleton className="h-40 w-full" />
   }
@@ -84,8 +108,14 @@ export function RemoteSupportDetailPage() {
     return <p className="text-sm text-muted-foreground">{t('remote.notFound')}</p>
   }
 
-  const canStart = session.status === 'Allowed' && can('remote.attended')
+  const endpoint = endpointQuery.data
+  const canStart =
+    session.status === 'Allowed' && Boolean(endpoint?.isReadyForRemote) && can('remote.attended')
   const canEnd = session.status === 'InSession' && can('remote.attended')
+  const canRequestAccess =
+    session.status === 'Requested' &&
+    Boolean(session.technicianUserId) &&
+    can('remote.attended')
   const readiness = readinessQuery.data
 
   return (
@@ -114,6 +144,16 @@ export function RemoteSupportDetailPage() {
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
+      {endpoint ? (
+        <RemoteDeviceCard endpoint={endpoint} variant="technician" />
+      ) : (
+        <Card>
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            {t('remote.device.notPrepared')}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
@@ -122,9 +162,9 @@ export function RemoteSupportDetailPage() {
           <CardContent className="space-y-2">
             <DetailRow
               label={t('remote.fields.configurationItem')}
-              value={session.configurationItemId}
+              value={session.configurationItemId ?? '—'}
             />
-            {can('remote.admin') ? (
+            {can('remote.admin') && session.configurationItemId ? (
               <Button asChild size="sm" variant="ghost" className="h-auto p-0">
                 <Link to={`/it/cmdb?ci=${session.configurationItemId}`}>
                   {t('remote.openCiMapping')}
@@ -228,12 +268,30 @@ export function RemoteSupportDetailPage() {
         canPost={isChatOpen(session)}
       />
 
-      {(canStart || canEnd) && (
+      {(!session.technicianUserId || canRequestAccess || canStart || canEnd) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">{t('remote.actions.title')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap items-end gap-3">
+            {!session.technicianUserId ? (
+              <Button
+                type="button"
+                onClick={() => takeMutation.mutate()}
+                disabled={takeMutation.isPending}
+              >
+                {t('remote.actions.take')}
+              </Button>
+            ) : null}
+            {canRequestAccess ? (
+              <Button
+                type="button"
+                onClick={() => requestAccessMutation.mutate()}
+                disabled={requestAccessMutation.isPending}
+              >
+                {t('remote.actions.requestAccess')}
+              </Button>
+            ) : null}
             {canStart ? (
               <Button type="button" onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
                 {t('remote.actions.start')}

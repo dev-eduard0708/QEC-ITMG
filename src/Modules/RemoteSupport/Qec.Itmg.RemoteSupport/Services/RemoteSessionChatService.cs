@@ -37,6 +37,15 @@ public sealed class RemoteSessionChatService(
     public static class SystemEvents
     {
         public const string Requested = "remote.requested";
+        public const string SelfRequested = "remote.self_requested";
+        public const string TechnicianJoined = "remote.technician_joined";
+        public const string EnrollmentIssued = "remote.enrollment_issued";
+        public const string HelperDownloaded = "remote.helper_downloaded";
+        public const string DeviceRegistered = "remote.device_registered";
+        public const string DeviceOnline = "remote.device_online";
+        public const string AgentPreparing = "remote.agent_preparing";
+        public const string DeviceReady = "remote.device_ready";
+        public const string AccessRequested = "remote.access_requested";
         public const string Allowed = "remote.allowed";
         public const string Declined = "remote.declined";
         public const string Expired = "remote.expired";
@@ -45,6 +54,7 @@ public sealed class RemoteSessionChatService(
         public const string Ended = "remote.ended";
         public const string Failed = "remote.failed";
         public const string ChatOpened = "remote.chat_opened";
+        public const string DeviceExpired = "remote.device_expired";
     }
 
     public async Task<IReadOnlyList<RemoteSessionMessageDto>> ListAsync(

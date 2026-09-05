@@ -44,9 +44,32 @@ public sealed class RemoteSupportOptions
     /// <summary>Optional employee-facing install instructions (plain text / markdown-lite).</summary>
     public string AgentInstallInstructions { get; set; } = string.Empty;
 
+    /// <summary>Optional HTTPS URL for the QEC Support Helper bootstrap package (built/signed outside git).</summary>
+    public string HelperDownloadUrl { get; set; } = string.Empty;
+
+    /// <summary>Optional helper install instructions for employees.</summary>
+    public string HelperInstallInstructions { get; set; } = string.Empty;
+
+    /// <summary>One-time enrollment token lifetime (minutes). Default 10.</summary>
+    public int EnrollmentTokenLifetimeMinutes { get; set; } = 10;
+
+    /// <summary>How long temporary endpoints remain associated after last activity (hours).</summary>
+    public int TemporaryEndpointRetentionHours { get; set; } = 72;
+
+    /// <summary>
+    /// Development only: when helper binary is unavailable, allow mock endpoint registration
+    /// labelled as development. Must stay false in production.
+    /// </summary>
+    public bool AllowDevelopmentMockEnrollment { get; set; }
+
     public bool HasAgentDownload =>
         !string.IsNullOrWhiteSpace(AgentDownloadUrl)
         && Uri.TryCreate(AgentDownloadUrl.Trim(), UriKind.Absolute, out Uri? uri)
+        && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
+
+    public bool HasHelperDownload =>
+        !string.IsNullOrWhiteSpace(HelperDownloadUrl)
+        && Uri.TryCreate(HelperDownloadUrl.Trim(), UriKind.Absolute, out Uri? uri)
         && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp);
 
     public bool IsConfigured =>

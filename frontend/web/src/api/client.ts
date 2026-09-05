@@ -3674,7 +3674,8 @@ export type RemoteEngineStatus = {
 export type RemoteSessionRequest = {
   id: string
   remoteNumber: string
-  configurationItemId: string
+  configurationItemId: string | null
+  remoteEndpointId: string | null
   ticketId: string | null
   changeRequestId: string | null
   requestedByUserId: string
@@ -3763,6 +3764,62 @@ export type RemoteSessionMessage = {
   sentAtUtc: string
 }
 
+export type RemoteEndpoint = {
+  id: string
+  ownerUserId: string
+  currentRemoteSessionRequestId: string | null
+  configurationItemId: string | null
+  engineNodeId: string | null
+  endpointKind: string
+  deviceName: string
+  operatingSystem: string
+  operatingSystemVersion: string | null
+  architecture: string | null
+  helperVersion: string | null
+  agentVersion: string | null
+  connectionStatus: string
+  isReadyForRemote: boolean
+  hasEngineNode: boolean
+  firstSeenAtUtc: string
+  lastSeenAtUtc: string
+  expiresAtUtc: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type EnrollmentIssueResult = {
+  enrollmentId: string
+  token: string
+  expiresAtUtc: string
+  helperDownloadConfigured: boolean
+  helperDownloadUrl: string | null
+  helperInstallInstructions: string | null
+  agentDownloadConfigured: boolean
+  agentDownloadUrl: string | null
+  agentInstallInstructions: string | null
+}
+
+export type EnrollmentRedeemResult = {
+  endpointId: string
+  remoteSessionRequestId: string
+  deviceName: string
+  connectionStatus: string
+  waitingForRemoteAgent: boolean
+  agentDownloadUrl: string | null
+  agentInstallInstructions: string | null
+}
+
+export type RedeemEnrollmentPayload = {
+  token: string
+  deviceName: string
+  operatingSystem: string
+  operatingSystemVersion?: string | null
+  architecture?: string | null
+  helperVersion?: string | null
+  reportedEngineNodeId?: string | null
+}
+
 export type CreateAttendedRemotePayload = {
   configurationItemId: string
   targetUserId: string
@@ -3820,6 +3877,81 @@ export const remoteSupportApi = {
     ),
   getSession: (id: string) =>
     apiFetch<RemoteSessionRequest>(`/api/v1/remote-support/sessions/${id}`),
+  createSelfHelp: (payload: { reason: string; configurationItemId?: string | null }) =>
+    apiFetch<RemoteSessionRequest>('/api/v1/me/remote-support', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  issueEnrollment: (sessionId: string) =>
+    apiFetch<EnrollmentIssueResult>(`/api/v1/me/remote-support/${sessionId}/enrollment`, {
+      method: 'POST',
+    }),
+  selectManagedDevice: (sessionId: string, configurationItemId: string) =>
+    apiFetch<RemoteEndpoint>(
+      `/api/v1/me/remote-support/${sessionId}/select-managed-device`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ configurationItemId }),
+      },
+    ),
+  getMyEndpoint: (sessionId: string) =>
+    apiFetch<RemoteEndpoint | null>(`/api/v1/me/remote-support/${sessionId}/endpoint`),
+  getSessionEndpoint: (sessionId: string) =>
+    apiFetch<RemoteEndpoint | null>(`/api/v1/remote-support/sessions/${sessionId}/endpoint`),
+  takeSession: (id: string) =>
+    apiFetch<RemoteSessionRequest>(`/api/v1/remote-support/sessions/${id}/take`, {
+      method: 'POST',
+    }),
+  assignTechnician: (id: string, technicianUserId: string) =>
+    apiFetch<RemoteSessionRequest>(`/api/v1/remote-support/sessions/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ technicianUserId }),
+    }),
+  requestAccess: (id: string) =>
+    apiFetch<RemoteSessionRequest>(`/api/v1/remote-support/sessions/${id}/request-access`, {
+      method: 'POST',
+    }),
+  listEndpoints: (params?: {
+    kind?: string
+    status?: string
+    includeExpired?: boolean
+    take?: number
+  }) => {
+    const query = new URLSearchParams()
+    if (params?.kind) query.set('kind', params.kind)
+    if (params?.status) query.set('status', params.status)
+    if (params?.includeExpired != null) {
+      query.set('includeExpired', String(params.includeExpired))
+    }
+    if (params?.take) query.set('take', String(params.take))
+    const qs = query.toString()
+    return apiFetch<RemoteEndpoint[]>(`/api/v1/remote-support/endpoints${qs ? `?${qs}` : ''}`)
+  },
+  linkEndpointCi: (id: string, configurationItemId: string) =>
+    apiFetch<RemoteEndpoint>(`/api/v1/remote-support/endpoints/${id}/link-ci`, {
+      method: 'POST',
+      body: JSON.stringify({ configurationItemId }),
+    }),
+  expireEndpoint: (id: string) =>
+    apiFetch<{ expired: boolean }>(`/api/v1/remote-support/endpoints/${id}/expire`, {
+      method: 'POST',
+    }),
+  redeemEnrollment: (payload: RedeemEnrollmentPayload) =>
+    apiFetch<EnrollmentRedeemResult>('/api/v1/remote-support/enrollments/redeem', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  devMockEndpoint: (
+    sessionId: string,
+    body: Partial<RedeemEnrollmentPayload> = {},
+  ) =>
+    apiFetch<EnrollmentRedeemResult>(
+      `/api/v1/me/remote-support/${sessionId}/dev-mock-endpoint`,
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
   createAttended: (payload: CreateAttendedRemotePayload) =>
     apiFetch<RemoteSessionRequest>('/api/v1/remote-support/sessions/attended', {
       method: 'POST',

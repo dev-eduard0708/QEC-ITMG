@@ -35,6 +35,8 @@ public sealed class RemoteSupportModule : IModule
             RemoteSupportDbContext.SchemaName);
         services.AddScoped<RemoteSessionService>();
         services.AddScoped<RemoteSessionChatService>();
+        services.AddScoped<RemoteEndpointService>();
+        services.AddSingleton<IRemoteEndpointEnrollmentEngine, DeferredRemoteEndpointEnrollmentEngine>();
         services.AddSingleton<IRemoteSupportChatNotifier, NoOpRemoteSupportChatNotifier>();
     }
 }

@@ -79,6 +79,8 @@ import { RemoteSupportDetailPage } from '@/features/it/remote-support-detail-pag
 import { EmployeeRemoteSupportPage } from '@/features/employee/remote-support-page'
 import { EmployeeRemoteSupportSetupPage } from '@/features/employee/remote-support-setup-page'
 import { EmployeeRemoteSupportDetailPage } from '@/features/employee/remote-support-detail-page'
+import { EmployeeRemoteSupportNewPage } from '@/features/employee/remote-support-new-page'
+import { RemoteSupportEndpointsPage } from '@/features/it/remote-support-endpoints-page'
 
 export function AppRouter() {
   return (
@@ -106,6 +108,7 @@ export function AppRouter() {
           <Route path="employee/security/awareness/:assignmentId" element={<EmployeeAwarenessDetailPage />} />
           <Route path="employee/security/report" element={<ReportSecurityConcernPage />} />
           <Route path="employee/remote-support" element={<EmployeeRemoteSupportPage />} />
+          <Route path="employee/remote-support/new" element={<EmployeeRemoteSupportNewPage />} />
           <Route path="employee/remote-support/setup" element={<EmployeeRemoteSupportSetupPage />} />
           <Route path="employee/remote-support/:id" element={<EmployeeRemoteSupportDetailPage />} />
           <Route path="it" element={<ItHomePage />} />
@@ -281,6 +284,7 @@ export function AppRouter() {
             }
           >
             <Route path="it/remote-support" element={<RemoteSupportPage />} />
+            <Route path="it/remote-support/endpoints" element={<RemoteSupportEndpointsPage />} />
             <Route path="it/remote-support/:id" element={<RemoteSupportDetailPage />} />
           </Route>
           <Route path="unauthorized" element={<UnauthorizedPage />} />

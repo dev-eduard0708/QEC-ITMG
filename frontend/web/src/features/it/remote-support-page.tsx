@@ -27,7 +27,15 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { remoteSupportKeys, cmdbKeys } from '@/features/it/query-keys'
 import { cn } from '@/lib/utils'
 
-type TabKey = 'pending' | 'ready' | 'active' | 'history'
+type TabKey =
+  | 'waiting'
+  | 'assigned'
+  | 'waitingDevice'
+  | 'waitingApproval'
+  | 'ready'
+  | 'connecting'
+  | 'inSession'
+  | 'completed'
 
 function engineStatusVariant(
   status: string,
@@ -70,13 +78,21 @@ function sessionStatusVariant(status: string): 'default' | 'secondary' | 'succes
 
 function filterByTab(tab: TabKey, session: RemoteSessionRequest): boolean {
   switch (tab) {
-    case 'pending':
-      return session.status === 'NotifyUser' || session.status === 'Requested'
+    case 'waiting':
+      return session.status === 'Requested' && !session.technicianUserId
+    case 'assigned':
+      return session.status === 'Requested' && Boolean(session.technicianUserId)
+    case 'waitingDevice':
+      return !session.remoteEndpointId && !['Ended', 'Declined', 'Expired'].includes(session.status)
+    case 'waitingApproval':
+      return session.status === 'NotifyUser'
     case 'ready':
       return session.status === 'Allowed' || session.status === 'Authorized'
-    case 'active':
-      return session.status === 'InSession' || session.status === 'Connecting'
-    case 'history':
+    case 'connecting':
+      return session.status === 'Connecting'
+    case 'inSession':
+      return session.status === 'InSession'
+    case 'completed':
       return ['Ended', 'Declined', 'Expired'].includes(session.status)
     default:
       return false
@@ -86,6 +102,11 @@ function filterByTab(tab: TabKey, session: RemoteSessionRequest): boolean {
 function SessionRow({ session }: { session: RemoteSessionRequest }) {
   const { t } = useTranslation()
   const { can } = useAuth()
+  const queryClient = useQueryClient()
+  const takeMutation = useMutation({
+    mutationFn: () => remoteSupportApi.takeSession(session.id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: remoteSupportKeys.all }),
+  })
 
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 py-3 last:border-0">
@@ -108,7 +129,17 @@ function SessionRow({ session }: { session: RemoteSessionRequest }) {
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {can('remote.admin') ? (
+        {!session.technicianUserId ? (
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => takeMutation.mutate()}
+            disabled={takeMutation.isPending}
+          >
+            {t('remote.actions.take')}
+          </Button>
+        ) : null}
+        {can('remote.admin') && session.configurationItemId ? (
           <Button asChild size="sm" variant="ghost">
             <Link to={`/it/cmdb?ci=${session.configurationItemId}`}>
               {t('remote.openCiMapping')}
@@ -130,7 +161,7 @@ export function RemoteSupportPage() {
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   const ticketIdFromUrl = searchParams.get('ticketId') ?? ''
-  const [activeTab, setActiveTab] = useState<TabKey>('pending')
+  const [activeTab, setActiveTab] = useState<TabKey>('waiting')
   const [configurationItemId, setConfigurationItemId] = useState('')
   const [targetUserId, setTargetUserId] = useState('')
   const [reason, setReason] = useState('')
@@ -179,7 +210,7 @@ export function RemoteSupportPage() {
       setReason('')
       setFormError(null)
       await queryClient.invalidateQueries({ queryKey: remoteSupportKeys.all })
-      setActiveTab('pending')
+      setActiveTab('assigned')
       navigate(`/it/remote-support/${created.id}`)
     },
     onError: (error) => {
@@ -190,10 +221,14 @@ export function RemoteSupportPage() {
   const tabCounts = useMemo(() => {
     const items = listQuery.data?.items ?? []
     return {
-      pending: items.filter((s) => filterByTab('pending', s)).length,
+      waiting: items.filter((s) => filterByTab('waiting', s)).length,
+      assigned: items.filter((s) => filterByTab('assigned', s)).length,
+      waitingDevice: items.filter((s) => filterByTab('waitingDevice', s)).length,
+      waitingApproval: items.filter((s) => filterByTab('waitingApproval', s)).length,
       ready: items.filter((s) => filterByTab('ready', s)).length,
-      active: items.filter((s) => filterByTab('active', s)).length,
-      history: items.filter((s) => filterByTab('history', s)).length,
+      connecting: items.filter((s) => filterByTab('connecting', s)).length,
+      inSession: items.filter((s) => filterByTab('inSession', s)).length,
+      completed: items.filter((s) => filterByTab('completed', s)).length,
     }
   }, [listQuery.data?.items])
 
@@ -204,15 +239,27 @@ export function RemoteSupportPage() {
 
   const readiness = readinessQuery.data
   const tabs: { key: TabKey; label: string }[] = [
-    { key: 'pending', label: t('remote.tabs.pending') },
-    { key: 'ready', label: t('remote.tabs.ready') },
-    { key: 'active', label: t('remote.tabs.active') },
-    { key: 'history', label: t('remote.tabs.history') },
+    { key: 'waiting', label: t('remote.tabs.waiting') },
+    { key: 'assigned', label: t('remote.tabs.assigned') },
+    { key: 'waitingDevice', label: t('remote.tabs.waitingDevice') },
+    { key: 'waitingApproval', label: t('remote.tabs.waitingApproval') },
+    { key: 'ready', label: t('remote.tabs.readyConnect') },
+    { key: 'connecting', label: t('remote.tabs.connecting') },
+    { key: 'inSession', label: t('remote.tabs.inSession') },
+    { key: 'completed', label: t('remote.tabs.completed') },
   ]
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t('remote.title')} description={t('remote.description')} />
+      <PageHeader
+        title={t('remote.title')}
+        description={t('remote.description')}
+        actions={
+          <Button asChild variant="outline">
+            <Link to="/it/remote-support/endpoints">{t('remote.endpoints.title')}</Link>
+          </Button>
+        }
+      />
 
       <div className="flex flex-wrap items-center gap-3">
         {readinessQuery.isLoading ? (

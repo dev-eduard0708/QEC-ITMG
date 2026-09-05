@@ -36,7 +36,8 @@ public sealed class RemoteSessionRequest
 
     public Guid Id { get; private set; }
     public string RemoteNumber { get; private set; } = null!;
-    public Guid ConfigurationItemId { get; private set; }
+    public Guid? ConfigurationItemId { get; private set; }
+    public Guid? RemoteEndpointId { get; private set; }
     public Guid? TicketId { get; private set; }
     public Guid? ChangeRequestId { get; private set; }
     public Guid RequestedByUserId { get; private set; }
@@ -69,7 +70,7 @@ public sealed class RemoteSessionRequest
 
     public static RemoteSessionRequest CreateAttended(
         string remoteNumber,
-        Guid configurationItemId,
+        Guid? configurationItemId,
         Guid requestedByUserId,
         Guid targetUserId,
         string reason,
@@ -78,20 +79,25 @@ public sealed class RemoteSessionRequest
         Guid? ticketId = null,
         Guid? changeRequestId = null,
         string? requestedPrivileges = null,
-        Guid? technicianUserId = null)
+        Guid? technicianUserId = null,
+        Guid? remoteEndpointId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(remoteNumber);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
-        if (configurationItemId == Guid.Empty)
-            throw new ArgumentException("Configuration item is required.", nameof(configurationItemId));
         if (targetUserId == Guid.Empty)
             throw new ArgumentException("Target user is required for attended support.", nameof(targetUserId));
+
+        Guid? ci = NormalizeGuid(configurationItemId);
+        Guid? endpoint = NormalizeGuid(remoteEndpointId);
+        if (ci is null && endpoint is null)
+            throw new ArgumentException("A managed configuration item or remote endpoint is required for IT-initiated attended support.");
 
         return new RemoteSessionRequest
         {
             Id = Guid.CreateVersion7(),
             RemoteNumber = remoteNumber.Trim(),
-            ConfigurationItemId = configurationItemId,
+            ConfigurationItemId = ci,
+            RemoteEndpointId = endpoint,
             TicketId = NormalizeGuid(ticketId),
             ChangeRequestId = NormalizeGuid(changeRequestId),
             RequestedByUserId = requestedByUserId,
@@ -103,6 +109,42 @@ public sealed class RemoteSessionRequest
             Status = RemoteSessionStatus.NotifyUser,
             RequestedAtUtc = utcNow,
             ExpiresAtUtc = utcNow.Add(consentTtl),
+            CreatedAtUtc = utcNow,
+            UpdatedAtUtc = utcNow,
+        };
+    }
+
+    /// <summary>
+    /// Employee self-service attended request. Technician may be unassigned; device may be prepared later.
+    /// Consent window starts only when a technician requests remote access.
+    /// </summary>
+    public static RemoteSessionRequest CreateEmployeeSelfRequest(
+        string remoteNumber,
+        Guid employeeUserId,
+        string reason,
+        DateTimeOffset utcNow,
+        Guid? ticketId = null,
+        Guid? configurationItemId = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remoteNumber);
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        if (employeeUserId == Guid.Empty)
+            throw new ArgumentException("Employee is required.", nameof(employeeUserId));
+
+        return new RemoteSessionRequest
+        {
+            Id = Guid.CreateVersion7(),
+            RemoteNumber = remoteNumber.Trim(),
+            ConfigurationItemId = NormalizeGuid(configurationItemId),
+            TicketId = NormalizeGuid(ticketId),
+            RequestedByUserId = employeeUserId,
+            TargetUserId = employeeUserId,
+            TechnicianUserId = null,
+            Reason = reason.Trim(),
+            SessionType = RemoteSessionType.Attended,
+            Status = RemoteSessionStatus.Requested,
+            RequestedAtUtc = utcNow,
+            ExpiresAtUtc = null,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow,
         };
@@ -129,6 +171,7 @@ public sealed class RemoteSessionRequest
             Id = Guid.CreateVersion7(),
             RemoteNumber = remoteNumber.Trim(),
             ConfigurationItemId = configurationItemId,
+            RemoteEndpointId = null,
             TicketId = NormalizeGuid(ticketId),
             ChangeRequestId = NormalizeGuid(changeRequestId),
             RequestedByUserId = requestedByUserId,
@@ -149,6 +192,60 @@ public sealed class RemoteSessionRequest
         Status = RemoteSessionStatus.NotifyUser;
         UpdatedAtUtc = utcNow;
     }
+
+    public void AssignTechnician(Guid technicianUserId, DateTimeOffset utcNow)
+    {
+        if (technicianUserId == Guid.Empty)
+            throw new ArgumentException("Technician is required.", nameof(technicianUserId));
+        if (Status is RemoteSessionStatus.Ended or RemoteSessionStatus.Declined or RemoteSessionStatus.Expired)
+            throw new InvalidOperationException("Cannot assign technician on a closed request.");
+
+        TechnicianUserId = technicianUserId;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void BindRemoteEndpoint(Guid remoteEndpointId, DateTimeOffset utcNow)
+    {
+        if (remoteEndpointId == Guid.Empty)
+            throw new ArgumentException("Endpoint is required.", nameof(remoteEndpointId));
+        RemoteEndpointId = remoteEndpointId;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void BindConfigurationItem(Guid configurationItemId, DateTimeOffset utcNow)
+    {
+        if (configurationItemId == Guid.Empty)
+            throw new ArgumentException("Configuration item is required.", nameof(configurationItemId));
+        ConfigurationItemId = configurationItemId;
+        UpdatedAtUtc = utcNow;
+    }
+
+    /// <summary>Technician asks the employee for remote-control consent (distinct from chat).</summary>
+    public void RequestEmployeeAccess(DateTimeOffset utcNow, TimeSpan consentTtl)
+    {
+        if (SessionType != RemoteSessionType.Attended)
+            throw new InvalidOperationException("Only attended sessions use employee consent.");
+        if (Status is RemoteSessionStatus.Ended or RemoteSessionStatus.Declined or RemoteSessionStatus.Expired)
+            throw new InvalidOperationException("Request is closed.");
+        if (Status is RemoteSessionStatus.Connecting or RemoteSessionStatus.InSession)
+            throw new InvalidOperationException("Session is already connecting or active.");
+        if (Status == RemoteSessionStatus.Allowed)
+            throw new InvalidOperationException("Employee already allowed remote access.");
+
+        if (consentTtl < TimeSpan.FromMinutes(1))
+            consentTtl = TimeSpan.FromMinutes(1);
+
+        Status = RemoteSessionStatus.NotifyUser;
+        ExpiresAtUtc = utcNow.Add(consentTtl);
+        AllowedAtUtc = null;
+        DeclinedAtUtc = null;
+        ConsentUserId = null;
+        ConsentIpAddress = null;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public bool HasConnectTarget =>
+        ConfigurationItemId is not null || RemoteEndpointId is not null;
 
     public void Allow(Guid consentUserId, string? ipAddress, DateTimeOffset utcNow)
     {

@@ -27,9 +27,9 @@ public sealed class IdentitySeedRunner(
         await sharedDbTransaction.ExecuteAsync(async ct =>
         {
             Dictionary<string, Permission> permissions = await EnsurePermissionsAsync(ct);
-            await EnsureRoleAsync(
+            Role employee = await EnsureRoleAsync(
                 IdentitySeedCatalog.EmployeeRoleName,
-                "Default role for Google JIT and standard users. No admin permissions.",
+                "Default role for Google JIT and standard users. Narrow self-service permissions only.",
                 ct);
             Role platformAdmin = await EnsureRoleAsync(
                 IdentitySeedCatalog.PlatformAdministratorRoleName,
@@ -45,6 +45,12 @@ public sealed class IdentitySeedRunner(
                 .Where(permissions.ContainsKey)
                 .Select(key => permissions[key]);
             await EnsureRolePermissionsAsync(auditor, auditorPerms, ct);
+
+            IEnumerable<Permission> employeePerms = IdentitySeedCatalog.EmployeePermissionKeys
+                .Where(permissions.ContainsKey)
+                .Select(key => permissions[key]);
+            await EnsureRolePermissionsAsync(employee, employeePerms, ct);
+
             await EnsurePlatformAdministratorBootstrapAsync(platformAdmin, ct);
 
             logger.LogInformation(

@@ -1,8 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useMemo, useState } from 'react'
-import { ApiError, meApi, remoteSupportApi } from '@/api/client'
+import { useState } from 'react'
+import {
+  ApiError,
+  meApi,
+  remoteSupportApi,
+  type EnrollmentIssueResult,
+} from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import {
@@ -20,9 +25,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { equipmentKeys, remoteSupportKeys, ticketKeys } from '@/features/it/query-keys'
-import { formatDeviceLabel } from '@/features/employee/employee-request-helpers'
+import { remoteSupportKeys, ticketKeys } from '@/features/it/query-keys'
 import { RemoteSessionChat } from '@/features/remote-support/remote-session-chat'
+import { RemoteDeviceCard } from '@/features/remote-support/remote-device-card'
 import {
   friendlySessionStatusKey,
   sessionStatusVariant,
@@ -44,6 +49,7 @@ export function EmployeeRemoteSupportDetailPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [formError, setFormError] = useState<string | null>(null)
+  const [enrollment, setEnrollment] = useState<EnrollmentIssueResult | null>(null)
 
   const sessionQuery = useQuery({
     queryKey: remoteSupportKeys.mineDetail(id),
@@ -51,9 +57,11 @@ export function EmployeeRemoteSupportDetailPage() {
     enabled: Boolean(id),
   })
 
-  const equipmentQuery = useQuery({
-    queryKey: equipmentKeys.mine,
-    queryFn: () => meApi.listEquipment(),
+  const endpointQuery = useQuery({
+    queryKey: [...remoteSupportKeys.mineDetail(id), 'endpoint'],
+    queryFn: () => remoteSupportApi.getMyEndpoint(id),
+    enabled: Boolean(id),
+    refetchInterval: (query) => (query.state.data ? false : 5_000),
   })
 
   const ticketId = sessionQuery.data?.ticketId
@@ -101,15 +109,27 @@ export function EmployeeRemoteSupportDetailPage() {
     },
   })
 
-  const deviceLabel = useMemo(() => {
-    const session = sessionQuery.data
-    if (!session) return t('employee.remote.yourDevice')
-    const match = (equipmentQuery.data ?? []).find(
-      (asset) => asset.configurationItemId === session.configurationItemId,
-    )
-    if (match) return formatDeviceLabel(match)
-    return t('employee.remote.yourDevice')
-  }, [equipmentQuery.data, sessionQuery.data, t])
+  const enrollmentMutation = useMutation({
+    mutationFn: () => remoteSupportApi.issueEnrollment(id),
+    onSuccess: (issued) => {
+      setEnrollment(issued)
+      setFormError(null)
+    },
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : t('remote.error.generic'))
+    },
+  })
+
+  const mockMutation = useMutation({
+    mutationFn: () => remoteSupportApi.devMockEndpoint(id),
+    onSuccess: async () => {
+      setFormError(null)
+      await endpointQuery.refetch()
+    },
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : t('remote.error.generic'))
+    },
+  })
 
   if (sessionQuery.isLoading) {
     return <Skeleton className="h-40 w-full" />
@@ -120,8 +140,10 @@ export function EmployeeRemoteSupportDetailPage() {
     return <p className="text-sm text-muted-foreground">{t('remote.notFound')}</p>
   }
 
-  const awaitingConsent = session.status === 'NotifyUser' || session.status === 'Requested'
+  const awaitingConsent = session.status === 'NotifyUser'
   const inSession = session.status === 'InSession'
+  const endpoint = endpointQuery.data
+  const preparingThisComputer = !endpoint && !session.configurationItemId
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -140,6 +162,70 @@ export function EmployeeRemoteSupportDetailPage() {
       </Badge>
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+
+      {endpoint ? <RemoteDeviceCard endpoint={endpoint} variant="employee" /> : null}
+
+      {preparingThisComputer ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('employee.remote.prepare.title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              {t('employee.remote.prepare.privacy')}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {t('employee.remote.prepare.oneTimeWarning')}
+            </p>
+            <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+              {t('employee.remote.prepare.doNotShare')}
+            </p>
+            {!enrollment ? (
+              <Button
+                type="button"
+                onClick={() => enrollmentMutation.mutate()}
+                disabled={enrollmentMutation.isPending}
+              >
+                {t('employee.remote.prepare.download')}
+              </Button>
+            ) : enrollment.helperDownloadConfigured && enrollment.helperDownloadUrl ? (
+              <>
+                <Button asChild>
+                  <a
+                    href={enrollment.helperDownloadUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {t('employee.remote.prepare.download')}
+                  </a>
+                </Button>
+                {enrollment.helperInstallInstructions ? (
+                  <p className="whitespace-pre-wrap text-sm text-muted-foreground">
+                    {enrollment.helperInstallInstructions}
+                  </p>
+                ) : null}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t('employee.remote.prepare.unavailable')}
+              </p>
+            )}
+            {import.meta.env.DEV ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => mockMutation.mutate()}
+                disabled={mockMutation.isPending}
+              >
+                {t('employee.remote.prepare.developmentMock')}
+              </Button>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              {t('employee.remote.prepare.waiting')}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {awaitingConsent ? (
         <Card className="border-2 border-amber-400 bg-amber-50/60 dark:bg-amber-950/30">
@@ -190,7 +276,10 @@ export function EmployeeRemoteSupportDetailPage() {
         <CardContent className="space-y-2">
           <DetailRow label={t('remote.fields.technician')} value={t('employee.remote.itTechnician')} />
           <DetailRow label={t('remote.fields.reason')} value={session.reason} />
-          <DetailRow label={t('employee.remote.device')} value={deviceLabel} />
+          <DetailRow
+            label={t('employee.remote.device')}
+            value={endpoint?.deviceName ?? t('employee.remote.yourDevice')}
+          />
           <DetailRow
             label={t('employee.remote.relatedRequest')}
             value={ticketQuery.data?.ticketNumber ?? t('employee.remote.noRelatedRequest')}

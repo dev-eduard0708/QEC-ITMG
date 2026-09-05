@@ -116,6 +116,13 @@ public static class IdentitySeedCatalog
         ("remote.unattended", "Authorize and start unattended remote support (policy gated)"),
         ("remote.audit.read", "View remote support history and audit detail"),
         ("remote.admin", "Manage remote engine CI mapping and remote-support admin settings"),
+        ("remote.self.request", "Employee self-service: create own attended remote-support request"),
+    ];
+
+    /// <summary>Default Employee role — narrow self-service only.</summary>
+    public static readonly string[] EmployeePermissionKeys =
+    [
+        "remote.self.request",
     ];
 
     /// <summary>Read-oriented auditor role. Does not include manage/export/admin permissions.</summary>

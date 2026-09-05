@@ -9,8 +9,9 @@ export type FriendlyBadgeVariant = 'default' | 'secondary' | 'success' | 'warnin
 export function friendlySessionStatusKey(status: string): string {
   switch (status) {
     case 'NotifyUser':
-    case 'Requested':
       return 'employee.remote.sessionStatus.needsApproval'
+    case 'Requested':
+      return 'employee.remote.sessionStatus.waitingForTechnician'
     case 'Allowed':
     case 'Authorized':
       return 'employee.remote.sessionStatus.waitingForIt'

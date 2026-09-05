@@ -14,74 +14,109 @@ Related: [ADR-0008](../12-decisions/ADR-0008-remote-support-integration.md) · [
 | Start/end/outcome audit | File transfer **if exposed** — copy into ITMG audit when API allows |
 | MFA step-up for unattended | |
 | Session chat transcript + audit | Engine-side chat **if any** — not used |
+| On-demand `RemoteEndpoint` + enrollment | Agent package / MeshCentral node |
 
 The engine **must not** be a hidden bypass. Operational control: technicians are not Domain Admins on MeshCentral; only the app’s service account creates sessions. Engine UI is break-glass.
 
-## Mapping
+## Identity-first eligibility
 
-`ConfigurationItem.RemoteEngineNodeId` (or mapping table). No session without a CI (create CI first).
+Remote Support eligibility is based on **authenticated ITMG identity**, not raw email suffixes and not browser-supplied addresses.
 
-## Employee agent onboarding
+Employee self-service requires:
 
-`GET /api/v1/me/remote-support/onboarding` returns readiness per assigned device plus the agent download/instructions from `RemoteSupportOptions`. The employee UI (`/employee/remote-support` → `/employee/remote-support/setup`) is deliberately jargon-free: no engine, node, or MeshCentral wording.
+- authenticated BFF/cookie session
+- Active ITMG user
+- `UserType = Employee` (or Support/Admin permissions)
+- permission `remote.self.request`
 
-Readiness per device:
+Production company-domain enforcement stays in Google OIDC:
 
-| `readinessStatus` | Meaning | Who acts |
-|-------------------|---------|----------|
-| `Ready` | CI mapped and engine healthy | Nobody — IT may request a session |
-| `SetupRequired` | Device linked to a CI but not mapped | Employee installs the agent (one-time per device) |
-| `WaitingForIt` | Mapping exists but engine is disabled/unconfigured | IT |
-| `DeviceNotLinked` | Asset has no CI | IT registers the CI |
+`Authentication:Oidc:AllowedDomains`
 
-`overallStatus` drives the employee page CTA: anything other than `Ready` shows **Set up Remote Support**. `AgentNotConfigured` means no download URL is configured, so the setup page states that Remote Support is not configured yet instead of implying the employee can fix it. Readiness is never reported as `Ready` on the strength of an install the platform cannot observe — only a real CI mapping plus a healthy engine produces `Ready`.
+Development may continue to allow configured personal-Gmail test accounts. Remote Support does **not** hardcode `qehc.edu.sa` and does **not** re-check email domains.
 
-Ownership split for onboarding: ITMG owns asset→CI linkage, CI→node mapping (`remote.admin`, via CMDB), and the agent download/instruction configuration. The engine owns agent installation mechanics and reporting the node online.
+SQL RBAC remains authoritative for technician powers (`remote.request`, `remote.attended`, …). Google group/domain membership alone never grants Support privileges.
+
+## Two device modes
+
+### Managed device
+
+Employee or IT selects a company CI with `ConfigurationItem.RemoteEngineNodeId` mapping. Helper download can be skipped when the mapping is healthy.
+
+### On-demand / temporary device
+
+Employee may request help from a computer that is **not** in Asset Management or CMDB (home PC, branch workstation, personal laptop used for authorized work, etc.).
+
+Flow:
+
+1. Authenticated Active Employee → **Get Remote Help**
+2. Chat opens immediately (ticket auto-created/linked)
+3. **Prepare this computer** → one-time enrollment token (hash stored only)
+4. Support Helper redeems token → `RemoteEndpoint` (Temporary) appears to Support
+5. Technician chats → **Request remote access** → employee **Allow**
+6. MeshCentral connects using resolved engine node when available
+7. Session ends → temporary association expires; unattended remains prohibited
+
+Managed devices use CI mapping. On-demand attended support may use a request-scoped `RemoteEndpoint`. A CI is **not** required for on-demand mode. Temporary endpoints are never auto-promoted to permanent assets; `remote.admin` may link to an existing CI later.
+
+Location is independent: no same-LAN / same-branch / known corporate IP / VPN requirement is imposed by the application.
+
+## RemoteEndpoint
+
+Lightweight RemoteSupport-owned identity for operation only — **not** an Asset and **not** a CMDB replacement.
+
+Minimum fields: device name, OS, architecture, helper/agent versions, connection status, optional engine node, optional CI link.
+
+Do not collect serial numbers, software inventory, personal files, browser history, GPS, or unnecessary MACs by default.
+
+## Mapping (managed)
+
+`ConfigurationItem.RemoteEngineNodeId` remains the managed-device mapping. ITMG CI is the operational reference; external Asset Management remains authoritative for physical lifecycle.
+
+## Employee Get Remote Help
+
+`POST /api/v1/me/remote-support` (`remote.self.request`):
+
+- creates attended `RemoteSessionRequest` (`Status=Requested`, technician unassigned)
+- auto-creates a Service Request ticket and links it
+- optional managed `ConfigurationItemId`
+- opens chat immediately
+
+Enrollment: `POST /api/v1/me/remote-support/{id}/enrollment` issues a ≥256-bit single-use token (10 minutes default). Only the SHA-256 hash is stored. Helper redeems via `POST /api/v1/remote-support/enrollments/redeem` (no browser cookie). Tokens are never logged or BusinessAudited in plaintext.
+
+Helper source: `tools/Qec.Itmg.RemoteSupport.Helper` (build/sign outside git — **no EXE/MSI in the repo**). Configure `RemoteSupport:HelperDownloadUrl` for employee download. If unset: “Support Helper is not available on this environment.”
+
+MeshCentral automatic node provisioning is **deferred** unless a real documented API is configured (`IRemoteEndpointEnrollmentEngine`). Endpoints may register with ITMG first and show “Waiting for remote agent” without falsely marking Ready.
 
 ## Session chat
 
-Chat is a first-class ITMG feature, not an engine passthrough, so the transcript stays inside ITMG audit even when the engine is unavailable.
+Preserved from V1. Chat works **before** helper install, device registration, consent, and engine connectivity.
 
-- `GET /api/v1/remote-support/sessions/{id}/messages` — full history (source of truth, reloaded on every mount)
-- `POST /api/v1/remote-support/sessions/{id}/messages` — persist a user message
-- SignalR hub `/hubs/remote-support` (`JoinSession`, `LeaveSession`, event `remoteChatMessage`) — live delivery only
+System events include self-request, technician joined, enrollment, device registered/ready, access requested, consent, connect, end.
 
-The web client persists through REST, subscribes to the hub for live updates, and falls back to polling every 8s when the hub cannot be reached. System messages (`messageType: System`) mark lifecycle events — requested, allowed, declined, expired, connecting, started, ended, failed — so a session that never connected still reads as an explainable conversation.
+Chat is **not** consent.
 
-Chat availability spans request creation through a 7-day post-end window. Chat is **not** consent: the employee consent banner keeps explicit Allow / Decline actions, and the UI states that chatting does not approve the connection.
+## Support queue
 
-## Attended flow
+IT `/it/remote-support` shows waiting/assigned/device/consent/connect states. Technicians **Take request** (`AssignTechnician`). Endpoints admin list: `/it/remote-support/endpoints`.
 
-1. Ticket exists (typical).
-2. Technician `remote.request` → `RemoteSessionRequest` (reason, ticket, CI, requested privileges).
-3. User notified (in-app + email).
-4. User Allow / Decline (authenticated as requester or device user).
-5. On Allow, adapter starts engine session; store engine session id.
-6. On end (webhook or poll), record duration, outcome, elevation, files if known.
-7. Consent evidence stored (who, when, IP).
+## Attended connect
 
-Decline and expiry are terminal for that request; technician may create a new request.
+1. Device Ready (managed mapping or temporary endpoint with engine node)
+2. Technician **Request remote access** → employee consent banner
+3. Employee **Allow remote access** / **Decline**
+4. Technician **Connect** (engine available, consent Allowed, target Ready)
 
-## Unattended flow
+## Unattended
 
-Allowed only if:
-
-- CI tagged `UnattendedRemotePermitted` **and** policy class (server, kiosk, IT-managed)
-- Role has `remote.unattended`
-- MFA step-up succeeded this session
-- Business reason required
-- Ticket **or** Change linked (configuration: required for production criticality)
-
-Employee users never see unattended.
-
-## Degraded mode
-
-If engine is down: request/consent still persist; connect button fails clearly. Audit still valid. Chat keeps working over REST (hub optional), so IT and the employee can still coordinate — including the system message explaining that the connection could not be established.
+Unchanged policy. Temporary endpoints **cannot** be unattended. Employee UI never exposes unattended.
 
 ## Permissions
 
-`remote.request`, `remote.attended`, `remote.unattended`, `remote.audit.read`, `remote.admin` (mapping)
+`remote.self.request`, `remote.request`, `remote.attended`, `remote.unattended`, `remote.audit.read`, `remote.admin`
 
-## MVP
+Default Employee role is seeded with `remote.self.request` only.
 
-Attended + records + adapter to MeshCentral (or mock). Broad unattended is post-MVP unless a single admin role is explicitly accepted in MVP-DEFINITION.
+## Degraded mode
+
+If engine is down: request/consent/chat still work; Connect fails clearly. Device may be detected while remote agent is still preparing.
