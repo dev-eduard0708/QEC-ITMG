@@ -1,6 +1,8 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Qec.Itmg.RemoteSupport;
 using Qec.Itmg.RemoteSupport.Services;
@@ -8,35 +10,41 @@ using Qec.Itmg.RemoteSupport.Services;
 namespace Qec.Itmg.Host.RemoteSupport;
 
 /// <summary>
-/// Assembles a session-bound helper package (EXE + short-lived enrollment bootstrap).
-/// Does not rebuild the EXE per request — packs the published artifact with a one-time token file.
+/// Resolves the published Support Helper EXE and assembles session-bound packages.
+/// Does not rebuild the EXE per request.
 /// </summary>
-public sealed class RemoteSupportHelperPackageService(IOptions<RemoteSupportOptions> options)
+public sealed class RemoteSupportHelperPackageService(
+    IOptions<RemoteSupportOptions> options,
+    IHostEnvironment hostEnvironment,
+    ILogger<RemoteSupportHelperPackageService> logger)
 {
     public string? ResolveHelperExePath()
     {
         RemoteSupportOptions cfg = options.Value;
         if (!string.IsNullOrWhiteSpace(cfg.HelperArtifactPath))
         {
-            string? configured = ResolveFromPath(cfg.HelperArtifactPath.Trim());
+            string configuredPath = cfg.HelperArtifactPath.Trim();
+            string? configured = ResolveFromPath(ResolvePossiblyRelative(configuredPath));
             if (configured is not null)
                 return configured;
+
+            logger.LogWarning(
+                "RemoteSupport HelperArtifactPath is set but no EXE was found at '{Path}'",
+                configuredPath);
         }
 
-        // Development convenience: repo artifacts/ folder relative to content roots.
-        string[] candidates =
-        [
-            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "artifacts", "remote-support")),
-            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "remote-support")),
-            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "artifacts", "remote-support")),
-        ];
-        foreach (string dir in candidates)
+        foreach (string dir in EnumerateCandidateDirectories())
         {
             string? found = ResolveFromPath(dir);
             if (found is not null)
+            {
+                logger.LogDebug("Resolved Support Helper EXE at {Path}", found);
                 return found;
+            }
         }
 
+        logger.LogWarning(
+            "Support Helper EXE not found. Publish with scripts/publish-remote-support-helper.ps1 or set RemoteSupport:HelperArtifactPath.");
         return null;
     }
 
@@ -99,13 +107,43 @@ public sealed class RemoteSupportHelperPackageService(IOptions<RemoteSupportOpti
         return (zipStream.ToArray(), "QecRemoteSupportHelper.zip");
     }
 
+    private IEnumerable<string> EnumerateCandidateDirectories()
+    {
+        string contentRoot = hostEnvironment.ContentRootPath;
+        yield return Path.GetFullPath(Path.Combine(contentRoot, "artifacts", "remote-support"));
+        yield return Path.GetFullPath(Path.Combine(contentRoot, "..", "..", "artifacts", "remote-support"));
+        yield return Path.GetFullPath(Path.Combine(contentRoot, "..", "..", "..", "artifacts", "remote-support"));
+
+        string? cursor = contentRoot;
+        for (int i = 0; i < 6 && !string.IsNullOrWhiteSpace(cursor); i++)
+        {
+            yield return Path.Combine(cursor, "artifacts", "remote-support");
+            cursor = Directory.GetParent(cursor)?.FullName;
+        }
+
+        yield return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "artifacts", "remote-support"));
+        yield return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "remote-support"));
+        yield return Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "artifacts", "remote-support"));
+    }
+
+    private string ResolvePossiblyRelative(string path)
+    {
+        if (Path.IsPathRooted(path))
+            return path;
+        return Path.GetFullPath(Path.Combine(hostEnvironment.ContentRootPath, path));
+    }
+
     private static string? ResolveFromPath(string path)
     {
         if (File.Exists(path) && path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             return path;
         if (Directory.Exists(path))
         {
-            return Directory.EnumerateFiles(path, "QecRemoteSupportHelper.exe", SearchOption.AllDirectories)
+            return Directory.EnumerateFiles(path, "QecRemoteSupportHelper.exe", SearchOption.TopDirectoryOnly)
+                    .FirstOrDefault()
+                ?? Directory.EnumerateFiles(path, "Qec.Itmg.RemoteSupport.Helper.exe", SearchOption.TopDirectoryOnly)
+                    .FirstOrDefault()
+                ?? Directory.EnumerateFiles(path, "QecRemoteSupportHelper.exe", SearchOption.AllDirectories)
                     .FirstOrDefault()
                 ?? Directory.EnumerateFiles(path, "Qec.Itmg.RemoteSupport.Helper.exe", SearchOption.AllDirectories)
                     .FirstOrDefault();

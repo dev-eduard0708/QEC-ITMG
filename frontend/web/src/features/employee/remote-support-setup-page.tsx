@@ -178,7 +178,11 @@ export function EmployeeRemoteSupportSetupPage() {
                 <p className="text-sm text-muted-foreground">{t('employee.remote.helperUnavailable')}</p>
               ) : null}
               {downloadMutation.isError ? (
-                <p className="text-sm text-destructive">{t('employee.remote.downloadFailed')}</p>
+                <p className="text-sm text-destructive">
+                  {downloadMutation.error instanceof Error
+                    ? downloadMutation.error.message
+                    : t('employee.remote.downloadFailed')}
+                </p>
               ) : null}
               <ol className="list-decimal space-y-1 ps-5 text-sm text-muted-foreground">
                 <li>{t('employee.remote.setupSteps.download')}</li>

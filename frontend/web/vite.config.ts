@@ -26,7 +26,17 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/api': backendProxy(false),
+      // Large Support Helper EXE (~70MB+); raise timeout so download is not cut off.
+      '/api/v1/me/remote-support/helper': {
+        ...backendProxy(false),
+        timeout: 600_000,
+        proxyTimeout: 600_000,
+      },
+      '/api': {
+        ...backendProxy(false),
+        timeout: 120_000,
+        proxyTimeout: 120_000,
+      },
       '/health': backendProxy(false),
       // SignalR hubs need websocket upgrade forwarding.
       '/hubs': { ...backendProxy(false), ws: true },

@@ -360,7 +360,7 @@ public static class RemoteSupportEndpoints
             });
         }).RequireAuthorization();
 
-        endpoints.MapGet("/api/v1/me/remote-support/helper/download", async (
+        endpoints.MapMethods("/api/v1/me/remote-support/helper/download", ["GET", "HEAD"], async (
             ClaimsPrincipal principal,
             ICurrentUserService currentUser,
             RemoteSupportHelperPackageService helperPackage,
@@ -393,13 +393,22 @@ public static class RemoteSupportEndpoints
             }
 
             http.Response.Headers.CacheControl = "private, no-store";
+            FileInfo info = new(path);
+            http.Response.Headers.ContentLength = info.Length;
+
+            if (HttpMethods.IsHead(http.Request.Method))
+            {
+                http.Response.ContentType = "application/octet-stream";
+                http.Response.Headers.ContentDisposition = "attachment; filename=\"QecRemoteSupportHelper.exe\"";
+                return Results.Empty;
+            }
+
             ct.ThrowIfCancellationRequested();
-            FileStream stream = File.OpenRead(path);
             return Results.File(
-                stream,
+                path,
                 contentType: "application/octet-stream",
                 fileDownloadName: "QecRemoteSupportHelper.exe",
-                enableRangeProcessing: false);
+                enableRangeProcessing: true);
         }).RequireAuthorization();
 
         endpoints.MapGet("/api/v1/me/remote-support/endpoints", async (

@@ -3964,34 +3964,29 @@ export const remoteSupportApi = {
     URL.revokeObjectURL(url)
   },
   async downloadHelper() {
-    const response = await fetch('/api/v1/me/remote-support/helper/download', {
+    // Probe with HEAD so failures are clear without buffering the ~70MB EXE in JavaScript.
+    const probe = await fetch('/api/v1/me/remote-support/helper/download', {
+      method: 'HEAD',
       credentials: 'include',
     })
-    if (!response.ok) {
-      let message = response.statusText || 'Support Helper is not available'
-      let code: string | undefined
-      try {
-        const payload = (await response.json()) as {
-          error?: string
-          message?: string
-        }
-        message = payload.message ?? payload.error ?? message
-        code = payload.error
-      } catch {
-        // Ignore non-JSON error bodies.
-      }
-      throw new ApiError(response.status, message, code)
+    if (!probe.ok) {
+      let message =
+        probe.status === 503
+          ? 'QEC Remote Support Helper is not available yet. Contact IT or republish the helper.'
+          : probe.status === 403
+            ? 'You do not have permission to download the Support Helper.'
+            : probe.statusText || 'Support Helper download failed'
+      throw new ApiError(probe.status, message, probe.status === 503 ? 'helper_unavailable' : undefined)
     }
 
-    const blob = await response.blob()
-    const url = URL.createObjectURL(blob)
+    // Native browser download streams through the proxy (no fetch()+blob for the EXE).
     const anchor = document.createElement('a')
-    anchor.href = url
+    anchor.href = '/api/v1/me/remote-support/helper/download'
     anchor.download = 'QecRemoteSupportHelper.exe'
+    anchor.rel = 'noopener'
     document.body.appendChild(anchor)
     anchor.click()
     anchor.remove()
-    URL.revokeObjectURL(url)
   },
   setup: () =>
     apiFetch<{
