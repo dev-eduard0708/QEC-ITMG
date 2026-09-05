@@ -444,7 +444,7 @@ Scanner ingest: stub adapter only (real scanners in P19).
 
 **Phase 15:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P15-08).
 
-**NEXT:** P17 Vendor / third-party.
+**NEXT:** P16 Business continuity.
 
 ---
 
@@ -472,11 +472,22 @@ Scanner ingest: stub adapter only (real scanners in P19).
 
 ## Phase 17 ? Vendor / third-party
 
-**Prerequisites:** P3 vendor FK may already exist; this fills Vendor aggregate.
+**Prerequisites:** P3 vendor FK may already exist; this fills Vendor aggregate. P9 Access; Identity UserType=Vendor.
 
 ### Packages
 
-P17-01 Vendor/contract; P17-02 Assessments; P17-03 Expiry notify; P17-04 Vendor access link; P17-05 UI; P17-06 Tests.
+| Package | Status |
+|---------|--------|
+| P17-01 Vendor/contract | Done |
+| P17-02 Assessments | Done |
+| P17-03 Expiry notify | Done |
+| P17-04 Vendor access link | Done |
+| P17-05 UI | Done |
+| P17-06 Tests | Deferred ? dedicated project testing phase |
+
+**Phase 17:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P17-06).
+
+**NEXT:** P18 Advanced reporting / executive dashboards.
 
 ---
 
