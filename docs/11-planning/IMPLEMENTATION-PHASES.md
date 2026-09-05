@@ -541,16 +541,31 @@ Scanner ingest: stub adapter only (real scanners in P19).
 
 ## Phase 20 ? AI assistance
 
-**Prerequisites:** Stable APIs + RBAC. Local/on-prem model optional.
+**Prerequisites:** Stable APIs + RBAC. Local/on-prem model optional. P7 Remote Support remains pending and is not delivered by AI.
 
 ### Packages
 
-P20-01 Tool-calling gateway **as user**; P20-02 Classification suggest; P20-03 KB suggest; P20-04 Summaries; P20-05 NL query restricted to permitted reports; P20-06 Redaction; P20-07 Prompt-injection tests; P20-08 Never unattended remote via model.
+| Package | Status |
+|---------|--------|
+| P20-01 Tool-calling gateway as user | Done |
+| P20-02 Classification suggest | Done |
+| P20-03 KB suggest | Done |
+| P20-04 Summaries | Done |
+| P20-05 NL report query | Done |
+| P20-06 Redaction | Done |
+| P20-07 Prompt-injection tests | Deferred ? dedicated project testing phase |
+| P20-08 Never unattended remote via model | Done |
 
-**Out of scope:** Autopilot changes to production.
+**Out of scope:** Autopilot changes to production. AI never starts remote/unattended sessions (P7 remains separate).
+
+**Phase 20:** FEATURE COMPLETE. FORMAL TESTING/HARDENING DEFERRED (P20-07).
+
+**NEXT:** P7 Remote Support integration.
 
 ---
 
 ## Suggested next coding task
 
-**Phases 0?19 are FEATURE COMPLETE** (dedicated package tests deferred to project testing phase where noted). Next: **P20 AI assistance**.
+**Phase 20 FEATURE COMPLETE.** P7 Remote Support remains intentionally retained and pending. Next: **P7 Remote Support integration**. After P7 feature completion: **project-wide validation/testing campaign**.
+
+Do **not** interpret prior ?phases feature complete? wording as implying P7 is complete.
