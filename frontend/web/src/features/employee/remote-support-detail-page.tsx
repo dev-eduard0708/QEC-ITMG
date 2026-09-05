@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useState } from 'react'
-import { ApiError, remoteSupportApi } from '@/api/client'
+import { useMemo, useState } from 'react'
+import { ApiError, meApi, remoteSupportApi } from '@/api/client'
 import { PageHeader } from '@/components/page-header'
 import {
   AlertDialog,
@@ -19,13 +19,14 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { remoteSupportKeys } from '@/features/it/query-keys'
+import { equipmentKeys, remoteSupportKeys, ticketKeys } from '@/features/it/query-keys'
+import { formatDeviceLabel } from '@/features/employee/employee-request-helpers'
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-wrap justify-between gap-2 text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className="max-w-[70%] break-all text-end">{value}</span>
+      <span className="max-w-[70%] text-end">{value}</span>
     </div>
   )
 }
@@ -40,6 +41,18 @@ export function EmployeeRemoteSupportDetailPage() {
     queryKey: remoteSupportKeys.mineDetail(id),
     queryFn: () => remoteSupportApi.myGet(id),
     enabled: Boolean(id),
+  })
+
+  const equipmentQuery = useQuery({
+    queryKey: equipmentKeys.mine,
+    queryFn: () => meApi.listEquipment(),
+  })
+
+  const ticketId = sessionQuery.data?.ticketId
+  const ticketQuery = useQuery({
+    queryKey: ticketKeys.mineDetail(ticketId ?? ''),
+    queryFn: () => meApi.getTicket(ticketId!),
+    enabled: Boolean(ticketId),
   })
 
   const invalidate = async () => {
@@ -80,6 +93,16 @@ export function EmployeeRemoteSupportDetailPage() {
     },
   })
 
+  const deviceLabel = useMemo(() => {
+    const session = sessionQuery.data
+    if (!session) return t('employee.remote.yourDevice')
+    const match = (equipmentQuery.data ?? []).find(
+      (asset) => asset.configurationItemId === session.configurationItemId,
+    )
+    if (match) return formatDeviceLabel(match)
+    return t('employee.remote.yourDevice')
+  }, [equipmentQuery.data, sessionQuery.data, t])
+
   if (sessionQuery.isLoading) {
     return <Skeleton className="h-40 w-full" />
   }
@@ -93,10 +116,10 @@ export function EmployeeRemoteSupportDetailPage() {
   const inSession = session.status === 'InSession'
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
-        title={session.remoteNumber}
-        description={t('remote.myDetailDescription')}
+        title={t('employee.remote.connectTitle')}
+        description={session.remoteNumber}
         actions={
           <Button asChild variant="outline">
             <Link to="/employee/remote-support">{t('remote.back')}</Link>
@@ -112,25 +135,19 @@ export function EmployeeRemoteSupportDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t('remote.sections.request')}</CardTitle>
+          <CardTitle className="text-base">{t('employee.remote.connectTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <DetailRow
-            label={t('remote.fields.technician')}
-            value={session.technicianUserId?.slice(0, 8) ?? '—'}
-          />
+          <DetailRow label={t('remote.fields.technician')} value={t('employee.remote.itTechnician')} />
           <DetailRow label={t('remote.fields.reason')} value={session.reason} />
+          <DetailRow label={t('employee.remote.device')} value={deviceLabel} />
           <DetailRow
-            label={t('remote.fields.ticket')}
-            value={session.ticketId?.slice(0, 8) ?? '—'}
-          />
-          <DetailRow
-            label={t('remote.fields.configurationItem')}
-            value={session.configurationItemId.slice(0, 8)}
+            label={t('employee.remote.relatedRequest')}
+            value={ticketQuery.data?.ticketNumber ?? t('employee.remote.noRelatedRequest')}
           />
           <DetailRow
             label={t('remote.fields.privileges')}
-            value={session.requestedPrivileges ?? '—'}
+            value={session.requestedPrivileges ?? t('employee.remote.standardAccess')}
           />
           <DetailRow
             label={t('remote.fields.expiresAt')}
@@ -142,14 +159,14 @@ export function EmployeeRemoteSupportDetailPage() {
       {awaitingConsent ? (
         <Card className="border-warning/40">
           <CardHeader>
-            <CardTitle className="text-base">{t('remote.consent.title')}</CardTitle>
+            <CardTitle className="text-base">{t('employee.remote.consentPrompt')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">{t('remote.consent.warning')}</p>
             <div className="flex flex-wrap gap-2">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button type="button">{t('remote.consent.allow')}</Button>
+                  <Button type="button">{t('employee.remote.allow')}</Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
@@ -162,7 +179,7 @@ export function EmployeeRemoteSupportDetailPage() {
                       onClick={() => allowMutation.mutate()}
                       disabled={allowMutation.isPending}
                     >
-                      {t('remote.consent.allow')}
+                      {t('employee.remote.allow')}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -173,7 +190,7 @@ export function EmployeeRemoteSupportDetailPage() {
                 onClick={() => declineMutation.mutate()}
                 disabled={declineMutation.isPending}
               >
-                {t('remote.consent.decline')}
+                {t('employee.remote.decline')}
               </Button>
             </div>
           </CardContent>

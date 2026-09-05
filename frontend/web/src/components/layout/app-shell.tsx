@@ -14,6 +14,7 @@ import {
   Languages,
   Laptop,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Menu,
   Monitor,
@@ -157,6 +158,7 @@ function buildNavGroups(can: (permissionKey: string) => boolean): NavGroupDef[] 
       icon: Briefcase,
       items: [
         { to: '/employee', labelKey: 'nav.home', icon: Users, end: true, visible: true },
+        { to: '/employee/requests/new', labelKey: 'nav.getHelp', icon: LifeBuoy, end: true, visible: true },
         { to: '/employee/requests', labelKey: 'nav.requests', icon: Ticket, visible: true },
         { to: '/employee/equipment', labelKey: 'nav.equipment', icon: HardDrive, visible: true },
         { to: '/employee/knowledge', labelKey: 'nav.knowledge', icon: BookOpen, visible: true },
@@ -289,6 +291,7 @@ function NavItemLink({
   label: string
 }) {
   const Icon = item.icon
+  const location = useLocation()
   return (
     <NavLink
       to={item.to}
@@ -296,15 +299,19 @@ function NavItemLink({
       onClick={onNavigate}
       title={collapsed ? label : undefined}
       aria-label={label}
-      className={({ isActive }) =>
-        cn(
+      className={({ isActive }) => {
+        const active =
+          item.to === '/employee/requests'
+            ? isActive && !location.pathname.startsWith('/employee/requests/new')
+            : isActive
+        return cn(
           'group/nav flex items-center gap-3 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2',
-          isActive
+          active
             ? 'bg-sidebar-accent text-white'
             : 'text-sidebar-muted hover:bg-white/10 hover:text-sidebar-foreground',
         )
-      }
+      }}
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
       {!collapsed ? <span className="truncate">{label}</span> : null}
@@ -650,6 +657,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/employee/policies')) return t('nav.myPolicies')
   if (pathname.startsWith('/employee/remote-support')) return t('nav.remoteSupport')
   if (pathname.startsWith('/employee/knowledge')) return t('nav.knowledge')
+  if (pathname.startsWith('/employee/requests/new')) return t('nav.getHelp')
   if (pathname.startsWith('/employee/requests')) return t('nav.requests')
   if (pathname.startsWith('/employee/equipment')) return t('nav.equipment')
   if (pathname === '/employee' || pathname === '/employee/') return t('nav.home')

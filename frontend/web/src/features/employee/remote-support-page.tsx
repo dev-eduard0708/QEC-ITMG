@@ -26,7 +26,7 @@ function SessionCard({ session }: { session: RemoteSessionRequest }) {
       <CardContent className="space-y-2 text-sm">
         <Row
           label={t('remote.fields.technician')}
-          value={session.technicianUserId?.slice(0, 8) ?? '—'}
+          value={t('employee.remote.itTechnician')}
         />
         <Row
           label={t('remote.fields.requestedAt')}
@@ -64,7 +64,7 @@ export function EmployeeRemoteSupportPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title={t('remote.myTitle')} description={t('remote.myDescription')} />
+      <PageHeader title={t('employee.remote.listTitle')} description={t('employee.remote.listHint')} />
 
       {query.isLoading ? (
         <div className="space-y-3">

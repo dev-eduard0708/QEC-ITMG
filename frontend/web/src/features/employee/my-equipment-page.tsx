@@ -15,7 +15,7 @@ export function MyEquipmentPage() {
   })
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader title={t('equipment.title')} description={t('equipment.description')} />
 
       {query.isLoading ? (
@@ -24,7 +24,9 @@ export function MyEquipmentPage() {
           <Skeleton className="h-28 w-full" />
         </div>
       ) : (query.data ?? []).length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('equipment.empty')}</p>
+        <div className="rounded-2xl border border-dashed px-6 py-12 text-center text-sm text-muted-foreground">
+          {t('equipment.empty')}
+        </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {(query.data ?? []).map((asset) => (
@@ -32,12 +34,18 @@ export function MyEquipmentPage() {
               <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
                 <div>
                   <CardTitle className="text-base">{asset.name}</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">{asset.assetNumber}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {t('equipment.fields.assetNumber')}: {asset.assetNumber}
+                  </p>
                 </div>
-                <Badge variant="secondary">{asset.status}</Badge>
+                <Badge variant="secondary">{t(`equipment.status.${asset.status}`, { defaultValue: asset.status })}</Badge>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <Row label={t('equipment.fields.model')} value={[asset.manufacturer, asset.model].filter(Boolean).join(' ') || '—'} />
+                <Row label={t('equipment.fields.type')} value={asset.assetType || '—'} />
+                <Row
+                  label={t('equipment.fields.model')}
+                  value={[asset.manufacturer, asset.model].filter(Boolean).join(' ') || '—'}
+                />
                 <Row label={t('equipment.fields.serial')} value={asset.serialNumber ?? '—'} />
                 <Row
                   label={t('equipment.fields.assignedAt')}
@@ -46,10 +54,6 @@ export function MyEquipmentPage() {
                       ? new Date(asset.activeAssignedAtUtc).toLocaleString()
                       : '—'
                   }
-                />
-                <Row
-                  label={t('equipment.fields.location')}
-                  value={asset.locationId ? asset.locationId.slice(0, 8) : '—'}
                 />
               </CardContent>
             </Card>
