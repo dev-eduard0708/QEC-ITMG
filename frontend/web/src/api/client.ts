@@ -2489,5 +2489,224 @@ export const auditsApi = {
   },
 }
 
+export type SecurityDashboard = {
+  openVulnerabilities: number
+  criticalHighVulnerabilities: number
+  overdueRemediation: number
+  openSecurityIncidents: number
+  openExceptions: number
+  expiringExceptions: number
+  openRisks: number
+  highResidualRisks: number
+  pentestOpenFindings: number
+  awarenessOutstanding: number
+  note: string
+}
+
+export type VulnerabilityItem = {
+  id: string
+  vulnerabilityNumber: string
+  title: string
+  description: string | null
+  configurationItemId: string
+  source: string
+  externalReference: string | null
+  severity: string
+  detectedAtUtc: string
+  dueAtUtc: string | null
+  status: string
+  ownerUserId: string | null
+  resolutionSummary: string | null
+  acceptedRiskReason: string | null
+  exceptionId: string | null
+  resolvedAtUtc: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  isOverdue: boolean
+}
+
+export type RiskItem = {
+  id: string
+  riskNumber: string
+  title: string
+  description: string
+  category: string
+  ownerUserId: string
+  status: string
+  likelihood: number
+  impact: number
+  inherentScore: number
+  residualScore: number | null
+  treatment: string
+  targetDate: string | null
+}
+
+export type PolicyExceptionItem = {
+  id: string
+  exceptionNumber: string
+  title: string
+  reason: string
+  status: string
+  startAtUtc: string
+  expiresAtUtc: string
+  isExpired: boolean
+  daysToExpiry: number | null
+  requestedByUserId: string
+}
+
+export type PentestItem = {
+  id: string
+  pentestNumber: string
+  title: string
+  provider: string | null
+  scopeSummary: string
+  status: string
+  startDate: string | null
+  endDate: string | null
+}
+
+export type AwarenessCampaignItem = {
+  id: string
+  title: string
+  description: string | null
+  status: string
+  startsAtUtc: string
+  dueAtUtc: string | null
+  assignedCount: number
+  completedCount: number
+  outstandingCount: number
+  overdueCount: number
+}
+
+export const securityApi = {
+  dashboard: () => apiFetch<SecurityDashboard>('/api/v1/security/dashboard'),
+  listVulnerabilities: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    status?: string
+    severity?: string
+    overdueOnly?: boolean
+  }) =>
+    apiFetch<{ items: VulnerabilityItem[]; totalCount: number }>(
+      `/api/v1/security/vulnerabilities${opsQuery({
+        page: params?.page,
+        pageSize: params?.pageSize,
+        search: params?.search,
+        status: params?.status,
+        severity: params?.severity,
+        overdueOnly: params?.overdueOnly === undefined ? undefined : String(params.overdueOnly),
+      })}`,
+    ),
+  getVulnerability: (id: string) => apiFetch<VulnerabilityItem>(`/api/v1/security/vulnerabilities/${id}`),
+  createVulnerability: (payload: {
+    title: string
+    configurationItemId: string
+    source?: string
+    severity?: string
+    description?: string | null
+    dueAtUtc?: string | null
+  }) =>
+    apiFetch<VulnerabilityItem>('/api/v1/security/vulnerabilities', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  transitionVulnerability: (
+    id: string,
+    payload: {
+      status: string
+      resolutionSummary?: string
+      acceptedRiskReason?: string
+      exceptionId?: string
+    },
+  ) =>
+    apiFetch<VulnerabilityItem>(`/api/v1/security/vulnerabilities/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listRemediationLinks: (id: string) =>
+    apiFetch<{ id: string; linkType: string; targetId: string; notes: string | null }[]>(
+      `/api/v1/security/vulnerabilities/${id}/links`,
+    ),
+  addRemediationLink: (id: string, linkType: string, targetId: string, notes?: string) =>
+    apiFetch(`/api/v1/security/vulnerabilities/${id}/links`, {
+      method: 'POST',
+      body: JSON.stringify({ linkType, targetId, notes }),
+    }),
+  listRisks: (params?: { search?: string; status?: string }) =>
+    apiFetch<{ items: RiskItem[] }>(
+      `/api/v1/security/risks${opsQuery({ search: params?.search, status: params?.status, pageSize: 50 })}`,
+    ),
+  createRisk: (payload: {
+    title: string
+    description: string
+    category: string
+    likelihood?: number
+    impact?: number
+    treatment?: string
+  }) => apiFetch<RiskItem>('/api/v1/security/risks', { method: 'POST', body: JSON.stringify(payload) }),
+  transitionRisk: (id: string, status: string) =>
+    apiFetch<RiskItem>(`/api/v1/security/risks/${id}/transition`, {
+      method: 'POST',
+      body: JSON.stringify({ status }),
+    }),
+  listExceptions: (status?: string) =>
+    apiFetch<PolicyExceptionItem[]>(`/api/v1/security/exceptions${opsQuery({ status })}`),
+  createException: (payload: {
+    title: string
+    reason: string
+    startAtUtc: string
+    expiresAtUtc: string
+    compensatingControls?: string | null
+  }) =>
+    apiFetch<PolicyExceptionItem>('/api/v1/security/exceptions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  submitException: (id: string) =>
+    apiFetch<PolicyExceptionItem>(`/api/v1/security/exceptions/${id}/submit`, { method: 'POST' }),
+  approveException: (id: string) =>
+    apiFetch<PolicyExceptionItem>(`/api/v1/security/exceptions/${id}/approve`, { method: 'POST' }),
+  rejectException: (id: string, reason: string) =>
+    apiFetch<PolicyExceptionItem>(`/api/v1/security/exceptions/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  listPentests: () => apiFetch<PentestItem[]>('/api/v1/security/pentests'),
+  createPentest: (payload: { title: string; scopeSummary: string; provider?: string | null }) =>
+    apiFetch<PentestItem>('/api/v1/security/pentests', { method: 'POST', body: JSON.stringify(payload) }),
+  listPentestFindings: (id: string) =>
+    apiFetch<{ id: string; title: string; severity: string; status: string }[]>(
+      `/api/v1/security/pentests/${id}/findings`,
+    ),
+  addPentestFinding: (
+    id: string,
+    payload: { title: string; description: string; severity?: string; configurationItemId?: string },
+  ) =>
+    apiFetch(`/api/v1/security/pentests/${id}/findings`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  listAwareness: () => apiFetch<AwarenessCampaignItem[]>('/api/v1/security/awareness'),
+  createAwareness: (payload: { title: string; description?: string | null; dueAtUtc?: string | null }) =>
+    apiFetch<AwarenessCampaignItem>('/api/v1/security/awareness', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  openAwareness: (id: string) =>
+    apiFetch<AwarenessCampaignItem>(`/api/v1/security/awareness/${id}/open`, { method: 'POST' }),
+  assignAwareness: (id: string, userId: string) =>
+    apiFetch(`/api/v1/security/awareness/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+  completeAwareness: (id: string, userId?: string) =>
+    apiFetch(`/api/v1/security/awareness/${id}/complete`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    }),
+}
+
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
