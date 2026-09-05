@@ -50,10 +50,13 @@ public sealed record PentestFindingDto(
 public sealed record AwarenessCampaignDto(
     Guid Id, string Title, string? Description, DateTimeOffset StartsAtUtc, DateTimeOffset? DueAtUtc,
     string Status, Guid OwnerUserId, DateTimeOffset CreatedAtUtc,
-    int AssignedCount, int CompletedCount, int OutstandingCount, int OverdueCount);
+    int AssignedCount, int CompletedCount, int OutstandingCount, int OverdueCount,
+    Guid? ModuleId = null, int? ModuleVersion = null, int PassThresholdPercent = 80);
 
 public sealed record AwarenessCompletionDto(
-    Guid Id, Guid CampaignId, Guid UserId, string Status, DateTimeOffset? CompletedAtUtc, Guid? EvidenceId, string? Notes);
+    Guid Id, Guid CampaignId, Guid UserId, string Status, DateTimeOffset? CompletedAtUtc, Guid? EvidenceId, string? Notes,
+    DateTimeOffset? AssignedAtUtc = null, DateTimeOffset? DueAtUtc = null, DateTimeOffset? StartedAtUtc = null,
+    int? Score = null, int AttemptCount = 0, int? ModuleVersion = null);
 
 public sealed record SecurityDashboardCounts(
     int OpenVulnerabilities,
@@ -524,11 +527,12 @@ public sealed class SecurityService(
 
     public async Task<AwarenessCompletionDto> AssignCompletionAsync(Guid campaignId, Guid userId, CancellationToken ct)
     {
-        _ = await db.AwarenessCampaigns.FirstOrDefaultAsync(x => x.Id == campaignId, ct)
+        AwarenessCampaign campaign = await db.AwarenessCampaigns.FirstOrDefaultAsync(x => x.Id == campaignId, ct)
             ?? throw new InvalidOperationException("Campaign not found.");
         bool exists = await db.AwarenessCompletions.AnyAsync(x => x.CampaignId == campaignId && x.UserId == userId, ct);
         if (exists) throw new InvalidOperationException("User already assigned.");
-        AwarenessCompletion completion = AwarenessCompletion.Assign(campaignId, userId);
+        AwarenessCompletion completion = AwarenessCompletion.Assign(
+            campaignId, userId, clock.UtcNow, campaign.DueAtUtc, campaign.ModuleVersion);
         db.AwarenessCompletions.Add(completion);
         await db.SaveChangesAsync(ct);
         return MapCompletion(completion);
@@ -629,11 +633,15 @@ public sealed class SecurityService(
         int assigned = completions.Count;
         int completed = completions.Count(x => x.Status is AwarenessCompletionStatus.Completed or AwarenessCompletionStatus.Exempt);
         int outstanding = completions.Count(x => x.Status == AwarenessCompletionStatus.Assigned);
-        int overdue = c.DueAtUtc is DateTimeOffset due && due < now ? outstanding : 0;
+        int overdue = completions.Count(x =>
+            x.Status == AwarenessCompletionStatus.Assigned
+            && (x.DueAtUtc ?? c.DueAtUtc) is DateTimeOffset due
+            && due < now);
         return new(c.Id, c.Title, c.Description, c.StartsAtUtc, c.DueAtUtc, c.Status.ToString(), c.OwnerUserId,
-            c.CreatedAtUtc, assigned, completed, outstanding, overdue);
+            c.CreatedAtUtc, assigned, completed, outstanding, overdue, c.ModuleId, c.ModuleVersion, c.PassThresholdPercent);
     }
 
     private static AwarenessCompletionDto MapCompletion(AwarenessCompletion x) => new(
-        x.Id, x.CampaignId, x.UserId, x.Status.ToString(), x.CompletedAtUtc, x.EvidenceId, x.Notes);
+        x.Id, x.CampaignId, x.UserId, x.Status.ToString(), x.CompletedAtUtc, x.EvidenceId, x.Notes,
+        x.AssignedAtUtc, x.DueAtUtc, x.StartedAtUtc, x.Score, x.AttemptCount, x.ModuleVersion);
 }

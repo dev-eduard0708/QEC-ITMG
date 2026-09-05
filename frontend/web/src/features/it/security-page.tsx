@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
+  awarenessApi,
   securityApi,
   type VulnerabilityItem,
   type RiskItem,
@@ -42,7 +43,6 @@ export function SecurityHomePage() {
   const [excReason, setExcReason] = useState('')
   const [pentestTitle, setPentestTitle] = useState('')
   const [pentestScope, setPentestScope] = useState('')
-  const [campaignTitle, setCampaignTitle] = useState('')
 
   const dashQuery = useQuery({
     queryKey: ['security', 'dashboard'],
@@ -289,18 +289,8 @@ export function SecurityHomePage() {
       {section === 'awareness' ? (
         <AwarenessPanel
           items={awarenessQuery.data ?? []}
-          canManage={can('risk.manage')}
-          title={campaignTitle}
-          setTitle={setCampaignTitle}
-          onCreate={async () => {
-            await securityApi.createAwareness({ title: campaignTitle })
-            setCampaignTitle('')
-            await refresh('awareness')
-          }}
-          onOpen={async (id) => {
-            await securityApi.openAwareness(id)
-            await refresh('awareness')
-          }}
+          canManage={can('sec.awareness.manage')}
+          onRefresh={() => refresh('awareness')}
         />
       ) : null}
     </div>
@@ -482,52 +472,230 @@ function PentestsPanel({
 function AwarenessPanel({
   items,
   canManage,
-  title,
-  setTitle,
-  onCreate,
-  onOpen,
+  onRefresh,
 }: {
   items: AwarenessCampaignItem[]
   canManage: boolean
-  title: string
-  setTitle: (v: string) => void
-  onCreate: () => Promise<void>
-  onOpen: (id: string) => Promise<void>
+  onRefresh: () => Promise<void>
 }) {
   const { t } = useTranslation()
+  const [moduleId, setModuleId] = useState('')
+  const [title, setTitle] = useState('')
+  const [dueAt, setDueAt] = useState('')
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null)
+
+  const modulesQuery = useQuery({
+    queryKey: ['security', 'awareness', 'modules'],
+    queryFn: () => awarenessApi.listModules(true),
+    enabled: canManage,
+  })
+  const completionsQuery = useQuery({
+    queryKey: ['security', 'awareness', 'completions', selectedCampaignId],
+    queryFn: () => awarenessApi.listCompletions(selectedCampaignId!),
+    enabled: Boolean(selectedCampaignId),
+  })
+
+  const activeModules = (modulesQuery.data ?? []).filter((m) => m.status === 'Active')
+
   return (
-    <div className="space-y-4">
-      {items.map((c) => (
-        <Card key={c.id}>
-          <CardContent className="flex flex-wrap items-center justify-between gap-2 py-4">
-            <div>
-              <p className="font-medium">{c.title}</p>
-              <p className="text-sm text-muted-foreground">
-                {c.status} · {t('security.awareness.assigned')}: {c.assignedCount} ·{' '}
-                {t('security.awareness.completed')}: {c.completedCount} ·{' '}
-                {t('security.awareness.outstanding')}: {c.outstandingCount}
-                {c.overdueCount ? ` · ${t('security.awareness.overdue')}: ${c.overdueCount}` : ''}
-              </p>
-            </div>
-            {canManage && c.status === 'Draft' ? (
-              <Button type="button" size="sm" onClick={() => onOpen(c.id)}>
-                {t('security.openCampaign')}
+    <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        {t('security.awareness.completionEvidence')} · {t('security.awareness.trainingEvidence')}
+      </p>
+
+      {canManage ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('security.awareness.modules')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  await awarenessApi.seedModules()
+                  await modulesQuery.refetch()
+                }}
+              >
+                {t('security.awareness.seed')}
               </Button>
-            ) : null}
+            </div>
+            <ul className="space-y-2 text-sm">
+              {(modulesQuery.data ?? []).map((m) => (
+                <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2">
+                  <span>
+                    {m.code} · {m.title} · {m.status} · v{m.version}
+                  </span>
+                  {m.status === 'Draft' ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={async () => {
+                        await awarenessApi.activateModule(m.id)
+                        await modulesQuery.refetch()
+                      }}
+                    >
+                      {t('security.awareness.activate')}
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+            <div className="flex flex-wrap gap-2 border-t pt-3">
+              <Select value={moduleId || undefined} onValueChange={setModuleId}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder={t('security.awareness.selectModule')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeModules.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder={t('security.fields.title')}
+                className="max-w-xs"
+              />
+              <Input
+                type="datetime-local"
+                value={dueAt}
+                onChange={(e) => setDueAt(e.target.value)}
+                aria-label={t('security.awareness.dueDate')}
+                className="max-w-xs"
+              />
+              <Button
+                type="button"
+                disabled={!moduleId}
+                onClick={async () => {
+                  await awarenessApi.createCampaign({
+                    moduleId,
+                    title: title.trim() || null,
+                    dueAtUtc: dueAt ? new Date(dueAt).toISOString() : null,
+                  })
+                  setTitle('')
+                  setDueAt('')
+                  await onRefresh()
+                }}
+              >
+                {t('security.awareness.createFromModule')}
+              </Button>
+            </div>
           </CardContent>
         </Card>
-      ))}
-      {canManage ? (
-        <div className="flex flex-wrap gap-2">
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('security.fields.title')} />
-          <Button type="button" disabled={!title.trim()} onClick={() => onCreate()}>
-            {t('security.createCampaign')}
-          </Button>
-        </div>
+      ) : null}
+
+      <div className="space-y-4">
+        {items.map((c) => (
+          <Card key={c.id}>
+            <CardContent className="space-y-3 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="font-medium">{c.title}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {c.status} · {t('security.awareness.assigned')}: {c.assignedCount} ·{' '}
+                    {t('security.awareness.completed')}: {c.completedCount} ·{' '}
+                    {t('security.awareness.outstanding')}: {c.outstandingCount}
+                    {c.overdueCount ? ` · ${t('security.awareness.overdue')}: ${c.overdueCount}` : ''}
+                    {c.assignedCount > 0
+                      ? ` · ${Math.round((c.completedCount / c.assignedCount) * 100)}%`
+                      : ''}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {canManage && (c.status === 'Draft' || c.status === 'Open') ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={async () => {
+                        await awarenessApi.assignOpen(c.id, { allEmployees: true })
+                        await onRefresh()
+                      }}
+                    >
+                      {t('security.awareness.assignAll')}
+                    </Button>
+                  ) : null}
+                  {canManage && c.status === 'Open' ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={async () => {
+                        await awarenessApi.closeCampaign(c.id)
+                        await onRefresh()
+                      }}
+                    >
+                      {t('security.awareness.close')}
+                    </Button>
+                  ) : null}
+                  <Button type="button" size="sm" variant="outline" onClick={() => setSelectedCampaignId(c.id)}>
+                    {t('security.awareness.completions')}
+                  </Button>
+                  {canManage ? (
+                    <Button asChild type="button" size="sm" variant="outline">
+                      <a href={awarenessApi.completionsExportUrl(c.id)} target="_blank" rel="noreferrer">
+                        {t('security.awareness.exportCsv')}
+                      </a>
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {selectedCampaignId ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {t('security.awareness.completions')} · {t('security.awareness.outstandingEvidence')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead>
+                <tr className="border-b text-muted-foreground">
+                  <th className="py-2 pe-3">User</th>
+                  <th className="py-2 pe-3">Status</th>
+                  <th className="py-2 pe-3">Assigned</th>
+                  <th className="py-2 pe-3">Due</th>
+                  <th className="py-2 pe-3">Completed</th>
+                  <th className="py-2 pe-3">Score</th>
+                  <th className="py-2">Attempts</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(completionsQuery.data ?? []).map((row) => (
+                  <tr key={row.id} className="border-b border-border/60">
+                    <td className="py-2 pe-3 font-mono text-xs">{row.userId.slice(0, 8)}…</td>
+                    <td className="py-2 pe-3">{row.status}</td>
+                    <td className="py-2 pe-3">
+                      {row.assignedAtUtc ? new Date(row.assignedAtUtc).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="py-2 pe-3">
+                      {row.dueAtUtc ? new Date(row.dueAtUtc).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="py-2 pe-3">
+                      {row.completedAtUtc ? new Date(row.completedAtUtc).toLocaleDateString() : '—'}
+                    </td>
+                    <td className="py-2 pe-3">{row.score ?? '—'}</td>
+                    <td className="py-2">{row.attemptCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
       ) : null}
     </div>
   )
 }
+
 
 export function VulnerabilityDetailPage() {
   const { id = '' } = useParams()

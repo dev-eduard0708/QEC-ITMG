@@ -17,6 +17,11 @@ public sealed class SecurityDbContext(DbContextOptions<SecurityDbContext> option
     public DbSet<PentestFinding> PentestFindings => Set<PentestFinding>();
     public DbSet<AwarenessCampaign> AwarenessCampaigns => Set<AwarenessCampaign>();
     public DbSet<AwarenessCompletion> AwarenessCompletions => Set<AwarenessCompletion>();
+    public DbSet<AwarenessModule> AwarenessModules => Set<AwarenessModule>();
+    public DbSet<AwarenessQuestion> AwarenessQuestions => Set<AwarenessQuestion>();
+    public DbSet<AwarenessAnswerOption> AwarenessAnswerOptions => Set<AwarenessAnswerOption>();
+    public DbSet<AwarenessAttempt> AwarenessAttempts => Set<AwarenessAttempt>();
+    public DbSet<AwarenessReminderLog> AwarenessReminderLogs => Set<AwarenessReminderLog>();
     public DbSet<ExceptionExpiryNotificationLog> ExceptionExpiryNotificationLogs => Set<ExceptionExpiryNotificationLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

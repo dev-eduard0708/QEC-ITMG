@@ -7,9 +7,10 @@ import {
   Laptop,
   LifeBuoy,
   Search,
+  Shield,
   Ticket,
 } from 'lucide-react'
-import { meApi, policiesApi, remoteSupportApi } from '@/api/client'
+import { awarenessApi, meApi, policiesApi, remoteSupportApi } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -28,6 +29,10 @@ export function EmployeeHomePage() {
     queryKey: ['me', 'policies', 'summary'],
     queryFn: () => policiesApi.summary(),
   })
+  const awarenessQuery = useQuery({
+    queryKey: ['me', 'security', 'awareness', 'summary'],
+    queryFn: () => awarenessApi.mySummary(),
+  })
   const remoteQuery = useQuery({
     queryKey: remoteSupportKeys.mine('home'),
     queryFn: () => remoteSupportApi.myList({ pageSize: 20, status: 'NotifyUser' }),
@@ -40,6 +45,7 @@ export function EmployeeHomePage() {
   const openCount = (ticketsQuery.data?.items ?? []).filter((item) => isOpenTicketStatus(item.status)).length
   const policyCount = policiesQuery.data?.outstandingForUser ?? 0
   const policyOverdue = policiesQuery.data?.overdue ?? 0
+  const awarenessOutstanding = awarenessQuery.data?.outstanding ?? 0
   const remotePending = remoteQuery.data?.totalCount ?? (remoteQuery.data?.items?.length ?? 0)
   const equipmentCount = equipmentQuery.data?.length ?? 0
 
@@ -50,6 +56,12 @@ export function EmployeeHomePage() {
       : policyCount > 0
         ? t('employee.counts.policiesDue', { count: policyCount })
         : t('employee.counts.policiesOk')
+
+  const awarenessMeta = awarenessQuery.isLoading
+    ? null
+    : awarenessOutstanding > 0
+      ? t('employee.counts.awarenessDue', { count: awarenessOutstanding })
+      : t('employee.counts.awarenessOk')
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -123,6 +135,24 @@ export function EmployeeHomePage() {
                 ? t('employee.counts.remotePending', { count: remotePending })
                 : t('employee.counts.remoteNone')
           }
+        />
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SecondaryCard
+          to="/employee/security/awareness"
+          icon={Shield}
+          title={t('employee.security.awareness.cardTitle')}
+          description={t('employee.actions.awarenessHint')}
+          meta={awarenessMeta}
+          actionLabel={t('employee.actions.openAwareness')}
+        />
+        <SecondaryCard
+          to="/employee/security/report"
+          icon={Shield}
+          title={t('employee.security.report.cardTitle')}
+          description={t('employee.actions.reportSecurityHint')}
+          meta={t('employee.security.report.cardMeta')}
         />
       </div>
 

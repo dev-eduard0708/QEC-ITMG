@@ -11,6 +11,10 @@ import { BreakGlassPage } from '@/features/auth/break-glass-page'
 import { LoginPage } from '@/features/auth/login-page'
 import { UnauthorizedPage } from '@/features/auth/unauthorized-page'
 import { EmployeeHomePage } from '@/features/employee/employee-home-page'
+import { EmployeeSecurityPage } from '@/features/employee/employee-security-page'
+import { EmployeeAwarenessPage } from '@/features/employee/employee-awareness-page'
+import { EmployeeAwarenessDetailPage } from '@/features/employee/employee-awareness-detail-page'
+import { ReportSecurityConcernPage } from '@/features/employee/report-security-concern-page'
 import { KnowledgeArticlePage } from '@/features/employee/knowledge-article-page'
 import { KnowledgePage } from '@/features/employee/knowledge-page'
 import { MyEquipmentPage } from '@/features/employee/my-equipment-page'
@@ -96,6 +100,10 @@ export function AppRouter() {
           <Route path="employee/knowledge/:slug" element={<KnowledgeArticlePage />} />
           <Route path="employee/policies" element={<MyPoliciesPage />} />
           <Route path="employee/policies/:id" element={<EmployeePolicyDetailPage />} />
+          <Route path="employee/security" element={<EmployeeSecurityPage />} />
+          <Route path="employee/security/awareness" element={<EmployeeAwarenessPage />} />
+          <Route path="employee/security/awareness/:assignmentId" element={<EmployeeAwarenessDetailPage />} />
+          <Route path="employee/security/report" element={<ReportSecurityConcernPage />} />
           <Route path="employee/remote-support" element={<EmployeeRemoteSupportPage />} />
           <Route path="employee/remote-support/:id" element={<EmployeeRemoteSupportDetailPage />} />
           <Route path="it" element={<ItHomePage />} />

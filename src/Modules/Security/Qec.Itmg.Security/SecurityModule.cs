@@ -20,6 +20,7 @@ public sealed class SecurityModule : IModule
 
         services.AddQecSqlServerDbContext<SecurityDbContext>(connectionString, SecurityDbContext.SchemaName);
         services.AddScoped<SecurityService>();
+        services.AddScoped<SecurityAwarenessWorkflowService>();
         // IVulnerabilityScannerIngestClient registered by PlatformModule (real adapter; disabled by default).
     }
 }

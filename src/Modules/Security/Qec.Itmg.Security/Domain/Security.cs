@@ -71,7 +71,7 @@ public enum PentestFindingStatus
 public enum AwarenessCampaignStatus
 {
     Draft = 0,
-    Open = 1,
+    Open = 1, // Active for employees
     Closed = 2,
 }
 
@@ -80,6 +80,13 @@ public enum AwarenessCompletionStatus
     Assigned = 0,
     Completed = 1,
     Exempt = 2,
+}
+
+public enum AwarenessModuleStatus
+{
+    Draft = 0,
+    Active = 1,
+    Inactive = 2,
 }
 
 public sealed class Vulnerability
@@ -636,6 +643,116 @@ public sealed class PentestFinding
     public void Close() => Status = PentestFindingStatus.Closed;
 }
 
+public sealed class AwarenessModule
+{
+    private AwarenessModule() { }
+
+    public Guid Id { get; private set; }
+    public string Code { get; private set; } = null!;
+    public string Title { get; private set; } = null!;
+    public string? Summary { get; private set; }
+    public string Body { get; private set; } = null!;
+    public int Version { get; private set; }
+    public AwarenessModuleStatus Status { get; private set; }
+    public int EstimatedMinutes { get; private set; }
+    public int PassThresholdPercent { get; private set; }
+    public DateTimeOffset CreatedAtUtc { get; private set; }
+    public DateTimeOffset UpdatedAtUtc { get; private set; }
+
+    public static AwarenessModule Create(
+        string code,
+        string title,
+        string body,
+        DateTimeOffset utcNow,
+        string? summary = null,
+        int version = 1,
+        int estimatedMinutes = 5,
+        int passThresholdPercent = 80,
+        AwarenessModuleStatus status = AwarenessModuleStatus.Draft)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        ArgumentException.ThrowIfNullOrWhiteSpace(body);
+        if (version < 1) throw new ArgumentOutOfRangeException(nameof(version));
+        if (estimatedMinutes < 1) throw new ArgumentOutOfRangeException(nameof(estimatedMinutes));
+        if (passThresholdPercent is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(passThresholdPercent));
+        return new AwarenessModule
+        {
+            Id = Guid.CreateVersion7(),
+            Code = code.Trim().ToUpperInvariant(),
+            Title = title.Trim(),
+            Summary = string.IsNullOrWhiteSpace(summary) ? null : summary.Trim(),
+            Body = body.Trim(),
+            Version = version,
+            Status = status,
+            EstimatedMinutes = estimatedMinutes,
+            PassThresholdPercent = passThresholdPercent,
+            CreatedAtUtc = utcNow,
+            UpdatedAtUtc = utcNow,
+        };
+    }
+
+    public void Activate(DateTimeOffset utcNow)
+    {
+        Status = AwarenessModuleStatus.Active;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void Deactivate(DateTimeOffset utcNow)
+    {
+        Status = AwarenessModuleStatus.Inactive;
+        UpdatedAtUtc = utcNow;
+    }
+}
+
+public sealed class AwarenessQuestion
+{
+    private AwarenessQuestion() { }
+
+    public Guid Id { get; private set; }
+    public Guid ModuleId { get; private set; }
+    public string QuestionText { get; private set; } = null!;
+    public int DisplayOrder { get; private set; }
+
+    public static AwarenessQuestion Create(Guid moduleId, string questionText, int displayOrder)
+    {
+        if (moduleId == Guid.Empty) throw new ArgumentException("Module required.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(questionText);
+        return new AwarenessQuestion
+        {
+            Id = Guid.CreateVersion7(),
+            ModuleId = moduleId,
+            QuestionText = questionText.Trim(),
+            DisplayOrder = displayOrder,
+        };
+    }
+}
+
+public sealed class AwarenessAnswerOption
+{
+    private AwarenessAnswerOption() { }
+
+    public Guid Id { get; private set; }
+    public Guid QuestionId { get; private set; }
+    public string Text { get; private set; } = null!;
+    public bool IsCorrect { get; private set; }
+    public int DisplayOrder { get; private set; }
+
+    public static AwarenessAnswerOption Create(Guid questionId, string text, bool isCorrect, int displayOrder)
+    {
+        if (questionId == Guid.Empty) throw new ArgumentException("Question required.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(text);
+        return new AwarenessAnswerOption
+        {
+            Id = Guid.CreateVersion7(),
+            QuestionId = questionId,
+            Text = text.Trim(),
+            IsCorrect = isCorrect,
+            DisplayOrder = displayOrder,
+        };
+    }
+}
+
 public sealed class AwarenessCampaign
 {
     private AwarenessCampaign() { }
@@ -643,6 +760,9 @@ public sealed class AwarenessCampaign
     public Guid Id { get; private set; }
     public string Title { get; private set; } = null!;
     public string? Description { get; private set; }
+    public Guid? ModuleId { get; private set; }
+    public int? ModuleVersion { get; private set; }
+    public int PassThresholdPercent { get; private set; }
     public DateTimeOffset StartsAtUtc { get; private set; }
     public DateTimeOffset? DueAtUtc { get; private set; }
     public AwarenessCampaignStatus Status { get; private set; }
@@ -651,15 +771,20 @@ public sealed class AwarenessCampaign
 
     public static AwarenessCampaign Create(
         string title, Guid ownerUserId, DateTimeOffset startsAtUtc, DateTimeOffset utcNow,
-        string? description = null, DateTimeOffset? dueAtUtc = null)
+        string? description = null, DateTimeOffset? dueAtUtc = null,
+        Guid? moduleId = null, int? moduleVersion = null, int passThresholdPercent = 80)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         if (ownerUserId == Guid.Empty) throw new ArgumentException("Owner required.");
+        if (passThresholdPercent is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(passThresholdPercent));
         return new AwarenessCampaign
         {
             Id = Guid.CreateVersion7(),
             Title = title.Trim(),
             Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            ModuleId = moduleId is null || moduleId == Guid.Empty ? null : moduleId,
+            ModuleVersion = moduleVersion,
+            PassThresholdPercent = passThresholdPercent,
             StartsAtUtc = startsAtUtc,
             DueAtUtc = dueAtUtc,
             Status = AwarenessCampaignStatus.Draft,
@@ -680,18 +805,46 @@ public sealed class AwarenessCompletion
     public Guid CampaignId { get; private set; }
     public Guid UserId { get; private set; }
     public AwarenessCompletionStatus Status { get; private set; }
+    public DateTimeOffset AssignedAtUtc { get; private set; }
+    public DateTimeOffset? DueAtUtc { get; private set; }
+    public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
+    public int? Score { get; private set; }
+    public int AttemptCount { get; private set; }
+    public int? ModuleVersion { get; private set; }
     public Guid? EvidenceId { get; private set; }
     public string? Notes { get; private set; }
 
-    public static AwarenessCompletion Assign(Guid campaignId, Guid userId) =>
+    public static AwarenessCompletion Assign(
+        Guid campaignId, Guid userId, DateTimeOffset utcNow, DateTimeOffset? dueAtUtc = null, int? moduleVersion = null) =>
         new()
         {
             Id = Guid.CreateVersion7(),
             CampaignId = campaignId,
             UserId = userId,
             Status = AwarenessCompletionStatus.Assigned,
+            AssignedAtUtc = utcNow,
+            DueAtUtc = dueAtUtc,
+            AttemptCount = 0,
+            ModuleVersion = moduleVersion,
         };
+
+    public void MarkStarted(DateTimeOffset utcNow)
+    {
+        if (StartedAtUtc is not null) return;
+        StartedAtUtc = utcNow;
+    }
+
+    public void RecordAttempt(int score, bool passed, DateTimeOffset utcNow)
+    {
+        AttemptCount += 1;
+        Score = score;
+        if (passed)
+        {
+            Status = AwarenessCompletionStatus.Completed;
+            CompletedAtUtc = utcNow;
+        }
+    }
 
     public void Complete(DateTimeOffset utcNow, Guid? evidenceId = null, string? notes = null)
     {
@@ -705,6 +858,59 @@ public sealed class AwarenessCompletion
     {
         Status = AwarenessCompletionStatus.Exempt;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+    }
+}
+
+public sealed class AwarenessAttempt
+{
+    private AwarenessAttempt() { }
+
+    public Guid Id { get; private set; }
+    public Guid AssignmentId { get; private set; }
+    public int AttemptNumber { get; private set; }
+    public int Score { get; private set; }
+    public bool Passed { get; private set; }
+    public DateTimeOffset SubmittedAtUtc { get; private set; }
+
+    public static AwarenessAttempt Create(
+        Guid assignmentId, int attemptNumber, int score, bool passed, DateTimeOffset utcNow)
+    {
+        if (assignmentId == Guid.Empty) throw new ArgumentException("Assignment required.");
+        if (attemptNumber < 1) throw new ArgumentOutOfRangeException(nameof(attemptNumber));
+        return new AwarenessAttempt
+        {
+            Id = Guid.CreateVersion7(),
+            AssignmentId = assignmentId,
+            AttemptNumber = attemptNumber,
+            Score = score,
+            Passed = passed,
+            SubmittedAtUtc = utcNow,
+        };
+    }
+}
+
+public sealed class AwarenessReminderLog
+{
+    private AwarenessReminderLog() { }
+
+    public Guid Id { get; private set; }
+    public Guid AssignmentId { get; private set; }
+    public Guid UserId { get; private set; }
+    public string ReminderKind { get; private set; } = null!;
+    public DateTimeOffset NotifiedAtUtc { get; private set; }
+
+    public static AwarenessReminderLog Create(
+        Guid assignmentId, Guid userId, string reminderKind, DateTimeOffset utcNow)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reminderKind);
+        return new AwarenessReminderLog
+        {
+            Id = Guid.CreateVersion7(),
+            AssignmentId = assignmentId,
+            UserId = userId,
+            ReminderKind = reminderKind.Trim(),
+            NotifiedAtUtc = utcNow,
+        };
     }
 }
 

@@ -3,6 +3,7 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Contracts.Audit;
+using Qec.Itmg.Contracts.Identity;
 using Qec.Itmg.DocumentManagement.Domain;
 using Qec.Itmg.DocumentManagement.Persistence;
 

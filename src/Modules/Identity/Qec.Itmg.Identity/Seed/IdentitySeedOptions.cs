@@ -85,6 +85,7 @@ public static class IdentitySeedCatalog
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
         ("sec.dashboard", "View security dashboard counts"),
+        ("sec.awareness.manage", "Manage security awareness modules, campaigns, and completion exports"),
         ("vuln.read", "View vulnerabilities"),
         ("vuln.manage", "Create and manage vulnerabilities and remediation links"),
         ("risk.manage", "Manage risk register"),

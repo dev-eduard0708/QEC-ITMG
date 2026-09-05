@@ -163,6 +163,7 @@ function buildNavGroups(can: (permissionKey: string) => boolean): NavGroupDef[] 
         { to: '/employee/equipment', labelKey: 'nav.equipment', icon: HardDrive, visible: true },
         { to: '/employee/knowledge', labelKey: 'nav.knowledge', icon: BookOpen, visible: true },
         { to: '/employee/policies', labelKey: 'nav.myPolicies', icon: FileText, visible: true },
+        { to: '/employee/security', labelKey: 'nav.employeeSecurity', icon: Shield, visible: true },
         { to: '/employee/remote-support', labelKey: 'nav.remoteSupport', icon: Laptop, visible: true },
       ],
     },
@@ -654,6 +655,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   }
   if (pathname === '/it' || pathname === '/it/') return t('nav.itDashboard')
 
+  if (pathname.startsWith('/employee/security')) return t('nav.employeeSecurity')
   if (pathname.startsWith('/employee/policies')) return t('nav.myPolicies')
   if (pathname.startsWith('/employee/remote-support')) return t('nav.remoteSupport')
   if (pathname.startsWith('/employee/knowledge')) return t('nav.knowledge')

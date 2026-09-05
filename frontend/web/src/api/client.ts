@@ -127,7 +127,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     return undefined as T
   }
 
-  return (await response.json()) as T
+  // Some endpoints answer 200 with an empty body (e.g. Results.Ok() without a value).
+  const text = await response.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
 }
 
 export const adminApi = {
@@ -430,6 +433,44 @@ export const meApi = {
     apiFetch<TicketTimelineItem[]>(`/api/v1/me/tickets/${id}/timeline`),
   ticketAttachmentContentUrl: (ticketId: string, attachmentId: string) =>
     `/api/v1/me/tickets/${ticketId}/attachments/${attachmentId}/content`,
+  reportSecurityConcern: (payload: ReportSecurityConcernPayload) =>
+    apiFetch<Ticket>('/api/v1/me/security/concerns', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  uploadAttachment: async (ticketId: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiFetch<TicketAttachment>(`/api/v1/me/tickets/${ticketId}/attachments`, {
+      method: 'POST',
+      body: form,
+    })
+  },
+}
+
+export const SECURITY_CONCERN_CATEGORIES = [
+  'phishing',
+  'account',
+  'lost_device',
+  'malware',
+  'data_disclosure',
+  'suspicious_link',
+  'unauthorized_access',
+  'other',
+] as const
+
+export type SecurityConcernCategory = (typeof SECURITY_CONCERN_CATEGORIES)[number]
+
+export type ReportSecurityConcernPayload = {
+  categoryKey: SecurityConcernCategory | string
+  description: string
+  title?: string | null
+  noticedAtUtc?: string | null
+  affectedDeviceOrService?: string | null
+  configurationItemId?: string | null
+  sender?: string | null
+  subject?: string | null
+  suspiciousReason?: string | null
 }
 
 export type Ticket = {
@@ -2675,10 +2716,15 @@ export type AwarenessCampaignItem = {
   status: string
   startsAtUtc: string
   dueAtUtc: string | null
+  ownerUserId: string
+  createdAtUtc: string
   assignedCount: number
   completedCount: number
   outstandingCount: number
   overdueCount: number
+  moduleId: string | null
+  moduleVersion: number | null
+  passThresholdPercent: number
 }
 
 export const securityApi = {
@@ -2807,6 +2853,140 @@ export const securityApi = {
     apiFetch(`/api/v1/security/awareness/${id}/complete`, {
       method: 'POST',
       body: JSON.stringify({ userId }),
+    }),
+}
+
+export type AwarenessAnswerOption = {
+  id: string
+  text: string
+  displayOrder: number
+  isCorrect: boolean | null
+}
+
+export type AwarenessQuestion = {
+  id: string
+  questionText: string
+  displayOrder: number
+  options: AwarenessAnswerOption[]
+}
+
+export type AwarenessModuleItem = {
+  id: string
+  code: string
+  title: string
+  summary: string | null
+  body: string
+  version: number
+  status: string
+  estimatedMinutes: number
+  passThresholdPercent: number
+  createdAtUtc: string
+  updatedAtUtc: string
+  questions: AwarenessQuestion[]
+}
+
+export type AwarenessCompletionRow = {
+  id: string
+  campaignId: string
+  userId: string
+  status: string
+  completedAtUtc: string | null
+  evidenceId: string | null
+  notes: string | null
+  assignedAtUtc: string | null
+  dueAtUtc: string | null
+  startedAtUtc: string | null
+  score: number | null
+  attemptCount: number
+  moduleVersion: number | null
+}
+
+export type AwarenessAssignResult = {
+  assigned: number
+  items: AwarenessCompletionRow[]
+}
+
+export type EmployeeAwarenessItem = {
+  assignmentId: string
+  campaignId: string
+  moduleId: string | null
+  title: string
+  summary: string | null
+  estimatedMinutes: number
+  assignedAtUtc: string
+  dueAtUtc: string | null
+  status: string
+  completedAtUtc: string | null
+  score: number | null
+  attemptCount: number
+  moduleVersion: number | null
+  isOverdue: boolean
+}
+
+export type EmployeeAwarenessSummary = {
+  assigned: number
+  completed: number
+  outstanding: number
+  overdue: number
+}
+
+export type EmployeeAwarenessDetail = {
+  assignment: EmployeeAwarenessItem | null
+  module: AwarenessModuleItem
+}
+
+export type AwarenessQuizAnswer = {
+  questionId: string
+  optionId: string
+}
+
+export type AwarenessQuizResult = {
+  passed: boolean
+  score: number
+  attemptNumber: number
+  message: string
+  completedAtUtc: string | null
+}
+
+export type EmployeeAwarenessFilter = 'outstanding' | 'completed' | 'all'
+
+export const awarenessApi = {
+  listCampaigns: () => apiFetch<AwarenessCampaignItem[]>('/api/v1/security/awareness'),
+  seedModules: () =>
+    apiFetch<AwarenessModuleItem[]>('/api/v1/security/awareness/modules/seed', { method: 'POST' }),
+  listModules: (includeInactive?: boolean) =>
+    apiFetch<AwarenessModuleItem[]>(
+      `/api/v1/security/awareness/modules${opsQuery({
+        includeInactive: includeInactive === undefined ? undefined : String(includeInactive),
+      })}`,
+    ),
+  activateModule: (moduleId: string) =>
+    apiFetch<void>(`/api/v1/security/awareness/modules/${moduleId}/activate`, { method: 'POST' }),
+  createCampaign: (payload: { moduleId: string; title?: string | null; dueAtUtc?: string | null }) =>
+    apiFetch<AwarenessCampaignItem>('/api/v1/security/awareness/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  assignOpen: (id: string, payload: { allEmployees?: boolean; userIds?: string[] }) =>
+    apiFetch<AwarenessAssignResult>(`/api/v1/security/awareness/${id}/assign-open`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  closeCampaign: (id: string) =>
+    apiFetch<void>(`/api/v1/security/awareness/${id}/close`, { method: 'POST' }),
+  listCompletions: (id: string) =>
+    apiFetch<AwarenessCompletionRow[]>(`/api/v1/security/awareness/${id}/completions`),
+  completionsExportUrl: (id: string) => `/api/v1/security/awareness/${id}/completions/export.csv`,
+
+  mySummary: () => apiFetch<EmployeeAwarenessSummary>('/api/v1/me/security/awareness/summary'),
+  mine: (filter?: EmployeeAwarenessFilter) =>
+    apiFetch<EmployeeAwarenessItem[]>(`/api/v1/me/security/awareness${opsQuery({ filter })}`),
+  mineGet: (assignmentId: string) =>
+    apiFetch<EmployeeAwarenessDetail>(`/api/v1/me/security/awareness/${assignmentId}`),
+  submitQuiz: (assignmentId: string, answers: AwarenessQuizAnswer[]) =>
+    apiFetch<AwarenessQuizResult>(`/api/v1/me/security/awareness/${assignmentId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
     }),
 }
 

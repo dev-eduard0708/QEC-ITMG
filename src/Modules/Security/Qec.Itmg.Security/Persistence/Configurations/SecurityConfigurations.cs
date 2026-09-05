@@ -141,6 +141,7 @@ internal sealed class AwarenessCampaignConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(32);
         builder.HasIndex(x => x.Status).HasDatabaseName("IX_AwarenessCampaign_Status");
         builder.HasIndex(x => x.DueAtUtc).HasDatabaseName("IX_AwarenessCampaign_DueAtUtc");
+        builder.HasIndex(x => x.ModuleId).HasDatabaseName("IX_AwarenessCampaign_ModuleId");
     }
 }
 
@@ -155,7 +156,78 @@ internal sealed class AwarenessCompletionConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(x => new { x.CampaignId, x.UserId })
             .IsUnique()
             .HasDatabaseName("IX_AwarenessCompletion_Campaign_User");
+        builder.HasIndex(x => x.UserId).HasDatabaseName("IX_AwarenessCompletion_UserId");
+        builder.HasIndex(x => x.DueAtUtc).HasDatabaseName("IX_AwarenessCompletion_DueAtUtc");
+        builder.HasIndex(x => x.Status).HasDatabaseName("IX_AwarenessCompletion_Status");
         builder.HasOne<AwarenessCampaign>().WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AwarenessModuleConfiguration : IEntityTypeConfiguration<AwarenessModule>
+{
+    public void Configure(EntityTypeBuilder<AwarenessModule> builder)
+    {
+        builder.ToTable("AwarenessModule");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Code).IsRequired().HasMaxLength(64);
+        builder.Property(x => x.Title).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.Summary).HasMaxLength(1000);
+        builder.Property(x => x.Body).IsRequired();
+        builder.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.HasIndex(x => x.Code).IsUnique().HasDatabaseName("IX_AwarenessModule_Code");
+        builder.HasIndex(x => x.Status).HasDatabaseName("IX_AwarenessModule_Status");
+    }
+}
+
+internal sealed class AwarenessQuestionConfiguration : IEntityTypeConfiguration<AwarenessQuestion>
+{
+    public void Configure(EntityTypeBuilder<AwarenessQuestion> builder)
+    {
+        builder.ToTable("AwarenessQuestion");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.QuestionText).IsRequired().HasMaxLength(1000);
+        builder.HasIndex(x => new { x.ModuleId, x.DisplayOrder }).HasDatabaseName("IX_AwarenessQuestion_Module_Order");
+        builder.HasOne<AwarenessModule>().WithMany().HasForeignKey(x => x.ModuleId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AwarenessAnswerOptionConfiguration : IEntityTypeConfiguration<AwarenessAnswerOption>
+{
+    public void Configure(EntityTypeBuilder<AwarenessAnswerOption> builder)
+    {
+        builder.ToTable("AwarenessAnswerOption");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Text).IsRequired().HasMaxLength(500);
+        builder.HasIndex(x => new { x.QuestionId, x.DisplayOrder }).HasDatabaseName("IX_AwarenessAnswer_Question_Order");
+        builder.HasOne<AwarenessQuestion>().WithMany().HasForeignKey(x => x.QuestionId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AwarenessAttemptConfiguration : IEntityTypeConfiguration<AwarenessAttempt>
+{
+    public void Configure(EntityTypeBuilder<AwarenessAttempt> builder)
+    {
+        builder.ToTable("AwarenessAttempt");
+        builder.HasKey(x => x.Id);
+        builder.HasIndex(x => x.AssignmentId).HasDatabaseName("IX_AwarenessAttempt_AssignmentId");
+        builder.HasIndex(x => new { x.AssignmentId, x.AttemptNumber })
+            .IsUnique()
+            .HasDatabaseName("IX_AwarenessAttempt_Assignment_Number");
+        builder.HasOne<AwarenessCompletion>().WithMany().HasForeignKey(x => x.AssignmentId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AwarenessReminderLogConfiguration : IEntityTypeConfiguration<AwarenessReminderLog>
+{
+    public void Configure(EntityTypeBuilder<AwarenessReminderLog> builder)
+    {
+        builder.ToTable("AwarenessReminderLog");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.ReminderKind).IsRequired().HasMaxLength(32);
+        builder.HasIndex(x => new { x.AssignmentId, x.ReminderKind })
+            .IsUnique()
+            .HasDatabaseName("IX_AwarenessReminder_Assignment_Kind");
+        builder.HasOne<AwarenessCompletion>().WithMany().HasForeignKey(x => x.AssignmentId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 

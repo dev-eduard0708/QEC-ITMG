@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Qec.Itmg.DocumentManagement.Services;
+using Qec.Itmg.Contracts.Identity;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
 

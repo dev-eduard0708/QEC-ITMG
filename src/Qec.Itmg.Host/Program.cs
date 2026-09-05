@@ -15,7 +15,7 @@ using Qec.Itmg.Host.Persistence;
 using Qec.Itmg.Host.ChangeManagement;
 using Qec.Itmg.Host.AccessManagement;
 using Qec.Itmg.Host.DocumentManagement;
-using Qec.Itmg.DocumentManagement.Services;
+using Qec.Itmg.Contracts.Identity;
 using Qec.Itmg.Host.Governance;
 using Qec.Itmg.Host.Compliance;
 using Qec.Itmg.Host.Evidence;
@@ -76,6 +76,7 @@ try
     builder.Services.AddScoped<ChangeHistoryService>();
     builder.Services.AddScoped<AccessNotificationService>();
     builder.Services.AddScoped<DocumentNotificationService>();
+    builder.Services.AddScoped<SecurityAwarenessNotificationService>();
     builder.Services.AddScoped<IActiveEmployeeLookup, IdentityActiveEmployeeLookup>();
     builder.Services.AddScoped<AuditNotificationService>();
 
@@ -107,6 +108,7 @@ try
         builder.Services.AddTransient<EventRetentionJob>();
         builder.Services.AddTransient<DocumentReviewReminderJob>();
         builder.Services.AddTransient<PolicyAcknowledgementReminderJob>();
+        builder.Services.AddTransient<SecurityAwarenessReminderJob>();
         builder.Services.AddTransient<EvidenceExpiryJob>();
         builder.Services.AddTransient<ContinuityReminderJob>();
         builder.Services.AddTransient<VendorReminderJob>();
@@ -161,6 +163,10 @@ try
             "policy-acknowledgement-reminders",
             job => job.ExecuteAsync(CancellationToken.None),
             "30 7 * * *");
+        recurringJobs.AddOrUpdate<SecurityAwarenessReminderJob>(
+            "security-awareness-reminders",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "45 7 * * *");
         recurringJobs.AddOrUpdate<EvidenceExpiryJob>(
             "evidence-expiry",
             job => job.ExecuteAsync(CancellationToken.None),
