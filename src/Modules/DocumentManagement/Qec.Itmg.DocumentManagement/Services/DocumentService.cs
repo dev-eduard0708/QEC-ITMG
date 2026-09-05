@@ -16,14 +16,38 @@ public sealed record DocumentDto(
     string? RetirementReason, DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc, string RowVersion,
     int? DaysToReview, bool ReviewDueSoon, bool ReviewOverdue, int? CurrentVersionNumber,
     Guid? CurrentAttachmentId, Guid? CurrentApprovedByUserId, DateTimeOffset? CurrentApprovedAtUtc,
-    DateTimeOffset? CurrentPublishedAtUtc, string? CurrentContentText);
+    DateTimeOffset? CurrentPublishedAtUtc, string? CurrentContentText,
+    Guid? ReviewerUserId = null,
+    Guid? PublisherUserId = null,
+    Guid? CurrentSubmittedByUserId = null,
+    DateTimeOffset? CurrentSubmittedAtUtc = null,
+    Guid? CurrentPublishedByUserId = null,
+    int? AssignedEmployeeCount = null,
+    int? OutstandingAcknowledgementCount = null);
 
-public sealed record DocumentListResult(IReadOnlyList<DocumentDto> Items, int TotalCount, int Page, int PageSize, int ReviewOverdueCount, int ReviewDueSoonCount);
+public sealed record DocumentListResult(
+    IReadOnlyList<DocumentDto> Items, int TotalCount, int Page, int PageSize,
+    int ReviewOverdueCount, int ReviewDueSoonCount,
+    int DraftCount = 0,
+    int InReviewCount = 0,
+    int ApprovedCount = 0,
+    int PublishedCount = 0,
+    int AcknowledgementOutstandingCount = 0);
+
+public sealed record PolicyWorkspaceSummaryDto(
+    int Draft,
+    int InReview,
+    int Approved,
+    int Published,
+    int AcknowledgementOutstanding);
 
 public sealed record DocumentVersionDto(
     Guid Id, Guid ManagedDocumentId, int VersionNumber, Guid CreatedByUserId, DateTimeOffset CreatedAtUtc,
     string? ChangeSummary, string? ContentText, Guid? AttachmentId, Guid? ApprovedByUserId, DateTimeOffset? ApprovedAtUtc,
-    DateTimeOffset? PublishedAtUtc, Guid? SupersedesVersionId);
+    DateTimeOffset? PublishedAtUtc, Guid? SupersedesVersionId,
+    Guid? SubmittedByUserId = null,
+    DateTimeOffset? SubmittedAtUtc = null,
+    Guid? PublishedByUserId = null);
 
 public sealed record PolicyAcknowledgementDto(
     Guid Id, Guid ManagedDocumentId, Guid DocumentVersionId, Guid UserId, DateTimeOffset AcknowledgedAtUtc,
@@ -108,9 +132,47 @@ public sealed class DocumentService(
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         Dictionary<Guid, DocumentVersion> versions = await LoadVersionsAsync(
             items.Where(x => x.CurrentVersionId.HasValue).Select(x => x.CurrentVersionId!.Value).ToList(), ct);
+
+        Dictionary<Guid, (int Assigned, int Outstanding)> ackCounts = [];
+        if (type == DocumentType.Policy || items.Any(x => x.DocumentType == DocumentType.Policy))
+            ackCounts = await LoadPolicyAckCountsAsync(items, ct);
+
+        IQueryable<ManagedDocument> statusBase = db.ManagedDocuments.AsNoTracking()
+            .Where(x => type == null || x.DocumentType == type.Value);
+        if (publishedOnly) statusBase = statusBase.Where(x => x.Status == DocumentStatus.Published);
+        if (!includeConfidential)
+            statusBase = statusBase.Where(x => x.Classification == DocumentClassification.Internal);
+
+        int draftCount = await statusBase.CountAsync(x => x.Status == DocumentStatus.Draft, ct);
+        int inReviewCount = await statusBase.CountAsync(x => x.Status == DocumentStatus.InReview, ct);
+        int approvedCount = await statusBase.CountAsync(x => x.Status == DocumentStatus.Approved, ct);
+        int publishedCount = await statusBase.CountAsync(x => x.Status == DocumentStatus.Published, ct);
+
+        int ackOutstanding = 0;
+        if (type is null or DocumentType.Policy)
+            ackOutstanding = await CountPolicyAcknowledgementOutstandingAsync(ct);
+
         return new(
-            items.Select(x => Map(x, x.CurrentVersionId is Guid vid && versions.TryGetValue(vid, out DocumentVersion? v) ? v : null, now)).ToList(),
-            total, page, pageSize, overdueCount, dueSoonCount);
+            items.Select(x =>
+            {
+                DocumentVersion? v = x.CurrentVersionId is Guid vid && versions.TryGetValue(vid, out DocumentVersion? found) ? found : null;
+                ackCounts.TryGetValue(x.Id, out (int Assigned, int Outstanding) counts);
+                return Map(x, v, now, counts.Assigned, counts.Outstanding);
+            }).ToList(),
+            total, page, pageSize, overdueCount, dueSoonCount,
+            draftCount, inReviewCount, approvedCount, publishedCount, ackOutstanding);
+    }
+
+    public async Task<PolicyWorkspaceSummaryDto> GetPolicyWorkspaceSummaryAsync(CancellationToken ct)
+    {
+        IQueryable<ManagedDocument> q = db.ManagedDocuments.AsNoTracking()
+            .Where(x => x.DocumentType == DocumentType.Policy);
+        return new(
+            await q.CountAsync(x => x.Status == DocumentStatus.Draft, ct),
+            await q.CountAsync(x => x.Status == DocumentStatus.InReview, ct),
+            await q.CountAsync(x => x.Status == DocumentStatus.Approved, ct),
+            await q.CountAsync(x => x.Status == DocumentStatus.Published, ct),
+            await CountPolicyAcknowledgementOutstandingAsync(ct));
     }
 
     public async Task<DocumentDto?> GetAsync(Guid id, bool includeConfidential, bool allowUnpublished, CancellationToken ct)
@@ -128,7 +190,8 @@ public sealed class DocumentService(
     public async Task<DocumentDto> CreateAsync(
         string title, DocumentType type, Guid ownerUserId, DocumentClassification classification,
         Guid? designatedApproverUserId, DateTimeOffset? effectiveDate, DateTimeOffset? reviewDate,
-        bool requiresAcknowledgement, Guid actorUserId, string? changeSummary, CancellationToken ct)
+        bool requiresAcknowledgement, Guid actorUserId, string? changeSummary, CancellationToken ct,
+        string? contentText = null, Guid? reviewerUserId = null, Guid? publisherUserId = null)
     {
         DocumentDto? created = null;
         await sharedDbTransaction.ExecuteAsync(async innerCt =>
@@ -136,9 +199,10 @@ public sealed class DocumentService(
             string number = await numbers.NextAsync(SequenceKey, Prefix, innerCt);
             ManagedDocument doc = ManagedDocument.Create(
                 number, title, type, ownerUserId, classification, clock.UtcNow,
-                designatedApproverUserId, effectiveDate, reviewDate, requiresAcknowledgement);
+                designatedApproverUserId, reviewerUserId, publisherUserId, effectiveDate, reviewDate, requiresAcknowledgement);
             db.ManagedDocuments.Add(doc);
-            DocumentVersion version = DocumentVersion.Create(doc.Id, 1, actorUserId, clock.UtcNow, changeSummary);
+            DocumentVersion version = DocumentVersion.Create(
+                doc.Id, 1, actorUserId, clock.UtcNow, changeSummary, contentText: contentText);
             db.DocumentVersions.Add(version);
             doc.SetCurrentVersion(version.Id, clock.UtcNow);
             await businessAudit.AppendAsync(DocumentAudit.Created(doc.Id, doc.DocumentNumber), innerCt);
@@ -151,13 +215,87 @@ public sealed class DocumentService(
     public async Task<DocumentDto> UpdateMetadataAsync(
         Guid id, string title, Guid ownerUserId, Guid? designatedApproverUserId,
         DocumentClassification classification, DateTimeOffset? effectiveDate, DateTimeOffset? reviewDate,
-        bool requiresAcknowledgement, bool requireReAcknowledgement, CancellationToken ct)
+        bool requiresAcknowledgement, bool requireReAcknowledgement, CancellationToken ct,
+        Guid? reviewerUserId = null, Guid? publisherUserId = null, string? contentText = null)
     {
         ManagedDocument doc = await LoadAsync(id, ct);
-        doc.UpdateMetadata(title, ownerUserId, designatedApproverUserId, classification, effectiveDate, reviewDate, requiresAcknowledgement, requireReAcknowledgement, clock.UtcNow);
-        await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "Title", null, title), ct);
+        string? oldTitle = doc.Title;
+        Guid oldOwner = doc.OwnerUserId;
+        Guid? oldReviewer = doc.ReviewerUserId;
+        Guid? oldApprover = doc.DesignatedApproverUserId;
+        Guid? oldPublisher = doc.PublisherUserId;
+
+        doc.UpdateMetadata(
+            title, ownerUserId,
+            reviewerUserId ?? doc.ReviewerUserId,
+            designatedApproverUserId,
+            publisherUserId ?? doc.PublisherUserId,
+            classification, effectiveDate, reviewDate, requiresAcknowledgement, requireReAcknowledgement, clock.UtcNow);
+
+        if (!string.Equals(oldTitle, doc.Title, StringComparison.Ordinal))
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "Title", oldTitle, doc.Title), ct);
+        if (oldOwner != doc.OwnerUserId)
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "PolicyOwnerAssigned", oldOwner.ToString(), doc.OwnerUserId.ToString()), ct);
+        if (oldReviewer != doc.ReviewerUserId)
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "PolicyReviewerAssigned", oldReviewer?.ToString(), doc.ReviewerUserId?.ToString()), ct);
+        if (oldApprover != doc.DesignatedApproverUserId)
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "PolicyApproverAssigned", oldApprover?.ToString(), doc.DesignatedApproverUserId?.ToString()), ct);
+        if (oldPublisher != doc.PublisherUserId)
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "PolicyPublisherAssigned", oldPublisher?.ToString(), doc.PublisherUserId?.ToString()), ct);
+
+        if (contentText is not null && doc.Status == DocumentStatus.Draft && doc.CurrentVersionId is Guid versionId)
+        {
+            DocumentVersion version = await db.DocumentVersions.FirstAsync(x => x.Id == versionId, ct);
+            version.SetContentText(contentText);
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "ContentText", null, "updated"), ct);
+        }
+
         await db.SaveChangesAsync(ct);
         return (await GetAsync(id, includeConfidential: true, allowUnpublished: true, ct))!;
+    }
+
+    public async Task<DocumentDto> AssignWorkflowResponsibilitiesAsync(
+        Guid id,
+        Guid actorUserId,
+        Guid? ownerUserId,
+        Guid? reviewerUserId,
+        Guid? designatedApproverUserId,
+        Guid? publisherUserId,
+        bool assignAllUnassignedToActor,
+        CancellationToken ct)
+    {
+        ManagedDocument doc = await LoadAsync(id, ct);
+        Guid? nextOwner = ownerUserId;
+        Guid? nextReviewer = reviewerUserId;
+        Guid? nextApprover = designatedApproverUserId;
+        Guid? nextPublisher = publisherUserId;
+
+        if (assignAllUnassignedToActor)
+        {
+            nextOwner = actorUserId;
+            nextReviewer = actorUserId;
+            nextApprover = actorUserId;
+            nextPublisher = actorUserId;
+        }
+
+        Guid oldOwner = doc.OwnerUserId;
+        Guid? oldReviewer = doc.ReviewerUserId;
+        Guid? oldApprover = doc.DesignatedApproverUserId;
+        Guid? oldPublisher = doc.PublisherUserId;
+
+        doc.AssignWorkflowResponsibilities(nextOwner, nextReviewer, nextApprover, nextPublisher, clock.UtcNow);
+
+        if (oldOwner != doc.OwnerUserId)
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "PolicyOwnerAssigned", oldOwner.ToString(), doc.OwnerUserId.ToString()), ct);
+        if (oldReviewer != doc.ReviewerUserId)
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "PolicyReviewerAssigned", oldReviewer?.ToString(), doc.ReviewerUserId?.ToString()), ct);
+        if (oldApprover != doc.DesignatedApproverUserId)
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "PolicyApproverAssigned", oldApprover?.ToString(), doc.DesignatedApproverUserId?.ToString()), ct);
+        if (oldPublisher != doc.PublisherUserId)
+            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "PolicyPublisherAssigned", oldPublisher?.ToString(), doc.PublisherUserId?.ToString()), ct);
+
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(id, true, true, ct))!;
     }
 
     public async Task<DocumentVersionDto> CreateRevisionAsync(Guid id, Guid actorUserId, string? changeSummary, CancellationToken ct)
@@ -195,16 +333,32 @@ public sealed class DocumentService(
         return items.Select(Map).ToList();
     }
 
-    public async Task<DocumentDto> SubmitForReviewAsync(Guid id, CancellationToken ct) =>
-        await TransitionAsync(id, DocumentStatus.InReview, ct);
+    public async Task<DocumentDto> SubmitForReviewAsync(Guid id, Guid actorUserId, CancellationToken ct)
+    {
+        if (actorUserId == Guid.Empty) throw new ArgumentException("Actor is required.", nameof(actorUserId));
+        ManagedDocument doc = await LoadAsync(id, ct);
+        if (doc.Status != DocumentStatus.Draft)
+            throw new InvalidOperationException("Only draft documents can be submitted for review.");
+        if (doc.CurrentVersionId is null)
+            throw new InvalidOperationException("Document has no current version.");
+
+        DocumentVersion version = await db.DocumentVersions.FirstAsync(x => x.Id == doc.CurrentVersionId, ct);
+        version.MarkSubmitted(actorUserId, clock.UtcNow);
+        DocumentStatus from = doc.Status;
+        doc.TransitionTo(DocumentStatus.InReview, clock.UtcNow);
+        await businessAudit.AppendAsync(DocumentAudit.Field(
+            doc.Id, doc.DocumentNumber, "PolicySubmittedForReview", from.ToString(), nameof(DocumentStatus.InReview),
+            BusinessAuditAction.StatusChanged), ct);
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(id, true, true, ct))!;
+    }
 
     public async Task<DocumentDto> ApproveAsync(Guid id, Guid actorUserId, CancellationToken ct)
     {
         ManagedDocument doc = await LoadAsync(id, ct);
         if (doc.Status != DocumentStatus.InReview)
             throw new InvalidOperationException("Document is not in review.");
-        if (actorUserId == doc.OwnerUserId)
-            throw new InvalidOperationException("Document owner cannot approve their own document.");
+        // Single-admin operating model: owner may also approve. DesignatedApproverUserId still restricts when set.
         if (doc.DesignatedApproverUserId is Guid designated && designated != actorUserId)
             throw new InvalidOperationException("Only the designated approver can approve this document.");
         if (doc.CurrentVersionId is null)
@@ -214,7 +368,7 @@ public sealed class DocumentService(
         DocumentStatus from = doc.Status;
         doc.TransitionTo(DocumentStatus.Approved, clock.UtcNow);
         await businessAudit.AppendAsync(DocumentAudit.Field(
-            doc.Id, doc.DocumentNumber, "Status", from.ToString(), nameof(DocumentStatus.Approved),
+            doc.Id, doc.DocumentNumber, "PolicyApproved", from.ToString(), nameof(DocumentStatus.Approved),
             BusinessAuditAction.StatusChanged), ct);
         await db.SaveChangesAsync(ct);
         return (await GetAsync(id, true, true, ct))!;
@@ -226,30 +380,35 @@ public sealed class DocumentService(
         DocumentStatus from = doc.Status;
         doc.TransitionTo(DocumentStatus.Draft, clock.UtcNow);
         await businessAudit.AppendAsync(DocumentAudit.Field(
-            doc.Id, doc.DocumentNumber, "Status", from.ToString(), nameof(DocumentStatus.Draft),
+            doc.Id, doc.DocumentNumber, "PolicyReturnedToDraft", from.ToString(), nameof(DocumentStatus.Draft),
             BusinessAuditAction.StatusChanged, reason), ct);
         await db.SaveChangesAsync(ct);
         return (await GetAsync(id, true, true, ct))!;
     }
 
-    public async Task<DocumentDto> PublishAsync(Guid id, CancellationToken ct)
+    public async Task<DocumentDto> PublishAsync(Guid id, Guid actorUserId, CancellationToken ct)
     {
+        if (actorUserId == Guid.Empty) throw new ArgumentException("Actor is required.", nameof(actorUserId));
         ManagedDocument doc = await LoadAsync(id, ct);
         if (doc.Status != DocumentStatus.Approved)
             throw new InvalidOperationException("Only approved documents can be published.");
+        if (doc.PublisherUserId is Guid designatedPublisher && designatedPublisher != actorUserId)
+            throw new InvalidOperationException("Only the designated publisher can publish this document.");
         if (doc.CurrentVersionId is null)
             throw new InvalidOperationException("Document has no current version.");
         DocumentVersion version = await db.DocumentVersions.FirstAsync(x => x.Id == doc.CurrentVersionId, ct);
         if (version.ApprovedAtUtc is null)
             throw new InvalidOperationException("Current version is not approved.");
 
-        version.MarkPublished(clock.UtcNow);
+        version.MarkPublished(actorUserId, clock.UtcNow);
+        if (doc.PublisherUserId is null)
+            doc.AssignWorkflowResponsibilities(null, null, null, actorUserId, clock.UtcNow);
         DocumentStatus from = doc.Status;
         doc.TransitionTo(DocumentStatus.Published, clock.UtcNow);
         doc.SetEffectiveDateIfMissing(clock.UtcNow, clock.UtcNow);
 
         await businessAudit.AppendAsync(DocumentAudit.Field(
-            doc.Id, doc.DocumentNumber, "Status", from.ToString(), nameof(DocumentStatus.Published),
+            doc.Id, doc.DocumentNumber, "PolicyPublished", from.ToString(), nameof(DocumentStatus.Published),
             BusinessAuditAction.StatusChanged), ct);
         await db.SaveChangesAsync(ct);
         return (await GetAsync(id, true, true, ct))!;
@@ -474,17 +633,79 @@ public sealed class DocumentService(
             .ToDictionaryAsync(x => x.Id, ct);
     }
 
-    private static DocumentDto Map(ManagedDocument x, DocumentVersion? version, DateTimeOffset now) =>
+    private async Task<Dictionary<Guid, (int Assigned, int Outstanding)>> LoadPolicyAckCountsAsync(
+        List<ManagedDocument> items, CancellationToken ct)
+    {
+        List<ManagedDocument> published = items
+            .Where(x => x.DocumentType == DocumentType.Policy
+                && x.RequiresAcknowledgement
+                && x.Status == DocumentStatus.Published
+                && x.CurrentVersionId is not null)
+            .ToList();
+        if (published.Count == 0) return [];
+
+        Dictionary<Guid, (int Assigned, int Outstanding)> result = [];
+        foreach (ManagedDocument doc in published)
+        {
+            // Lightweight per-doc counts for list cards; detail page uses full stats service.
+            Guid versionId = doc.CurrentVersionId!.Value;
+            int assigned = await db.PolicyAssignments.AsNoTracking()
+                .CountAsync(x => x.DocumentVersionId == versionId, ct);
+            int acknowledged = await db.PolicyAcknowledgements.AsNoTracking()
+                .CountAsync(x => x.DocumentVersionId == versionId, ct);
+            // Approximate outstanding: for AllEmployees assignment, detail stats are authoritative.
+            int outstanding = Math.Max(0, assigned > 0 ? Math.Max(assigned, acknowledged) - acknowledged : 0);
+            result[doc.Id] = (assigned, outstanding);
+        }
+
+        return result;
+    }
+
+    private async Task<int> CountPolicyAcknowledgementOutstandingAsync(CancellationToken ct)
+    {
+        // Count published policies that require acknowledgement and have at least one assignment
+        // with any outstanding employee (approx: policies with assignments where ack count < assigned target).
+        List<ManagedDocument> docs = await db.ManagedDocuments.AsNoTracking()
+            .Where(x => x.DocumentType == DocumentType.Policy
+                && x.RequiresAcknowledgement
+                && x.Status == DocumentStatus.Published
+                && x.CurrentVersionId != null)
+            .ToListAsync(ct);
+        int outstandingPolicies = 0;
+        foreach (ManagedDocument doc in docs)
+        {
+            Guid versionId = doc.CurrentVersionId!.Value;
+            bool hasAssignment = await db.PolicyAssignments.AsNoTracking()
+                .AnyAsync(x => x.DocumentVersionId == versionId, ct);
+            if (!hasAssignment) continue;
+            // Treat as outstanding workspace item when assignment exists (admin attention); exact employee
+            // outstanding is shown on detail stats.
+            outstandingPolicies++;
+        }
+
+        return outstandingPolicies;
+    }
+
+    private static DocumentDto Map(
+        ManagedDocument x,
+        DocumentVersion? version,
+        DateTimeOffset now,
+        int? assignedCount = null,
+        int? outstandingCount = null) =>
         new(x.Id, x.DocumentNumber, x.Title, x.DocumentType.ToString(), x.OwnerUserId, x.DesignatedApproverUserId,
             x.Classification.ToString(), x.Status.ToString(), x.CurrentVersionId, x.EffectiveDate, x.ReviewDate,
             x.RequiresAcknowledgement, x.RequireReAcknowledgement, x.RetirementReason, x.CreatedAtUtc, x.UpdatedAtUtc,
             Convert.ToBase64String(x.RowVersion), x.DaysToReview(now), x.IsReviewDueSoon(now), x.IsReviewOverdue(now),
             version?.VersionNumber, version?.AttachmentId, version?.ApprovedByUserId, version?.ApprovedAtUtc, version?.PublishedAtUtc,
-            version?.ContentText);
+            version?.ContentText,
+            x.ReviewerUserId, x.PublisherUserId,
+            version?.SubmittedByUserId, version?.SubmittedAtUtc, version?.PublishedByUserId,
+            assignedCount, outstandingCount);
 
     private static DocumentVersionDto Map(DocumentVersion x) =>
         new(x.Id, x.ManagedDocumentId, x.VersionNumber, x.CreatedByUserId, x.CreatedAtUtc, x.ChangeSummary,
-            x.ContentText, x.AttachmentId, x.ApprovedByUserId, x.ApprovedAtUtc, x.PublishedAtUtc, x.SupersedesVersionId);
+            x.ContentText, x.AttachmentId, x.ApprovedByUserId, x.ApprovedAtUtc, x.PublishedAtUtc, x.SupersedesVersionId,
+            x.SubmittedByUserId, x.SubmittedAtUtc, x.PublishedByUserId);
 }
 
 public sealed record DocumentReviewCandidate(

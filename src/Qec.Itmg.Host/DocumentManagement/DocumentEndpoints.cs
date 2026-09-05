@@ -152,6 +152,8 @@ public static class DocumentEndpoints
                 page ?? 1, pageSize ?? 25, search, DocumentType.Policy, ParseEnum<DocumentStatus>(status),
                 publishedOnly: !confidential, includeConfidential: confidential, reviewOverdueOnly: reviewOverdueOnly == true, ct));
         });
+        read.MapGet("/workspace-summary", async (DocumentService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetPolicyWorkspaceSummaryAsync(ct)));
         read.MapGet("/{id:guid}", async (
             Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser, DocumentService svc, CancellationToken ct) =>
         {
@@ -178,8 +180,49 @@ public static class DocumentEndpoints
                 DocumentDto created = await svc.CreateAsync(
                     req.Title, DocumentType.Policy, req.OwnerUserId ?? session.Id, classification,
                     req.DesignatedApproverUserId, req.EffectiveDate, req.ReviewDate,
-                    req.RequiresAcknowledgement ?? true, session.Id, req.ChangeSummary, ct);
+                    req.RequiresAcknowledgement ?? true, session.Id, req.ChangeSummary, ct,
+                    contentText: req.ContentText,
+                    reviewerUserId: req.ReviewerUserId,
+                    publisherUserId: req.PublisherUserId);
                 return Results.Created($"/api/v1/policies/{created.Id}", created);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(PolicyManage);
+
+        endpoints.MapPut("/api/v1/policies/{id:guid}", async (
+            Guid id, UpdateDocumentRequest req, DocumentService svc, CancellationToken ct) =>
+        {
+            if (!Enum.TryParse(req.Classification, true, out DocumentClassification classification))
+                return Validation("Valid classification required.");
+            try
+            {
+                return Results.Ok(await svc.UpdateMetadataAsync(
+                    id, req.Title, req.OwnerUserId, req.DesignatedApproverUserId, classification,
+                    req.EffectiveDate, req.ReviewDate, req.RequiresAcknowledgement, req.RequireReAcknowledgement, ct,
+                    reviewerUserId: req.ReviewerUserId,
+                    publisherUserId: req.PublisherUserId,
+                    contentText: req.ContentText));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(PolicyManage);
+
+        endpoints.MapPost("/api/v1/policies/{id:guid}/responsibilities", async (
+            Guid id, AssignPolicyResponsibilitiesRequest req, ClaimsPrincipal principal,
+            ICurrentUserService currentUser, DocumentService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                return Results.Ok(await svc.AssignWorkflowResponsibilitiesAsync(
+                    id,
+                    session.Id,
+                    req.OwnerUserId,
+                    req.ReviewerUserId,
+                    req.DesignatedApproverUserId,
+                    req.PublisherUserId,
+                    req.AssignAllToMe == true,
+                    ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(PolicyManage);
@@ -327,11 +370,14 @@ public static class DocumentEndpoints
     private static void MapWorkflow(IEndpointRouteBuilder endpoints, string prefix, string managePerm, string approvePerm)
     {
         endpoints.MapPost($"{prefix}/{{id:guid}}/submit", async (
-            Guid id, DocumentService svc, DocumentNotificationService notifications, CancellationToken ct) =>
+            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            DocumentService svc, DocumentNotificationService notifications, CancellationToken ct) =>
         {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
             try
             {
-                DocumentDto updated = await svc.SubmitForReviewAsync(id, ct);
+                DocumentDto updated = await svc.SubmitForReviewAsync(id, session.Id, ct);
                 await notifications.NotifyReviewRequestedAsync(updated, ct);
                 return Results.Ok(updated);
             }
@@ -366,11 +412,14 @@ public static class DocumentEndpoints
         }).RequirePermission(approvePerm);
 
         endpoints.MapPost($"{prefix}/{{id:guid}}/publish", async (
-            Guid id, DocumentService svc, DocumentNotificationService notifications, CancellationToken ct) =>
+            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            DocumentService svc, DocumentNotificationService notifications, CancellationToken ct) =>
         {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
             try
             {
-                DocumentDto updated = await svc.PublishAsync(id, ct);
+                DocumentDto updated = await svc.PublishAsync(id, session.Id, ct);
                 await notifications.NotifyPublishedAsync(updated, ct);
                 return Results.Ok(updated);
             }
@@ -424,10 +473,13 @@ public sealed class DocumentNotificationService(
 
     public async Task NotifyReviewRequestedAsync(DocumentDto doc, CancellationToken ct)
     {
-        if (doc.DesignatedApproverUserId is Guid approver)
+        HashSet<Guid> recipients = [];
+        if (doc.ReviewerUserId is Guid reviewer) recipients.Add(reviewer);
+        if (doc.DesignatedApproverUserId is Guid approver) recipients.Add(approver);
+        foreach (Guid recipient in recipients)
         {
             await notifications.CreateAsync(
-                approver, "document.review_requested", NotificationSeverity.Warning,
+                recipient, "document.review_requested", NotificationSeverity.Warning,
                 $"Review requested: {doc.DocumentNumber}",
                 $"Please review \"{doc.Title}\".",
                 ResourceType, doc.Id, ActionUrl(doc), ct);
@@ -625,12 +677,21 @@ public sealed class PolicyAcknowledgementReminderJob(
 
 public sealed record CreateDocumentRequest(
     string Title, string? DocumentType, string? Classification, Guid? OwnerUserId, Guid? DesignatedApproverUserId,
-    DateTimeOffset? EffectiveDate, DateTimeOffset? ReviewDate, bool? RequiresAcknowledgement, string? ChangeSummary);
+    DateTimeOffset? EffectiveDate, DateTimeOffset? ReviewDate, bool? RequiresAcknowledgement, string? ChangeSummary,
+    string? ContentText = null, Guid? ReviewerUserId = null, Guid? PublisherUserId = null);
 
 public sealed record UpdateDocumentRequest(
     string Title, Guid OwnerUserId, Guid? DesignatedApproverUserId, string Classification,
     DateTimeOffset? EffectiveDate, DateTimeOffset? ReviewDate, bool RequiresAcknowledgement,
-    bool RequireReAcknowledgement = true);
+    bool RequireReAcknowledgement = true,
+    Guid? ReviewerUserId = null, Guid? PublisherUserId = null, string? ContentText = null);
+
+public sealed record AssignPolicyResponsibilitiesRequest(
+    Guid? OwnerUserId,
+    Guid? ReviewerUserId,
+    Guid? DesignatedApproverUserId,
+    Guid? PublisherUserId,
+    bool? AssignAllToMe);
 
 public sealed record RevisionRequest(string? ChangeSummary);
 public sealed record ReasonRequest(string? Reason);

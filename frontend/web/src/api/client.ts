@@ -1545,11 +1545,31 @@ export type ManagedDocument = {
   currentApprovedAtUtc: string | null
   currentPublishedAtUtc: string | null
   currentContentText?: string | null
+  reviewerUserId: string | null
+  publisherUserId: string | null
+  currentSubmittedByUserId: string | null
+  currentSubmittedAtUtc: string | null
+  currentPublishedByUserId: string | null
+  assignedEmployeeCount: number | null
+  outstandingAcknowledgementCount: number | null
 }
 
 export type DocumentListResult = OpsPaged<ManagedDocument> & {
   reviewOverdueCount: number
   reviewDueSoonCount: number
+  draftCount: number
+  inReviewCount: number
+  approvedCount: number
+  publishedCount: number
+  acknowledgementOutstandingCount: number
+}
+
+export type PolicyWorkspaceSummary = {
+  draft: number
+  inReview: number
+  approved: number
+  published: number
+  acknowledgementOutstanding: number
 }
 
 export type DocumentVersion = {
@@ -1565,6 +1585,9 @@ export type DocumentVersion = {
   approvedAtUtc: string | null
   publishedAtUtc: string | null
   supersedesVersionId: string | null
+  submittedByUserId: string | null
+  submittedAtUtc: string | null
+  publishedByUserId: string | null
 }
 
 export type AcknowledgementSummary = {
@@ -1681,6 +1704,42 @@ export const documentsApi = {
   },
 }
 
+export type CreatePolicyPayload = {
+  title: string
+  classification?: string
+  ownerUserId?: string | null
+  reviewerUserId?: string | null
+  designatedApproverUserId?: string | null
+  publisherUserId?: string | null
+  effectiveDate?: string | null
+  reviewDate?: string | null
+  requiresAcknowledgement?: boolean
+  changeSummary?: string | null
+  contentText?: string | null
+}
+
+export type UpdatePolicyPayload = {
+  title: string
+  ownerUserId: string
+  reviewerUserId?: string | null
+  designatedApproverUserId?: string | null
+  publisherUserId?: string | null
+  classification: string
+  effectiveDate?: string | null
+  reviewDate?: string | null
+  requiresAcknowledgement: boolean
+  requireReAcknowledgement?: boolean
+  contentText?: string | null
+}
+
+export type PolicyResponsibilitiesPayload = {
+  ownerUserId?: string | null
+  reviewerUserId?: string | null
+  designatedApproverUserId?: string | null
+  publisherUserId?: string | null
+  assignAllToMe?: boolean
+}
+
 export const policiesApi = {
   list: (params?: {
     page?: number
@@ -1699,15 +1758,25 @@ export const policiesApi = {
           params?.reviewOverdueOnly === undefined ? undefined : String(params.reviewOverdueOnly),
       })}`,
     ),
+  workspaceSummary: () => apiFetch<PolicyWorkspaceSummary>('/api/v1/policies/workspace-summary'),
   get: (id: string) => apiFetch<ManagedDocument>(`/api/v1/policies/${id}`),
-  create: (payload: {
-    title: string
-    classification?: string
-    designatedApproverUserId?: string | null
-    reviewDate?: string | null
-    requiresAcknowledgement?: boolean
-  }) =>
+  create: (payload: CreatePolicyPayload) =>
     apiFetch<ManagedDocument>('/api/v1/policies', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id: string, payload: UpdatePolicyPayload) =>
+    apiFetch<ManagedDocument>(`/api/v1/policies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  assignResponsibilities: (id: string, payload: PolicyResponsibilitiesPayload) =>
+    apiFetch<ManagedDocument>(`/api/v1/policies/${id}/responsibilities`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  createRevision: (id: string, changeSummary?: string) =>
+    apiFetch<DocumentVersion>(`/api/v1/policies/${id}/revisions`, {
+      method: 'POST',
+      body: JSON.stringify({ changeSummary }),
+    }),
   seedCatalog: () => apiFetch<{ seeded: boolean }>('/api/v1/policies/seed-catalog', { method: 'POST' }),
   listVersions: (id: string) => apiFetch<DocumentVersion[]>(`/api/v1/policies/${id}/versions`),
   submit: (id: string) => apiFetch<ManagedDocument>(`/api/v1/policies/${id}/submit`, { method: 'POST' }),

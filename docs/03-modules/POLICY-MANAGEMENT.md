@@ -12,6 +12,14 @@ Number, title, type, owner, approver, version, effective date, review date, clas
 
 Draft → In Review → Approved → Published → Superseded / Retired. Historic versions immutable.
 
+## Workflow responsibilities
+
+Each policy carries four named responsibilities: **Policy Owner**, **Reviewer**, **Approver**, and **Publisher** (`OwnerUserId`, `ReviewerUserId`, `DesignatedApproverUserId`, `PublisherUserId`). They are set from the policy detail page, including an "assign all to me" shortcut for small teams.
+
+Segregation of duties is **not enforced**: a single administrator may author, submit, approve, publish, and assign the same policy. This is deliberate for small IT teams. Each transition still records the acting user and timestamp on the version (`SubmittedBy*`, `ApprovedBy*`, `PublishedBy*`), so the audit trail stays complete even when one person performs every step.
+
+Enforcing SoD (for example, approver must differ from submitter) remains an optional future policy-level setting; it is not part of the current workflow.
+
 ## Named policies (initial catalog data, not separate tables)
 
 Information security, acceptable use, access control, password, change, backup, DR/BCP, third-party. Additional policies are records, not code.

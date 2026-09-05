@@ -36,7 +36,9 @@ public sealed class ManagedDocument
     public string Title { get; private set; } = null!;
     public DocumentType DocumentType { get; private set; }
     public Guid OwnerUserId { get; private set; }
+    public Guid? ReviewerUserId { get; private set; }
     public Guid? DesignatedApproverUserId { get; private set; }
+    public Guid? PublisherUserId { get; private set; }
     public DocumentClassification Classification { get; private set; }
     public DocumentStatus Status { get; private set; }
     public Guid? CurrentVersionId { get; private set; }
@@ -69,6 +71,8 @@ public sealed class ManagedDocument
         DocumentClassification classification,
         DateTimeOffset utcNow,
         Guid? designatedApproverUserId = null,
+        Guid? reviewerUserId = null,
+        Guid? publisherUserId = null,
         DateTimeOffset? effectiveDate = null,
         DateTimeOffset? reviewDate = null,
         bool requiresAcknowledgement = false,
@@ -84,7 +88,9 @@ public sealed class ManagedDocument
             Title = title.Trim(),
             DocumentType = documentType,
             OwnerUserId = ownerUserId,
+            ReviewerUserId = Norm(reviewerUserId),
             DesignatedApproverUserId = Norm(designatedApproverUserId),
+            PublisherUserId = Norm(publisherUserId),
             Classification = classification,
             Status = DocumentStatus.Draft,
             EffectiveDate = effectiveDate,
@@ -99,7 +105,9 @@ public sealed class ManagedDocument
     public void UpdateMetadata(
         string title,
         Guid ownerUserId,
+        Guid? reviewerUserId,
         Guid? designatedApproverUserId,
+        Guid? publisherUserId,
         DocumentClassification classification,
         DateTimeOffset? effectiveDate,
         DateTimeOffset? reviewDate,
@@ -113,7 +121,9 @@ public sealed class ManagedDocument
         if (ownerUserId == Guid.Empty) throw new ArgumentException("Owner is required.", nameof(ownerUserId));
         Title = title.Trim();
         OwnerUserId = ownerUserId;
+        ReviewerUserId = Norm(reviewerUserId);
         DesignatedApproverUserId = Norm(designatedApproverUserId);
+        PublisherUserId = Norm(publisherUserId);
         Classification = classification;
         EffectiveDate = effectiveDate;
         ReviewDate = reviewDate;
@@ -121,6 +131,50 @@ public sealed class ManagedDocument
         RequireReAcknowledgement = requireReAcknowledgement;
         UpdatedAtUtc = utcNow;
     }
+
+    public void AssignWorkflowResponsibilities(
+        Guid? ownerUserId,
+        Guid? reviewerUserId,
+        Guid? designatedApproverUserId,
+        Guid? publisherUserId,
+        DateTimeOffset utcNow)
+    {
+        if (Status is DocumentStatus.Retired or DocumentStatus.Superseded)
+            throw new InvalidOperationException("Cannot edit a terminal document.");
+        if (ownerUserId is Guid owner && owner != Guid.Empty)
+            OwnerUserId = owner;
+        if (reviewerUserId is not null)
+            ReviewerUserId = Norm(reviewerUserId);
+        if (designatedApproverUserId is not null)
+            DesignatedApproverUserId = Norm(designatedApproverUserId);
+        if (publisherUserId is not null)
+            PublisherUserId = Norm(publisherUserId);
+        UpdatedAtUtc = utcNow;
+    }
+
+    // Keep binary compatibility for older call sites that used the previous UpdateMetadata signature shape via service layer only.
+    public void UpdateMetadata(
+        string title,
+        Guid ownerUserId,
+        Guid? designatedApproverUserId,
+        DocumentClassification classification,
+        DateTimeOffset? effectiveDate,
+        DateTimeOffset? reviewDate,
+        bool requiresAcknowledgement,
+        bool requireReAcknowledgement,
+        DateTimeOffset utcNow) =>
+        UpdateMetadata(
+            title,
+            ownerUserId,
+            ReviewerUserId,
+            designatedApproverUserId,
+            PublisherUserId,
+            classification,
+            effectiveDate,
+            reviewDate,
+            requiresAcknowledgement,
+            requireReAcknowledgement,
+            utcNow);
 
     public void SetCurrentVersion(Guid versionId, DateTimeOffset utcNow)
     {
@@ -181,6 +235,9 @@ public sealed class DocumentVersion
     public Guid? AttachmentId { get; private set; }
     public Guid? ApprovedByUserId { get; private set; }
     public DateTimeOffset? ApprovedAtUtc { get; private set; }
+    public Guid? SubmittedByUserId { get; private set; }
+    public DateTimeOffset? SubmittedAtUtc { get; private set; }
+    public Guid? PublishedByUserId { get; private set; }
     public DateTimeOffset? PublishedAtUtc { get; private set; }
     public Guid? SupersedesVersionId { get; private set; }
 
@@ -226,6 +283,13 @@ public sealed class DocumentVersion
         AttachmentId = attachmentId;
     }
 
+    public void MarkSubmitted(Guid submittedByUserId, DateTimeOffset utcNow)
+    {
+        if (submittedByUserId == Guid.Empty) throw new ArgumentException("Submitter is required.", nameof(submittedByUserId));
+        SubmittedByUserId = submittedByUserId;
+        SubmittedAtUtc = utcNow;
+    }
+
     public void MarkApproved(Guid approverUserId, DateTimeOffset utcNow)
     {
         if (ApprovedAtUtc is not null) return;
@@ -233,6 +297,15 @@ public sealed class DocumentVersion
         ApprovedAtUtc = utcNow;
     }
 
+    public void MarkPublished(Guid publisherUserId, DateTimeOffset utcNow)
+    {
+        if (PublishedAtUtc is not null) return;
+        if (publisherUserId == Guid.Empty) throw new ArgumentException("Publisher is required.", nameof(publisherUserId));
+        PublishedByUserId = publisherUserId;
+        PublishedAtUtc = utcNow;
+    }
+
+    // Compatibility for call sites that only stamp publish time.
     public void MarkPublished(DateTimeOffset utcNow)
     {
         if (PublishedAtUtc is not null) return;

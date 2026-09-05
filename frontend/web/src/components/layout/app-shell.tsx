@@ -25,6 +25,7 @@ import {
   Radio,
   RefreshCw,
   Scale,
+  ScrollText,
   Settings2,
   Shield,
   Sparkles,
@@ -215,6 +216,7 @@ function buildNavGroups(can: (permissionKey: string) => boolean): NavGroupDef[] 
           icon: FileText,
           visible: can('doc.read') || can('policy.read'),
         },
+        { to: '/it/policies', labelKey: 'nav.policies', icon: ScrollText, visible: can('policy.read') },
         {
           to: '/it/governance',
           labelKey: 'nav.governance',
@@ -773,9 +775,8 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/events')) return t('nav.events')
   if (pathname.startsWith('/it/operations')) return t('nav.operations')
   if (pathname.startsWith('/it/access')) return t('nav.access')
-  if (pathname.startsWith('/it/documents') || pathname.startsWith('/it/policies')) {
-    return t('nav.documents')
-  }
+  if (pathname.startsWith('/it/policies')) return t('nav.policies')
+  if (pathname.startsWith('/it/documents')) return t('nav.documents')
   if (pathname.startsWith('/it/knowledge')) return t('nav.knowledgeAdmin')
   if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
   if (pathname.startsWith('/it/controls')) return t('nav.controls')
