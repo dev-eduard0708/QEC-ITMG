@@ -19,6 +19,7 @@ using Qec.Itmg.Host.Governance;
 using Qec.Itmg.Host.Compliance;
 using Qec.Itmg.Host.Evidence;
 using Qec.Itmg.Host.Audit;
+using Qec.Itmg.Host.Security;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -143,6 +144,14 @@ try
             "audit-evidence-request-reminders",
             job => job.ExecuteAsync(CancellationToken.None),
             "0 8 * * *");
+        recurringJobs.AddOrUpdate<SecurityExceptionExpiryJob>(
+            "security-exception-expiry",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "15 8 * * *");
+        recurringJobs.AddOrUpdate<SecurityExceptionReminderJob>(
+            "security-exception-reminders",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "30 8 * * *");
     }
 
     app.UseSerilogRequestLogging();
@@ -188,6 +197,7 @@ try
     app.MapComplianceEndpoints();
     app.MapEvidenceEndpoints();
     app.MapAuditEndpoints();
+    app.MapSecurityEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

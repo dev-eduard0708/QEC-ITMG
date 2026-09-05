@@ -15,6 +15,7 @@ public static class TicketEndpoints
     public const string TicketsRead = "tickets.read";
     public const string TicketsManage = "tickets.manage";
     public const string IncidentsSecurity = "incidents.security";
+    public const string TicketReadSecurity = "ticket.read.security";
 
     public static IEndpointRouteBuilder MapTicketEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -465,7 +466,8 @@ public static class TicketEndpoints
         CancellationToken cancellationToken)
     {
         CurrentUserDto? session = await currentUser.GetSessionAsync(principal, cancellationToken);
-        return session is not null && HasPermission(session, IncidentsSecurity);
+        return session is not null
+            && (HasPermission(session, IncidentsSecurity) || HasPermission(session, TicketReadSecurity));
     }
 
     private static bool HasPermission(CurrentUserDto session, string permissionKey) =>

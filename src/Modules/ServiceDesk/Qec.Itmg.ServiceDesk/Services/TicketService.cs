@@ -135,6 +135,15 @@ public sealed class TicketService(
             ByPriority: byPriority);
     }
 
+    public async Task<int> CountOpenSecurityIncidentsAsync(CancellationToken cancellationToken = default)
+    {
+        return await db.Tickets.AsNoTracking().CountAsync(
+            item => item.Type == TicketType.Incident
+                && ActiveStatuses.Contains(item.Status)
+                && item.SecurityClassification != SecurityClassification.None,
+            cancellationToken);
+    }
+
     public async Task<TicketListResult> ListAsync(
         int page = 1,
         int pageSize = 25,

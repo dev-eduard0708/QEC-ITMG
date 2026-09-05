@@ -84,6 +84,12 @@ public static class IdentitySeedCatalog
         ("finding.manage", "Manage findings, management responses, and corrective actions"),
         ("kb.read", "View knowledge base articles in IT workspace"),
         ("kb.manage", "Manage knowledge base articles"),
+        ("sec.dashboard", "View security dashboard counts"),
+        ("vuln.read", "View vulnerabilities"),
+        ("vuln.manage", "Create and manage vulnerabilities and remediation links"),
+        ("risk.manage", "Manage risk register"),
+        ("exception.approve", "Approve or reject security/policy exceptions"),
+        ("ticket.read.security", "View security classification on tickets/incidents"),
     ];
 
     /// <summary>Read-oriented auditor role. Does not include manage/export/admin permissions.</summary>

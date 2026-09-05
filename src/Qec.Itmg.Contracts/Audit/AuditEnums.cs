@@ -15,6 +15,10 @@ public enum AuditAggregateType
     Evidence = 11,
     AuditEngagement = 12,
     Finding = 13,
+    Vulnerability = 14,
+    Risk = 15,
+    PolicyException = 16,
+    PenetrationTest = 17,
 }
 
 public enum AuditActorType
