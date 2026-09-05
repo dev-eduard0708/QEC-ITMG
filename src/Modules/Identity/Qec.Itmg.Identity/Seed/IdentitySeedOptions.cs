@@ -90,6 +90,9 @@ public static class IdentitySeedCatalog
         ("risk.manage", "Manage risk register"),
         ("exception.approve", "Approve or reject security/policy exceptions"),
         ("ticket.read.security", "View security classification on tickets/incidents"),
+        ("bcm.read", "View business continuity BIA, plans, procedures, DR tests, and reports"),
+        ("bcm.manage", "Manage BIA, continuity plans, procedures, and SPOF metadata"),
+        ("dr.test.manage", "Schedule, run, and complete DR tests and evidence links"),
     ];
 
     /// <summary>Read-oriented auditor role. Does not include manage/export/admin permissions.</summary>

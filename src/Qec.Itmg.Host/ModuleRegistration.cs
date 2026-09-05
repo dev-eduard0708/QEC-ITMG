@@ -12,6 +12,7 @@ using Qec.Itmg.Compliance;
 using Qec.Itmg.Evidence;
 using Qec.Itmg.Audit;
 using Qec.Itmg.Security;
+using Qec.Itmg.BusinessContinuity;
 using Qec.Itmg.Operations;
 using Qec.Itmg.Organization;
 using Qec.Itmg.Platform;
@@ -42,6 +43,7 @@ internal static class ModuleRegistration
             new EvidenceModule(),
             new AuditModule(),
             new SecurityModule(),
+            new ContinuityModule(),
         ];
 
         foreach (IModule module in modules)

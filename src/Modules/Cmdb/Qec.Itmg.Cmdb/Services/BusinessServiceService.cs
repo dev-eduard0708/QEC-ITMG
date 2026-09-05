@@ -112,6 +112,31 @@ public sealed class BusinessServiceService(CmdbDbContext db, IClock clock)
         await db.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Guid>> ListLinkedConfigurationItemIdsAsync(
+        Guid businessServiceId,
+        CancellationToken cancellationToken = default) =>
+        await db.BusinessServiceConfigurationItems.AsNoTracking()
+            .Where(item => item.BusinessServiceId == businessServiceId)
+            .Select(item => item.ConfigurationItemId)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyDictionary<Guid, int>> CountSpofsByServiceAsync(
+        CancellationToken cancellationToken = default)
+    {
+        var links = await db.BusinessServiceConfigurationItems.AsNoTracking().ToListAsync(cancellationToken);
+        HashSet<Guid> spofIds = (await db.ConfigurationItems.AsNoTracking()
+            .Where(x => x.IsSinglePointOfFailure)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken))
+            .ToHashSet();
+
+        return links
+            .GroupBy(x => x.BusinessServiceId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Count(x => spofIds.Contains(x.ConfigurationItemId)));
+    }
+
     private static BusinessServiceDto Map(BusinessService item) =>
         new(
             item.Id,

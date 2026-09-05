@@ -51,6 +51,9 @@ public static class CmdbEndpoints
             return Results.Ok(await relationships.ListForCiAsync(id, cancellationToken));
         });
 
+        readGroup.MapGet("/cis/spofs", async (ConfigurationItemService service, CancellationToken cancellationToken) =>
+            Results.Ok(await service.ListSpofsAsync(cancellationToken)));
+
         readGroup.MapGet("/services", async (BusinessServiceService service, CancellationToken cancellationToken) =>
             Results.Ok(await service.ListAsync(cancellationToken)));
 
@@ -138,6 +141,35 @@ public static class CmdbEndpoints
                     request.RowVersion ?? string.Empty,
                     cancellationToken);
                 return Results.Ok(await service.GetConfigurationItemAsync(id, cancellationToken));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromDomainError(ex);
+            }
+            catch (ArgumentException ex)
+            {
+                return ValidationProblem(ex.Message);
+            }
+        });
+
+        manageGroup.MapPost("/cis/{id:guid}/spof", async (
+            Guid id,
+            SetSpofRequest request,
+            ConfigurationItemService service,
+            CancellationToken cancellationToken) =>
+        {
+            try
+            {
+                ConfigurationItemDto updated = await service.SetSpofAsync(
+                    id,
+                    request.IsSinglePointOfFailure,
+                    request.Reason,
+                    request.MitigationNotes,
+                    request.RiskId,
+                    request.Confirmed,
+                    request.RowVersion ?? string.Empty,
+                    cancellationToken);
+                return Results.Ok(updated);
             }
             catch (InvalidOperationException ex)
             {
@@ -328,6 +360,14 @@ public sealed record UpdateConfigurationItemRequest(
     string? Manufacturer,
     string? Model,
     string? Notes,
+    string? RowVersion);
+
+public sealed record SetSpofRequest(
+    bool IsSinglePointOfFailure,
+    string? Reason,
+    string? MitigationNotes,
+    Guid? RiskId,
+    bool Confirmed,
     string? RowVersion);
 
 public sealed record CreateCiRelationshipRequest(

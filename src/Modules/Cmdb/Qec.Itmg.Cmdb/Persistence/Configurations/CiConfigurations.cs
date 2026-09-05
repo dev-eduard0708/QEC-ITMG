@@ -83,6 +83,9 @@ internal sealed class ConfigurationItemConfiguration : IEntityTypeConfiguration<
             .HasMaxLength(2000)
             .HasColumnType("nvarchar(2000)");
 
+        builder.Property(item => item.SpofReason).HasMaxLength(2000);
+        builder.Property(item => item.SpofMitigationNotes).HasMaxLength(2000);
+
         builder.Property(item => item.CreatedAtUtc).IsRequired();
         builder.Property(item => item.UpdatedAtUtc).IsRequired();
         builder.Property(item => item.RowVersion)
@@ -95,6 +98,9 @@ internal sealed class ConfigurationItemConfiguration : IEntityTypeConfiguration<
 
         builder.HasIndex(item => item.CiTypeId)
             .HasDatabaseName("IX_ConfigurationItem_CiTypeId");
+
+        builder.HasIndex(item => item.IsSinglePointOfFailure)
+            .HasDatabaseName("IX_ConfigurationItem_IsSinglePointOfFailure");
 
         builder.HasOne<CiType>()
             .WithMany()

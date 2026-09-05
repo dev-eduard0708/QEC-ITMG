@@ -25,6 +25,11 @@ public sealed record ConfigurationItemDto(
     string? Manufacturer,
     string? Model,
     string? Notes,
+    bool IsSinglePointOfFailure,
+    string? SpofReason,
+    DateTimeOffset? SpofReviewedAtUtc,
+    string? SpofMitigationNotes,
+    Guid? SpofRiskId,
     string RowVersion,
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc);
@@ -209,11 +214,47 @@ public sealed class ConfigurationItemService(
                 item.Manufacturer,
                 item.Model,
                 item.Notes,
+                item.IsSinglePointOfFailure,
+                item.SpofReason,
+                item.SpofReviewedAtUtc,
+                item.SpofMitigationNotes,
+                item.SpofRiskId,
                 Convert.ToBase64String(item.RowVersion),
                 item.CreatedAtUtc,
                 item.UpdatedAtUtc);
         }).ToList();
     }
+
+    public async Task<ConfigurationItemDto> SetSpofAsync(
+        Guid id,
+        bool isSinglePointOfFailure,
+        string? reason,
+        string? mitigationNotes,
+        Guid? riskId,
+        bool confirmed,
+        string rowVersion,
+        CancellationToken cancellationToken = default)
+    {
+        ConfigurationItem entity = await db.ConfigurationItems.FirstOrDefaultAsync(item => item.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Configuration item was not found.");
+        if (!MatchesRowVersion(entity.RowVersion, rowVersion))
+            throw new InvalidOperationException("The configuration item was modified by another user.");
+        entity.SetSinglePointOfFailure(isSinglePointOfFailure, reason, mitigationNotes, riskId, clock.UtcNow, confirmed);
+        await db.SaveChangesAsync(cancellationToken);
+        return (await MapManyAsync([entity], cancellationToken)).Single();
+    }
+
+    public async Task<IReadOnlyList<ConfigurationItemDto>> ListSpofsAsync(CancellationToken cancellationToken = default)
+    {
+        List<ConfigurationItem> items = await db.ConfigurationItems.AsNoTracking()
+            .Where(x => x.IsSinglePointOfFailure)
+            .OrderBy(x => x.Name)
+            .ToListAsync(cancellationToken);
+        return await MapManyAsync(items, cancellationToken);
+    }
+
+    public async Task<int> CountConfirmedSpofsAsync(CancellationToken cancellationToken = default) =>
+        await db.ConfigurationItems.AsNoTracking().CountAsync(x => x.IsSinglePointOfFailure, cancellationToken);
 
     private static bool MatchesRowVersion(byte[] current, string expectedBase64)
     {

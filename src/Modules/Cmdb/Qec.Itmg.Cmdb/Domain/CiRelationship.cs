@@ -7,6 +7,8 @@ public enum CiRelationshipType
     ConnectsTo = 2,
     Supports = 3,
     Contains = 4,
+    /// <summary>Optional hint of redundancy/failover peer. Does not auto-declare SPOF.</summary>
+    RedundantWith = 5,
 }
 
 public sealed class CiRelationship

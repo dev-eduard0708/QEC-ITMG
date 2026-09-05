@@ -19,6 +19,10 @@ public enum AuditAggregateType
     Risk = 15,
     PolicyException = 16,
     PenetrationTest = 17,
+    BiaRecord = 18,
+    ContinuityPlan = 19,
+    RecoveryProcedure = 20,
+    DrTest = 21,
 }
 
 public enum AuditActorType

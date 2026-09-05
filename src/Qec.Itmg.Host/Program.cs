@@ -20,6 +20,7 @@ using Qec.Itmg.Host.Compliance;
 using Qec.Itmg.Host.Evidence;
 using Qec.Itmg.Host.Audit;
 using Qec.Itmg.Host.Security;
+using Qec.Itmg.Host.BusinessContinuity;
 using Qec.Itmg.Host.Operations;
 using Qec.Itmg.Host.ServiceDesk;
 using Qec.Itmg.Contracts.Audit;
@@ -152,6 +153,10 @@ try
             "security-exception-reminders",
             job => job.ExecuteAsync(CancellationToken.None),
             "30 8 * * *");
+        recurringJobs.AddOrUpdate<ContinuityReminderJob>(
+            "continuity-reminders",
+            job => job.ExecuteAsync(CancellationToken.None),
+            "0 9 * * *");
     }
 
     app.UseSerilogRequestLogging();
@@ -198,6 +203,7 @@ try
     app.MapEvidenceEndpoints();
     app.MapAuditEndpoints();
     app.MapSecurityEndpoints();
+    app.MapContinuityEndpoints();
     app.MapIntegrationReadinessEndpoints();
 
     if (app.Environment.IsEnvironment("Testing"))

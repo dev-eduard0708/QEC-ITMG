@@ -9,7 +9,9 @@ using Microsoft.AspNetCore.Routing;
 using Qec.Itmg.Audit.Domain;
 using Qec.Itmg.Audit.Services;
 using Qec.Itmg.BuildingBlocks.Time;
+using Qec.Itmg.Cmdb.Services;
 using Qec.Itmg.Contracts.Audit;
+using Qec.Itmg.Contracts.Continuity;
 using Qec.Itmg.Contracts.Evidence;
 using Qec.Itmg.DocumentManagement.Domain;
 using Qec.Itmg.DocumentManagement.Services;
@@ -315,6 +317,8 @@ public static class AuditEndpoints
             IEvidenceCoverageQuery evidenceCoverage,
             EvidenceService evidence,
             DocumentService documents,
+            BusinessServiceService businessServices,
+            IDrTestCoverageQuery drTestCoverage,
             IClock clock,
             CancellationToken ct) =>
         {
@@ -330,6 +334,12 @@ public static class AuditEndpoints
             DocumentListResult policies = await documents.ListAsync(
                 1, 1, null, DocumentType.Policy, null, publishedOnly: false, includeConfidential: true,
                 reviewOverdueOnly: true, ct);
+            var services = await businessServices.ListAsync(ct);
+            DrTestCoverageSnapshot drSnap = await drTestCoverage.GetMissingForCriticalServicesAsync(
+                services.Select(s => (s.Id, s.Criticality)).ToList(),
+                clock.UtcNow,
+                365,
+                ct);
 
             return Results.Ok(new
             {
@@ -342,6 +352,7 @@ public static class AuditEndpoints
                 overdueEvidenceRequests = internalCounts.OverdueEvidenceRequests,
                 capaCompletedAwaitingVerification = internalCounts.CompletedCapaAwaitingVerification,
                 capaVerified = internalCounts.VerifiedCapa,
+                drTestsMissingForCriticalServices = drSnap.CriticalServicesMissingRecentDrTest,
                 note = "Counts only. Not an audit certification or readiness score.",
             });
         }).RequirePermission(AuditRead);
