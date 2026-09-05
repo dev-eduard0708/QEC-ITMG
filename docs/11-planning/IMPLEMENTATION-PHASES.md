@@ -429,9 +429,22 @@ Content packs: load licensed/public text as **data files**, not code.
 
 ### Packages
 
-P15-01 Vulnerability; P15-02 Remediation link change/ticket; P15-03 Risk register; P15-04 Exceptions; P15-05 Pentest record; P15-06 Awareness completions; P15-07 Dashboard; P15-08 Tests.
+| Package | Scope | Status |
+|---|---|---|
+| P15-01 | Vulnerability | Done |
+| P15-02 | Remediation link change/ticket | Done |
+| P15-03 | Risk register | Done |
+| P15-04 | Exceptions | Done |
+| P15-05 | Pentest record | Done |
+| P15-06 | Awareness completions | Done |
+| P15-07 | Dashboard | Done |
+| P15-08 | Tests | Deferred ? dedicated project testing phase |
 
-Scanner ingest: stub adapter.
+Scanner ingest: stub adapter only (real scanners in P19).
+
+**Phase 15:** FEATURE COMPLETE. VALIDATION/HARDENING DEFERRED (P15-08).
+
+**NEXT:** P16 Business continuity.
 
 ---
 
