@@ -63,6 +63,24 @@ internal sealed class RemoteEndpointConfiguration : IEntityTypeConfiguration<Rem
     }
 }
 
+internal sealed class RemoteEndpointPairingConfiguration : IEntityTypeConfiguration<RemoteEndpointPairing>
+{
+    public void Configure(EntityTypeBuilder<RemoteEndpointPairing> builder)
+    {
+        builder.ToTable("RemoteEndpointPairing");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.DeviceSecretHash).IsRequired().HasMaxLength(64);
+        builder.Property(x => x.UserCode).IsRequired().HasMaxLength(16);
+        builder.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.CreatedFromIp).HasMaxLength(64);
+        builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
+        builder.HasIndex(x => x.DeviceSecretHash).HasDatabaseName("IX_RemoteEndpointPairing_DeviceSecretHash");
+        builder.HasIndex(x => x.UserCode).HasDatabaseName("IX_RemoteEndpointPairing_UserCode");
+        builder.HasIndex(x => x.Status).HasDatabaseName("IX_RemoteEndpointPairing_Status");
+        builder.HasIndex(x => x.ExpiresAtUtc).HasDatabaseName("IX_RemoteEndpointPairing_ExpiresAtUtc");
+    }
+}
+
 internal sealed class RemoteEndpointEnrollmentConfiguration : IEntityTypeConfiguration<RemoteEndpointEnrollment>
 {
     public void Configure(EntityTypeBuilder<RemoteEndpointEnrollment> builder)

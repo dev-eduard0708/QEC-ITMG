@@ -13,14 +13,36 @@ namespace Qec.Itmg.Host.RemoteSupport;
 /// </summary>
 public sealed class RemoteSupportHelperPackageService(IOptions<RemoteSupportOptions> options)
 {
-    public bool IsAvailable
+    public string? ResolveHelperExePath()
     {
-        get
+        RemoteSupportOptions cfg = options.Value;
+        if (!string.IsNullOrWhiteSpace(cfg.HelperArtifactPath))
         {
-            RemoteSupportOptions cfg = options.Value;
-            return cfg.HasHelperArtifact || cfg.HasHelperDownload;
+            string? configured = ResolveFromPath(cfg.HelperArtifactPath.Trim());
+            if (configured is not null)
+                return configured;
         }
+
+        // Development convenience: repo artifacts/ folder relative to content roots.
+        string[] candidates =
+        [
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "artifacts", "remote-support")),
+            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "artifacts", "remote-support")),
+            Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "artifacts", "remote-support")),
+        ];
+        foreach (string dir in candidates)
+        {
+            string? found = ResolveFromPath(dir);
+            if (found is not null)
+                return found;
+        }
+
+        return null;
     }
+
+    public bool IsExeAvailable => ResolveHelperExePath() is not null;
+
+    public bool IsAvailable => IsExeAvailable || options.Value.HasHelperDownload;
 
     public async Task<(byte[] Content, string FileName)> BuildPackageAsync(
         EnrollmentIssueResult enrollment,
@@ -28,7 +50,7 @@ public sealed class RemoteSupportHelperPackageService(IOptions<RemoteSupportOpti
         CancellationToken cancellationToken)
     {
         RemoteSupportOptions cfg = options.Value;
-        string? helperPath = ResolveHelperExePath(cfg);
+        string? helperPath = ResolveHelperExePath();
         if (helperPath is null)
             throw new InvalidOperationException("Support Helper is not available on this environment.");
 
@@ -77,20 +99,16 @@ public sealed class RemoteSupportHelperPackageService(IOptions<RemoteSupportOpti
         return (zipStream.ToArray(), "QecRemoteSupportHelper.zip");
     }
 
-    private static string? ResolveHelperExePath(RemoteSupportOptions cfg)
+    private static string? ResolveFromPath(string path)
     {
-        if (!cfg.HasHelperArtifact)
-            return null;
-        string path = cfg.HelperArtifactPath.Trim();
         if (File.Exists(path) && path.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             return path;
         if (Directory.Exists(path))
         {
-            string? exe = Directory.EnumerateFiles(path, "QecRemoteSupportHelper.exe", SearchOption.AllDirectories)
-                .FirstOrDefault()
+            return Directory.EnumerateFiles(path, "QecRemoteSupportHelper.exe", SearchOption.AllDirectories)
+                    .FirstOrDefault()
                 ?? Directory.EnumerateFiles(path, "Qec.Itmg.RemoteSupport.Helper.exe", SearchOption.AllDirectories)
                     .FirstOrDefault();
-            return exe;
         }
 
         return null;

@@ -73,6 +73,41 @@ public sealed record AgentBootstrapInfo(
     string? InviteUrl,
     string MeshDeviceGroupId);
 
+public sealed record PairingStartResult(
+    Guid PairingId,
+    string DeviceSecret,
+    string UserCode,
+    string VerificationUri,
+    string VerificationUriComplete,
+    DateTimeOffset ExpiresAtUtc);
+
+public sealed record PairingStatusResult(
+    Guid PairingId,
+    string Status,
+    DateTimeOffset ExpiresAtUtc,
+    Guid? EndpointId,
+    string? DeviceName,
+    string? ConnectionStatus,
+    bool WaitingForRemoteAgent,
+    string? AgentDownloadUrl,
+    string? AgentInstallInstructions,
+    string? ReportSecret);
+
+public sealed record PairingCompleteRequest(
+    string DeviceSecret,
+    string DeviceName,
+    string OperatingSystem,
+    string? OperatingSystemVersion,
+    string? Architecture,
+    string? HelperVersion,
+    string? ReportedEngineNodeId);
+
+public sealed record EmployeeSetupSnapshot(
+    bool HelperAvailable,
+    bool EngineConfigured,
+    string EngineStatus,
+    IReadOnlyList<RemoteEndpointDto> Endpoints);
+
 /// <summary>
 /// Real MeshCentral enrollment: agent URLs + node presence resolution via control.ashx.
 /// </summary>
@@ -676,6 +711,337 @@ public sealed class RemoteEndpointService(
             endpoint.MarkExpired(now);
         if (due.Count > 0)
             await db.SaveChangesAsync(ct);
+
+        List<RemoteEndpointPairing> expiredPairings = await db.RemoteEndpointPairings
+            .Where(x => x.Status == RemoteEndpointPairingStatus.Pending
+                || x.Status == RemoteEndpointPairingStatus.Authorized)
+            .Where(x => x.ExpiresAtUtc < now)
+            .ToListAsync(ct);
+        foreach (RemoteEndpointPairing pairing in expiredPairings)
+            pairing.MarkExpired(now);
+        if (expiredPairings.Count > 0)
+            await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<PairingStartResult> StartPairingAsync(
+        string publicAppBaseUrl,
+        string? clientIp,
+        CancellationToken ct)
+    {
+        EnforcePairingRateLimit(clientIp ?? "unknown");
+        DateTimeOffset now = clock.UtcNow;
+        TimeSpan lifetime = TimeSpan.FromMinutes(Math.Clamp(options.Value.EnrollmentTokenLifetimeMinutes, 1, 30));
+        (RemoteEndpointPairing pairing, string deviceSecret, string userCode) =
+            RemoteEndpointPairing.Start(now, lifetime, clientIp);
+
+        // Avoid colliding with an active code (rare).
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            bool exists = await db.RemoteEndpointPairings.AnyAsync(
+                x => x.UserCode == pairing.UserCode
+                    && (x.Status == RemoteEndpointPairingStatus.Pending
+                        || x.Status == RemoteEndpointPairingStatus.Authorized)
+                    && x.ExpiresAtUtc >= now,
+                ct);
+            if (!exists) break;
+            (pairing, deviceSecret, userCode) = RemoteEndpointPairing.Start(now, lifetime, clientIp);
+        }
+
+        db.RemoteEndpointPairings.Add(pairing);
+        await db.SaveChangesAsync(ct);
+
+        string appBase = string.IsNullOrWhiteSpace(publicAppBaseUrl)
+            ? (options.Value.PublicAppBaseUrl ?? "").TrimEnd('/')
+            : publicAppBaseUrl.TrimEnd('/');
+        if (string.IsNullOrWhiteSpace(appBase))
+            appBase = "http://localhost:5173";
+
+        string verificationUri = $"{appBase}/employee/remote-support/pair";
+        string verificationUriComplete = $"{verificationUri}?code={Uri.EscapeDataString(userCode)}";
+
+        return new PairingStartResult(
+            pairing.Id,
+            deviceSecret,
+            userCode,
+            verificationUri,
+            verificationUriComplete,
+            pairing.ExpiresAtUtc);
+    }
+
+    public async Task<PairingStatusResult> GetPairingStatusAsync(
+        Guid pairingId,
+        string? deviceSecret,
+        CancellationToken ct)
+    {
+        RemoteEndpointPairing pairing = await db.RemoteEndpointPairings
+            .FirstOrDefaultAsync(x => x.Id == pairingId, ct)
+            ?? throw new InvalidOperationException("Pairing not found.");
+
+        if (!pairing.MatchesDeviceSecret(deviceSecret))
+            throw new InvalidOperationException("Forbidden.");
+
+        DateTimeOffset now = clock.UtcNow;
+        if (pairing.Status is RemoteEndpointPairingStatus.Pending or RemoteEndpointPairingStatus.Authorized
+            && now > pairing.ExpiresAtUtc)
+        {
+            pairing.MarkExpired(now);
+            await db.SaveChangesAsync(ct);
+        }
+
+        RemoteEndpoint? endpoint = null;
+        if (pairing.EndpointId is Guid epId)
+            endpoint = await db.RemoteEndpoints.AsNoTracking().FirstOrDefaultAsync(x => x.Id == epId, ct);
+
+        AgentBootstrapInfo bootstrap = enrollmentEngine.GetAgentBootstrap();
+        return new PairingStatusResult(
+            pairing.Id,
+            pairing.Status.ToString(),
+            pairing.ExpiresAtUtc,
+            pairing.EndpointId,
+            endpoint?.DeviceName,
+            endpoint?.ConnectionStatus.ToString(),
+            endpoint is null || !endpoint.IsReadyForRemote,
+            bootstrap.AgentDownloadUrl,
+            bootstrap.AgentInstallInstructions,
+            null);
+    }
+
+    public async Task<RemoteEndpointPairing> GetPairingByUserCodeAsync(string userCode, CancellationToken ct)
+    {
+        string normalized = RemoteEndpointPairing.NormalizeUserCode(userCode);
+        if (normalized.Length < 6)
+            throw new InvalidOperationException("Invalid pairing code.");
+
+        // Stored with hyphen: XXXX-XXXX
+        string formatted = normalized.Length == 8
+            ? $"{normalized[..4]}-{normalized[4..]}"
+            : userCode.Trim().ToUpperInvariant();
+
+        DateTimeOffset now = clock.UtcNow;
+        RemoteEndpointPairing? pairing = await db.RemoteEndpointPairings
+            .FirstOrDefaultAsync(x => x.UserCode == formatted || x.UserCode == normalized, ct)
+            ?? throw new InvalidOperationException("Pairing code was not found.");
+
+        if (pairing.Status == RemoteEndpointPairingStatus.Pending && now > pairing.ExpiresAtUtc)
+        {
+            pairing.MarkExpired(now);
+            await db.SaveChangesAsync(ct);
+        }
+
+        return pairing;
+    }
+
+    public async Task AuthorizePairingAsync(string userCode, Guid userId, CancellationToken ct)
+    {
+        RemoteEndpointPairing pairing = await GetPairingByUserCodeAsync(userCode, ct);
+        pairing.Authorize(userId, clock.UtcNow);
+        await db.SaveChangesAsync(ct);
+        await businessAudit.AppendAsync(new BusinessAuditEntry
+        {
+            AggregateType = AuditAggregateType.RemoteSession,
+            AggregateId = pairing.Id,
+            Action = BusinessAuditAction.StatusChanged,
+            FieldName = "RemoteEndpointPairingAuthorized",
+            NewValue = userId.ToString("N"),
+            Source = AuditSource.Api,
+        }, ct);
+    }
+
+    public async Task RejectPairingAsync(string userCode, Guid userId, CancellationToken ct)
+    {
+        RemoteEndpointPairing pairing = await GetPairingByUserCodeAsync(userCode, ct);
+        pairing.Reject(clock.UtcNow);
+        await db.SaveChangesAsync(ct);
+        await businessAudit.AppendAsync(new BusinessAuditEntry
+        {
+            AggregateType = AuditAggregateType.RemoteSession,
+            AggregateId = pairing.Id,
+            Action = BusinessAuditAction.StatusChanged,
+            FieldName = "RemoteEndpointPairingRejected",
+            NewValue = userId.ToString("N"),
+            Source = AuditSource.Api,
+        }, ct);
+    }
+
+    public async Task<PairingStatusResult> CompletePairingAsync(
+        Guid pairingId,
+        PairingCompleteRequest request,
+        CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.DeviceSecret);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.DeviceName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(request.OperatingSystem);
+
+        RemoteEndpointPairing pairing = await db.RemoteEndpointPairings
+            .FirstOrDefaultAsync(x => x.Id == pairingId, ct)
+            ?? throw new InvalidOperationException("Pairing not found.");
+
+        if (!pairing.MatchesDeviceSecret(request.DeviceSecret))
+            throw new InvalidOperationException("Forbidden.");
+
+        DateTimeOffset now = clock.UtcNow;
+        if (!pairing.IsAuthorizedAwaitingDevice(now))
+            throw new InvalidOperationException(
+                pairing.Status == RemoteEndpointPairingStatus.Pending
+                    ? "Waiting for employee approval in the browser."
+                    : "Pairing is not available.");
+
+        Guid ownerId = pairing.AuthorizedUserId
+            ?? throw new InvalidOperationException("Pairing is not authorized.");
+
+        string? nodeId = await enrollmentEngine.TryResolveOrProvisionNodeAsync(
+            Guid.Empty,
+            request.DeviceName,
+            request.ReportedEngineNodeId,
+            ct);
+
+        TimeSpan retention = TimeSpan.FromHours(Math.Clamp(options.Value.TemporaryEndpointRetentionHours, 1, 24 * 30));
+        RemoteEndpoint endpoint = RemoteEndpoint.CreatePairedTemporary(
+            ownerId,
+            request.DeviceName,
+            request.OperatingSystem,
+            now,
+            retention,
+            request.OperatingSystemVersion,
+            request.Architecture,
+            request.HelperVersion,
+            nodeId);
+
+        if (nodeId is null)
+            endpoint.MarkWaitingForAgent(now);
+
+        pairing.Complete(endpoint.Id, now);
+        db.RemoteEndpoints.Add(endpoint);
+        await db.SaveChangesAsync(ct);
+
+        if (!endpoint.HasEngineNode)
+        {
+            string? resolved = await enrollmentEngine.TryResolveOrProvisionNodeAsync(
+                endpoint.Id, request.DeviceName, null, ct);
+            if (!string.IsNullOrWhiteSpace(resolved))
+            {
+                endpoint.MarkReady(resolved, clock.UtcNow);
+                await db.SaveChangesAsync(ct);
+            }
+        }
+
+        string reportSecret = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        ReportSecrets[endpoint.Id] = reportSecret;
+
+        AgentBootstrapInfo bootstrap = enrollmentEngine.GetAgentBootstrap();
+        await businessAudit.AppendAsync(new BusinessAuditEntry
+        {
+            AggregateType = AuditAggregateType.RemoteSession,
+            AggregateId = endpoint.Id,
+            Action = BusinessAuditAction.Created,
+            FieldName = "RemoteEndpointPaired",
+            NewValue = $"{endpoint.DeviceName}|{endpoint.OperatingSystem}",
+            Source = AuditSource.Api,
+        }, ct);
+
+        logger.LogInformation(
+            "Remote endpoint paired for user {UserId} (engineNode={HasNode})",
+            ownerId,
+            endpoint.HasEngineNode);
+
+        return new PairingStatusResult(
+            pairing.Id,
+            pairing.Status.ToString(),
+            pairing.ExpiresAtUtc,
+            endpoint.Id,
+            endpoint.DeviceName,
+            endpoint.ConnectionStatus.ToString(),
+            !endpoint.IsReadyForRemote,
+            bootstrap.AgentDownloadUrl,
+            bootstrap.AgentInstallInstructions,
+            reportSecret);
+    }
+
+    public async Task<IReadOnlyList<RemoteEndpointDto>> ListForOwnerAsync(
+        Guid ownerUserId,
+        bool syncPresence,
+        CancellationToken ct)
+    {
+        List<RemoteEndpoint> items = await db.RemoteEndpoints
+            .Where(x => x.OwnerUserId == ownerUserId
+                && x.ConnectionStatus != RemoteEndpointConnectionStatus.Expired)
+            .OrderByDescending(x => x.LastSeenAtUtc)
+            .ToListAsync(ct);
+
+        if (syncPresence)
+        {
+            foreach (RemoteEndpoint endpoint in items)
+            {
+                if (!endpoint.HasEngineNode)
+                {
+                    string? resolved = await enrollmentEngine.TryResolveOrProvisionNodeAsync(
+                        endpoint.Id, endpoint.DeviceName, null, ct);
+                    if (!string.IsNullOrWhiteSpace(resolved))
+                        endpoint.MarkReady(resolved, clock.UtcNow);
+                }
+                else
+                {
+                    await enrollmentEngine.SynchronizePresenceAsync(endpoint, ct);
+                }
+            }
+
+            if (items.Count > 0)
+                await db.SaveChangesAsync(ct);
+        }
+
+        return items
+            .OrderByDescending(x => x.IsReadyForRemote)
+            .ThenByDescending(x => x.LastSeenAtUtc)
+            .Select(Map)
+            .ToList();
+    }
+
+    public async Task UnpairEndpointAsync(Guid endpointId, Guid ownerUserId, CancellationToken ct)
+    {
+        RemoteEndpoint endpoint = await db.RemoteEndpoints.FirstOrDefaultAsync(x => x.Id == endpointId, ct)
+            ?? throw new InvalidOperationException("Endpoint not found.");
+        if (endpoint.OwnerUserId != ownerUserId)
+            throw new InvalidOperationException("Forbidden.");
+        endpoint.Unpair(clock.UtcNow);
+        await db.SaveChangesAsync(ct);
+        await businessAudit.AppendAsync(new BusinessAuditEntry
+        {
+            AggregateType = AuditAggregateType.RemoteSession,
+            AggregateId = endpoint.Id,
+            Action = BusinessAuditAction.Unlinked,
+            FieldName = "RemoteEndpointUnpaired",
+            NewValue = endpoint.DeviceName,
+            Source = AuditSource.Api,
+        }, ct);
+    }
+
+    public EmployeeSetupSnapshot BuildSetupSnapshot(
+        bool helperAvailable,
+        string engineStatus,
+        IReadOnlyList<RemoteEndpointDto> endpoints) =>
+        new(
+            helperAvailable,
+            options.Value.IsConfigured,
+            engineStatus,
+            endpoints);
+
+    private static void EnforcePairingRateLimit(string key)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        (int Count, DateTimeOffset WindowStart) state = RedeemAttempts.AddOrUpdate(
+            "pair:" + key,
+            _ => (1, now),
+            (_, prev) =>
+            {
+                if (now - prev.WindowStart > TimeSpan.FromMinutes(5))
+                    return (1, now);
+                return (prev.Count + 1, prev.WindowStart);
+            });
+        if (state.Count > 20)
+            throw new InvalidOperationException("Too many pairing attempts. Try again later.");
     }
 
     private static void EnforceRedeemRateLimit(string key)

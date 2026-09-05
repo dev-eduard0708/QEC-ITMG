@@ -5,10 +5,13 @@
 
 .EXAMPLE
   ./scripts/publish-remote-support-helper.ps1
+  ./scripts/publish-remote-support-helper.ps1 -ApiBaseUrl http://localhost:5080 -AppBaseUrl http://localhost:5173
 #>
 param(
   [string]$OutputDir = "artifacts/remote-support",
-  [string]$Configuration = "Release"
+  [string]$Configuration = "Release",
+  [string]$ApiBaseUrl = "http://localhost:5080",
+  [string]$AppBaseUrl = "http://localhost:5173"
 )
 
 $ErrorActionPreference = "Stop"
@@ -35,6 +38,12 @@ $alias = Join-Path $publishDir "QecRemoteSupportHelper.exe"
 if (Test-Path $published) {
   Copy-Item -Force $published $alias
 }
+
+$settings = @{
+  apiBaseUrl = $ApiBaseUrl
+  appBaseUrl = $AppBaseUrl
+} | ConvertTo-Json -Compress
+Set-Content -Path (Join-Path $publishDir "helper.settings.json") -Value $settings -Encoding UTF8
 
 Write-Host "Published helper to: $publishDir"
 Write-Host "Configure RemoteSupport:HelperArtifactPath to this folder (or the EXE path)."

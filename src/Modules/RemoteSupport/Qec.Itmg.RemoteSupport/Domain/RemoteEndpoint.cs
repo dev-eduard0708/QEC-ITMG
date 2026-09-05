@@ -67,10 +67,39 @@ public sealed class RemoteEndpoint
         string? helperVersion = null,
         string? engineNodeId = null)
     {
-        if (ownerUserId == Guid.Empty)
-            throw new ArgumentException("Owner is required.", nameof(ownerUserId));
         if (sessionRequestId == Guid.Empty)
             throw new ArgumentException("Session is required.", nameof(sessionRequestId));
+
+        RemoteEndpoint endpoint = CreatePairedTemporary(
+            ownerUserId,
+            deviceName,
+            operatingSystem,
+            utcNow,
+            retention,
+            operatingSystemVersion,
+            architecture,
+            helperVersion,
+            engineNodeId);
+        endpoint.CurrentRemoteSessionRequestId = sessionRequestId;
+        return endpoint;
+    }
+
+    /// <summary>
+    /// Pre-session pairing: temporary personal endpoint owned by the authenticated employee.
+    /// </summary>
+    public static RemoteEndpoint CreatePairedTemporary(
+        Guid ownerUserId,
+        string deviceName,
+        string operatingSystem,
+        DateTimeOffset utcNow,
+        TimeSpan? retention,
+        string? operatingSystemVersion = null,
+        string? architecture = null,
+        string? helperVersion = null,
+        string? engineNodeId = null)
+    {
+        if (ownerUserId == Guid.Empty)
+            throw new ArgumentException("Owner is required.", nameof(ownerUserId));
         ArgumentException.ThrowIfNullOrWhiteSpace(deviceName);
         ArgumentException.ThrowIfNullOrWhiteSpace(operatingSystem);
 
@@ -79,7 +108,6 @@ public sealed class RemoteEndpoint
         {
             Id = Guid.CreateVersion7(),
             OwnerUserId = ownerUserId,
-            CurrentRemoteSessionRequestId = sessionRequestId,
             EndpointKind = RemoteEndpointKind.Temporary,
             DeviceName = Truncate(deviceName.Trim(), 128),
             OperatingSystem = Truncate(operatingSystem.Trim(), 64),
@@ -96,6 +124,14 @@ public sealed class RemoteEndpoint
             CreatedAtUtc = now,
             UpdatedAtUtc = now,
         };
+    }
+
+    /// <summary>Employee removes Temporary pairing. Does not touch Asset/CI records.</summary>
+    public void Unpair(DateTimeOffset utcNow)
+    {
+        if (EndpointKind != RemoteEndpointKind.Temporary)
+            throw new InvalidOperationException("Only temporary personal computers can be removed here.");
+        MarkExpired(utcNow);
     }
 
     public static RemoteEndpoint CreateManagedProjection(

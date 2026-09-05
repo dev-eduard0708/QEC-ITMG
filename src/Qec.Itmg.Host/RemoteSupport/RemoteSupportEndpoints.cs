@@ -57,10 +57,90 @@ public static class RemoteSupportEndpoints
                 sessionCreationAvailable = engine.Configured && (
                     string.Equals(engine.Status, "Healthy", StringComparison.OrdinalIgnoreCase)
                     || string.Equals(engine.Status, "Configured", StringComparison.OrdinalIgnoreCase)),
-                helperArtifactAvailable = helperPackage.IsAvailable,
+                helperArtifactAvailable = helperPackage.IsExeAvailable || helperPackage.IsAvailable,
                 meshDeviceGroupConfigured = cfg.HasMeshDeviceGroup,
             });
         }).RequireAuthorization();
+
+        // Anonymous helper pairing (device-authorization style). No employee id from helper.
+        endpoints.MapPost("/api/v1/remote-support/pairings", async (
+            HttpContext http,
+            IOptions<RemoteSupportOptions> options,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            try
+            {
+                string? ip = http.Connection.RemoteIpAddress?.ToString();
+                string appBase = !string.IsNullOrWhiteSpace(options.Value.PublicAppBaseUrl)
+                    ? options.Value.PublicAppBaseUrl.TrimEnd('/')
+                    : $"{http.Request.Scheme}://{http.Request.Host}";
+                // Prefer SPA origin in Development when API and UI differ.
+                if (string.IsNullOrWhiteSpace(options.Value.PublicAppBaseUrl)
+                    && string.Equals(http.Request.Host.Host, "localhost", StringComparison.OrdinalIgnoreCase))
+                    appBase = "http://localhost:5173";
+
+                PairingStartResult started = await endpointsSvc.StartPairingAsync(appBase, ip, ct);
+                return Results.Ok(started);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromEx(ex);
+            }
+        });
+
+        endpoints.MapGet("/api/v1/remote-support/pairings/{id:guid}/status", async (
+            Guid id,
+            HttpContext http,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            string? secret = http.Request.Headers["X-Device-Secret"].FirstOrDefault()
+                ?? http.Request.Query["deviceSecret"].FirstOrDefault();
+            try
+            {
+                return Results.Ok(await endpointsSvc.GetPairingStatusAsync(id, secret, ct));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromEx(ex);
+            }
+        });
+
+        endpoints.MapPost("/api/v1/remote-support/pairings/{id:guid}/complete", async (
+            Guid id,
+            PairingCompleteHttpRequest req,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.DeviceSecret)
+                || string.IsNullOrWhiteSpace(req.DeviceName)
+                || string.IsNullOrWhiteSpace(req.OperatingSystem))
+                return Validation("DeviceSecret, DeviceName, and OperatingSystem are required.");
+            try
+            {
+                PairingStatusResult completed = await endpointsSvc.CompletePairingAsync(
+                    id,
+                    new PairingCompleteRequest(
+                        req.DeviceSecret,
+                        req.DeviceName,
+                        req.OperatingSystem,
+                        req.OperatingSystemVersion,
+                        req.Architecture,
+                        req.HelperVersion,
+                        req.ReportedEngineNodeId),
+                    ct);
+                return Results.Ok(completed);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromEx(ex);
+            }
+            catch (ArgumentException ex)
+            {
+                return FromEx(ex);
+            }
+        });
 
         RouteGroupBuilder it = endpoints.MapGroup("/api/v1/remote-support/sessions");
 
@@ -251,6 +331,186 @@ public static class RemoteSupportEndpoints
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
             return Results.Ok(await onboarding.GetAsync(session.Id, ct));
+        }).RequireAuthorization();
+
+        endpoints.MapGet("/api/v1/me/remote-support/setup", async (
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteEndpointService endpointsSvc,
+            RemoteSessionService sessions,
+            RemoteSupportHelperPackageService helperPackage,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            if (!session.Permissions.Contains(RemoteSelfRequest)
+                && !session.Permissions.Contains(RemoteRequest)
+                && !session.Permissions.Contains(RemoteAdmin))
+                return Results.Forbid();
+
+            IReadOnlyList<RemoteEndpointDto> endpoints = await endpointsSvc.ListForOwnerAsync(session.Id, syncPresence: true, ct);
+            RemoteEngineStatus engine = sessions.GetEngineStatus();
+            return Results.Ok(new
+            {
+                helperAvailable = helperPackage.IsExeAvailable,
+                engineConfigured = engine.Configured,
+                engineEnabled = engine.Enabled,
+                engineStatus = engine.Status,
+                endpoints,
+            });
+        }).RequireAuthorization();
+
+        endpoints.MapGet("/api/v1/me/remote-support/helper/download", async (
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteSupportHelperPackageService helperPackage,
+            HttpContext http,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            if (!session.Permissions.Contains(RemoteSelfRequest)
+                && !session.Permissions.Contains(RemoteRequest)
+                && !session.Permissions.Contains(RemoteAdmin))
+                return Results.Forbid();
+            if (!string.Equals(session.UserType, "Employee", StringComparison.OrdinalIgnoreCase)
+                && !session.Permissions.Contains(RemoteAdmin)
+                && !session.Permissions.Contains(RemoteRequest))
+                return Results.Json(
+                    new { error = "forbidden", message = "Active employee identity is required." },
+                    statusCode: StatusCodes.Status403Forbidden);
+
+            string? path = helperPackage.ResolveHelperExePath();
+            if (path is null || !File.Exists(path))
+            {
+                return Results.Json(
+                    new
+                    {
+                        error = "helper_unavailable",
+                        message = "QEC Remote Support Helper is not available yet. Contact IT or try again after the helper is published.",
+                    },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+
+            http.Response.Headers.CacheControl = "private, no-store";
+            ct.ThrowIfCancellationRequested();
+            FileStream stream = File.OpenRead(path);
+            return Results.File(
+                stream,
+                contentType: "application/octet-stream",
+                fileDownloadName: "QecRemoteSupportHelper.exe",
+                enableRangeProcessing: false);
+        }).RequireAuthorization();
+
+        endpoints.MapGet("/api/v1/me/remote-support/endpoints", async (
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            if (!session.Permissions.Contains(RemoteSelfRequest)
+                && !session.Permissions.Contains(RemoteRequest)
+                && !session.Permissions.Contains(RemoteAdmin))
+                return Results.Forbid();
+            return Results.Ok(await endpointsSvc.ListForOwnerAsync(session.Id, syncPresence: true, ct));
+        }).RequireAuthorization();
+
+        endpoints.MapDelete("/api/v1/me/remote-support/endpoints/{endpointId:guid}", async (
+            Guid endpointId,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            if (!session.Permissions.Contains(RemoteSelfRequest)
+                && !session.Permissions.Contains(RemoteAdmin))
+                return Results.Forbid();
+            try
+            {
+                await endpointsSvc.UnpairEndpointAsync(endpointId, session.Id, ct);
+                return Results.NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromEx(ex);
+            }
+        }).RequireAuthorization();
+
+        endpoints.MapGet("/api/v1/me/remote-support/pairings/by-code/{code}", async (
+            string code,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                RemoteEndpointPairing pairing = await endpointsSvc.GetPairingByUserCodeAsync(code, ct);
+                return Results.Ok(new
+                {
+                    pairingId = pairing.Id,
+                    userCode = pairing.UserCode,
+                    status = pairing.Status.ToString(),
+                    expiresAtUtc = pairing.ExpiresAtUtc,
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromEx(ex);
+            }
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/me/remote-support/pairings/authorize", async (
+            PairingCodeRequest req,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            if (!session.Permissions.Contains(RemoteSelfRequest)
+                && !session.Permissions.Contains(RemoteAdmin))
+                return Results.Forbid();
+            if (string.IsNullOrWhiteSpace(req.Code))
+                return Validation("Pairing code is required.");
+            try
+            {
+                await endpointsSvc.AuthorizePairingAsync(req.Code, session.Id, ct);
+                return Results.Ok(new { status = "Authorized" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromEx(ex);
+            }
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/me/remote-support/pairings/reject", async (
+            PairingCodeRequest req,
+            ClaimsPrincipal principal,
+            ICurrentUserService currentUser,
+            RemoteEndpointService endpointsSvc,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            if (string.IsNullOrWhiteSpace(req.Code))
+                return Validation("Pairing code is required.");
+            try
+            {
+                await endpointsSvc.RejectPairingAsync(req.Code, session.Id, ct);
+                return Results.Ok(new { status = "Rejected" });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return FromEx(ex);
+            }
         }).RequireAuthorization();
 
         endpoints.MapPost("/api/v1/me/remote-support", async (
@@ -1228,6 +1488,17 @@ public static class RemoteSupportEndpoints
         string? RemoteEngineProvider,
         bool UnattendedRemotePermitted,
         string? RowVersion);
+
+    public sealed record PairingCodeRequest(string Code);
+
+    public sealed record PairingCompleteHttpRequest(
+        string DeviceSecret,
+        string DeviceName,
+        string OperatingSystem,
+        string? OperatingSystemVersion,
+        string? Architecture,
+        string? HelperVersion,
+        string? ReportedEngineNodeId);
 }
 
 public sealed class RemoteSessionPollingJob(

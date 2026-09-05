@@ -16,6 +16,8 @@ public sealed class RemoteSupportDbContext(DbContextOptions<RemoteSupportDbConte
 
     public DbSet<RemoteEndpointEnrollment> RemoteEndpointEnrollments => Set<RemoteEndpointEnrollment>();
 
+    public DbSet<RemoteEndpointPairing> RemoteEndpointPairings => Set<RemoteEndpointPairing>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);

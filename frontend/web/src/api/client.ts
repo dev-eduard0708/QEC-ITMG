@@ -3963,6 +3963,72 @@ export const remoteSupportApi = {
     anchor.remove()
     URL.revokeObjectURL(url)
   },
+  async downloadHelper() {
+    const response = await fetch('/api/v1/me/remote-support/helper/download', {
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      let message = response.statusText || 'Support Helper is not available'
+      let code: string | undefined
+      try {
+        const payload = (await response.json()) as {
+          error?: string
+          message?: string
+        }
+        message = payload.message ?? payload.error ?? message
+        code = payload.error
+      } catch {
+        // Ignore non-JSON error bodies.
+      }
+      throw new ApiError(response.status, message, code)
+    }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = 'QecRemoteSupportHelper.exe'
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  },
+  setup: () =>
+    apiFetch<{
+      helperAvailable: boolean
+      engineConfigured: boolean
+      engineEnabled: boolean
+      engineStatus: string
+      endpoints: RemoteEndpoint[]
+    }>('/api/v1/me/remote-support/setup').then((data) => ({
+      ...data,
+      endpoints: data.endpoints.map(normalizeRemoteEndpoint),
+    })),
+  listMyEndpoints: () =>
+    apiFetch<RemoteEndpoint[]>('/api/v1/me/remote-support/endpoints').then((endpoints) =>
+      endpoints.map(normalizeRemoteEndpoint),
+    ),
+  unpairEndpoint: (endpointId: string) =>
+    apiFetch<void>(`/api/v1/me/remote-support/endpoints/${endpointId}`, {
+      method: 'DELETE',
+    }),
+  getPairingByCode: (code: string) =>
+    apiFetch<{
+      pairingId: string
+      userCode: string
+      status: string
+      expiresAtUtc: string
+    }>(`/api/v1/me/remote-support/pairings/by-code/${encodeURIComponent(code)}`),
+  authorizePairing: (code: string) =>
+    apiFetch<{ status: string }>('/api/v1/me/remote-support/pairings/authorize', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+  rejectPairing: (code: string) =>
+    apiFetch<{ status: string }>('/api/v1/me/remote-support/pairings/reject', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
   selectManagedDevice: (sessionId: string, configurationItemId: string) =>
     apiFetch<RemoteEndpoint>(
       `/api/v1/me/remote-support/${sessionId}/select-managed-device`,

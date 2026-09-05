@@ -78,6 +78,7 @@ import { RemoteSupportPage } from '@/features/it/remote-support-page'
 import { RemoteSupportDetailPage } from '@/features/it/remote-support-detail-page'
 import { EmployeeRemoteSupportPage } from '@/features/employee/remote-support-page'
 import { EmployeeRemoteSupportSetupPage } from '@/features/employee/remote-support-setup-page'
+import { EmployeeRemoteSupportPairPage } from '@/features/employee/remote-support-pair-page'
 import { EmployeeRemoteSupportDetailPage } from '@/features/employee/remote-support-detail-page'
 import { EmployeeRemoteSupportNewPage } from '@/features/employee/remote-support-new-page'
 import { RemoteSupportEndpointsPage } from '@/features/it/remote-support-endpoints-page'
@@ -110,6 +111,7 @@ export function AppRouter() {
           <Route path="employee/remote-support" element={<EmployeeRemoteSupportPage />} />
           <Route path="employee/remote-support/new" element={<EmployeeRemoteSupportNewPage />} />
           <Route path="employee/remote-support/setup" element={<EmployeeRemoteSupportSetupPage />} />
+          <Route path="employee/remote-support/pair" element={<EmployeeRemoteSupportPairPage />} />
           <Route path="employee/remote-support/:id" element={<EmployeeRemoteSupportDetailPage />} />
           <Route path="it" element={<ItHomePage />} />
           <Route element={<RequirePermission permission="assets.read" />}>

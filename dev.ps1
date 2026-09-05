@@ -12,17 +12,59 @@ function Stop-PortListener([int]$Port) {
     }
 }
 
+function Ensure-RemoteSupportHelper {
+    $artifactDir = Join-Path $PSScriptRoot "artifacts\remote-support"
+    $exe = Join-Path $artifactDir "QecRemoteSupportHelper.exe"
+    $helperProject = Join-Path $PSScriptRoot "tools\Qec.Itmg.RemoteSupport.Helper\Program.cs"
+    $publishScript = Join-Path $PSScriptRoot "scripts\publish-remote-support-helper.ps1"
+
+    $needsPublish = $false
+    if (-not (Test-Path $exe)) {
+        $needsPublish = $true
+        Write-Host "Remote Support Helper artifact missing — publishing..." -ForegroundColor Yellow
+    }
+    elseif ((Test-Path $helperProject) -and ((Get-Item $helperProject).LastWriteTimeUtc -gt (Get-Item $exe).LastWriteTimeUtc)) {
+        $needsPublish = $true
+        Write-Host "Remote Support Helper source is newer — republishing..." -ForegroundColor Yellow
+    }
+
+    if (-not $needsPublish) {
+        Write-Host "Remote Support Helper artifact ready." -ForegroundColor DarkGray
+        return
+    }
+
+    try {
+        & powershell -NoProfile -ExecutionPolicy Bypass -File $publishScript `
+            -ApiBaseUrl "http://localhost:5080" `
+            -AppBaseUrl "http://localhost:5173"
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path $exe)) {
+            throw "Publish finished without producing QecRemoteSupportHelper.exe"
+        }
+        Write-Host "Remote Support Helper published." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "WARNING: Could not publish Remote Support Helper. Download button may be unavailable." -ForegroundColor Yellow
+        Write-Host "  $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
 Stop-PortListener -Port 5080
 Stop-PortListener -Port 5173
 Start-Sleep -Milliseconds 500
+
+Ensure-RemoteSupportHelper
 
 if (-not (Test-Path "$PSScriptRoot\frontend\web\node_modules\vite")) {
     Write-Host "Installing frontend dependencies..." -ForegroundColor Yellow
     npm install --prefix frontend/web
 }
 
+$artifactPath = (Join-Path $PSScriptRoot "artifacts\remote-support").Replace('\', '\\')
+
 $apiCommand = @"
 `$env:ASPNETCORE_ENVIRONMENT = 'Development'
+`$env:RemoteSupport__HelperArtifactPath = '$artifactPath'
+`$env:RemoteSupport__PublicAppBaseUrl = 'http://localhost:5173'
 Write-Host 'API  http://localhost:5080' -ForegroundColor Cyan
 dotnet run --project src\Qec.Itmg.Host\Qec.Itmg.Host.csproj
 "@
