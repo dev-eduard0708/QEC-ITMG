@@ -198,6 +198,13 @@ export function TicketDetailPage() {
             <Button asChild variant="outline">
               <Link to="/it/tickets">{t('tickets.back')}</Link>
             </Button>
+            {can('remote.request') ? (
+              <Button asChild variant="secondary">
+                <Link to={`/it/remote-support?ticketId=${ticket.id}`}>
+                  {t('remote.requestFromTicket')}
+                </Link>
+              </Button>
+            ) : null}
             {can('evidence.upload') ? (
               <Button
                 type="button"

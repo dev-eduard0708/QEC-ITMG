@@ -54,3 +54,12 @@ export const eventKeys = {
   list: (filters: string) => [...eventKeys.all, 'list', filters] as const,
   detail: (id: string) => [...eventKeys.all, 'detail', id] as const,
 }
+
+export const remoteSupportKeys = {
+  all: ['remote-support'] as const,
+  readiness: () => [...remoteSupportKeys.all, 'readiness'] as const,
+  list: (filters: string) => [...remoteSupportKeys.all, 'list', filters] as const,
+  detail: (id: string) => [...remoteSupportKeys.all, 'detail', id] as const,
+  mine: (filters: string) => ['me', 'remote-support', filters] as const,
+  mineDetail: (id: string) => ['me', 'remote-support', 'detail', id] as const,
+}

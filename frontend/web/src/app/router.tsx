@@ -69,6 +69,10 @@ import { ChangeDetailPage } from '@/features/it/change-detail-page'
 import { TicketDetailPage } from '@/features/it/ticket-detail-page'
 import { TicketsPage } from '@/features/it/tickets-page'
 import { FoundationHomePage } from '@/features/foundation/foundation-home-page'
+import { RemoteSupportPage } from '@/features/it/remote-support-page'
+import { RemoteSupportDetailPage } from '@/features/it/remote-support-detail-page'
+import { EmployeeRemoteSupportPage } from '@/features/employee/remote-support-page'
+import { EmployeeRemoteSupportDetailPage } from '@/features/employee/remote-support-detail-page'
 
 export function AppRouter() {
   return (
@@ -87,6 +91,8 @@ export function AppRouter() {
           <Route path="employee/knowledge" element={<KnowledgePage />} />
           <Route path="employee/knowledge/:slug" element={<KnowledgeArticlePage />} />
           <Route path="employee/policies" element={<MyPoliciesPage />} />
+          <Route path="employee/remote-support" element={<EmployeeRemoteSupportPage />} />
+          <Route path="employee/remote-support/:id" element={<EmployeeRemoteSupportDetailPage />} />
           <Route path="it" element={<ItHomePage />} />
           <Route element={<RequirePermission permission="assets.read" />}>
             <Route path="it/assets" element={<AssetsPage />} />
@@ -246,6 +252,21 @@ export function AppRouter() {
           </Route>
           <Route element={<RequireAnyPermission permissions={['ai.use', 'ai.admin']} />}>
             <Route path="it/ai" element={<AiAssistantPage />} />
+          </Route>
+          <Route
+            element={
+              <RequireAnyPermission
+                permissions={[
+                  'remote.request',
+                  'remote.audit.read',
+                  'remote.attended',
+                  'remote.admin',
+                ]}
+              />
+            }
+          >
+            <Route path="it/remote-support" element={<RemoteSupportPage />} />
+            <Route path="it/remote-support/:id" element={<RemoteSupportDetailPage />} />
           </Route>
           <Route path="unauthorized" element={<UnauthorizedPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

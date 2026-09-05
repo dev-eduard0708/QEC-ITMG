@@ -20,6 +20,7 @@ import {
   Wrench,
   KeyRound,
   FileText,
+  Laptop,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -75,6 +76,13 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         to: '/employee/policies',
         labelKey: 'nav.myPolicies',
         icon: FileText,
+        end: false,
+        visible: true,
+      },
+      {
+        to: '/employee/remote-support',
+        labelKey: 'nav.remoteSupport',
+        icon: Laptop,
         end: false,
         visible: true,
       },
@@ -235,6 +243,17 @@ function WorkspaceNav({ onNavigate }: { onNavigate?: () => void }) {
         icon: Shield,
         end: false,
         visible: can('ai.use') || can('ai.admin'),
+      },
+      {
+        to: '/it/remote-support',
+        labelKey: 'nav.remoteSupport',
+        icon: Laptop,
+        end: false,
+        visible:
+          can('remote.request') ||
+          can('remote.audit.read') ||
+          can('remote.attended') ||
+          can('remote.admin'),
       },
     ],
     [can],
@@ -400,6 +419,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/knowledge')) return t('nav.knowledgeAdmin')
   if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
   if (pathname.startsWith('/employee/policies')) return t('docs.myPoliciesTitle')
+  if (pathname.startsWith('/employee/remote-support')) return t('nav.remoteSupport')
   if (pathname.startsWith('/employee/knowledge')) return t('nav.knowledge')
   if (pathname.startsWith('/employee/requests')) return t('nav.requests')
   if (pathname.startsWith('/employee/equipment')) return t('nav.equipment')
@@ -414,6 +434,7 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/vendors')) return t('nav.vendors')
   if (pathname.startsWith('/it/reports')) return t('nav.reports')
   if (pathname.startsWith('/it/ai')) return t('nav.ai')
+  if (pathname.startsWith('/it/remote-support')) return t('nav.remoteSupport')
   if (pathname.startsWith('/it/governance') || pathname.startsWith('/governance')) return t('nav.governance')
   return t('nav.foundation')
 }

@@ -223,6 +223,9 @@ export type ConfigurationItem = {
   spofReviewedAtUtc: string | null
   spofMitigationNotes: string | null
   spofRiskId: string | null
+  remoteEngineNodeId: string | null
+  remoteEngineProvider: string | null
+  unattendedRemotePermitted: boolean
   rowVersion: string
   createdAtUtc: string
   updatedAtUtc: string
@@ -3328,6 +3331,161 @@ export const integrationsApi = {
       message: string | null
       correlationId: string
     }>(`/api/v1/admin/integrations/${encodeURIComponent(provider)}/sync`, { method: 'POST' }),
+}
+
+export type RemoteEngineStatus = {
+  enabled: boolean
+  configured: boolean
+  providerKind: string
+  status: string
+  lastSuccessUtc: string | null
+  lastFailureUtc: string | null
+  lastErrorSummary: string | null
+  unattendedEnabled: boolean
+}
+
+export type RemoteSessionRequest = {
+  id: string
+  remoteNumber: string
+  configurationItemId: string
+  ticketId: string | null
+  changeRequestId: string | null
+  requestedByUserId: string
+  targetUserId: string | null
+  technicianUserId: string | null
+  reason: string
+  requestedPrivileges: string | null
+  sessionType: string
+  status: string
+  requestedAtUtc: string
+  expiresAtUtc: string | null
+  allowedAtUtc: string | null
+  declinedAtUtc: string | null
+  connectingAtUtc: string | null
+  startedAtUtc: string | null
+  endedAtUtc: string | null
+  engineSessionId: string | null
+  engineJoinUrl: string | null
+  outcome: string | null
+  endReason: string | null
+  consentUserId: string | null
+  consentIpAddress: string | null
+  elevationUsed: boolean | null
+  recordingReference: string | null
+  lastEngineError: string | null
+  mfaSatisfiedAtStart: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  durationSeconds: number | null
+}
+
+export type RemoteSessionListResult = {
+  items: RemoteSessionRequest[]
+  totalCount: number
+  page: number
+  pageSize: number
+}
+
+export type CreateAttendedRemotePayload = {
+  configurationItemId: string
+  targetUserId: string
+  reason: string
+  ticketId?: string | null
+  changeRequestId?: string | null
+  requestedPrivileges?: string | null
+  technicianUserId?: string | null
+}
+
+export type CreateUnattendedRemotePayload = {
+  configurationItemId: string
+  reason: string
+  ticketId?: string | null
+  changeRequestId?: string | null
+  requestedPrivileges?: string | null
+  technicianUserId?: string | null
+}
+
+export type SetCiRemoteMappingPayload = {
+  remoteEngineNodeId: string | null
+  remoteEngineProvider: string | null
+  unattendedRemotePermitted: boolean
+  rowVersion: string
+}
+
+function remoteSupportQuery(params?: {
+  page?: number
+  pageSize?: number
+  status?: string
+  ticketId?: string
+  configurationItemId?: string
+}) {
+  const query = new URLSearchParams()
+  if (params?.page) query.set('page', String(params.page))
+  if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+  if (params?.status) query.set('status', params.status)
+  if (params?.ticketId) query.set('ticketId', params.ticketId)
+  if (params?.configurationItemId) query.set('configurationItemId', params.configurationItemId)
+  const qs = query.toString()
+  return qs ? `?${qs}` : ''
+}
+
+export const remoteSupportApi = {
+  readiness: () => apiFetch<RemoteEngineStatus>('/api/v1/remote-support/readiness'),
+  listSessions: (params?: {
+    page?: number
+    pageSize?: number
+    status?: string
+    ticketId?: string
+    configurationItemId?: string
+  }) =>
+    apiFetch<RemoteSessionListResult>(
+      `/api/v1/remote-support/sessions${remoteSupportQuery(params)}`,
+    ),
+  getSession: (id: string) =>
+    apiFetch<RemoteSessionRequest>(`/api/v1/remote-support/sessions/${id}`),
+  createAttended: (payload: CreateAttendedRemotePayload) =>
+    apiFetch<RemoteSessionRequest>('/api/v1/remote-support/sessions/attended', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  createUnattended: (payload: CreateUnattendedRemotePayload) =>
+    apiFetch<RemoteSessionRequest>('/api/v1/remote-support/sessions/unattended', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  start: (id: string) =>
+    apiFetch<RemoteSessionRequest>(`/api/v1/remote-support/sessions/${id}/start`, {
+      method: 'POST',
+    }),
+  end: (id: string, reason?: string | null) =>
+    apiFetch<RemoteSessionRequest>(`/api/v1/remote-support/sessions/${id}/end`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? null }),
+    }),
+  myList: (params?: { page?: number; pageSize?: number; status?: string }) => {
+    const query = new URLSearchParams()
+    if (params?.page) query.set('page', String(params.page))
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize))
+    if (params?.status) query.set('status', params.status)
+    const qs = query.toString()
+    return apiFetch<RemoteSessionListResult>(`/api/v1/me/remote-support${qs ? `?${qs}` : ''}`)
+  },
+  myGet: (id: string) => apiFetch<RemoteSessionRequest>(`/api/v1/me/remote-support/${id}`),
+  allow: (id: string) =>
+    apiFetch<RemoteSessionRequest>(`/api/v1/me/remote-support/${id}/allow`, { method: 'POST' }),
+  decline: (id: string) =>
+    apiFetch<RemoteSessionRequest>(`/api/v1/me/remote-support/${id}/decline`, { method: 'POST' }),
+  myEnd: (id: string, reason?: string | null) =>
+    apiFetch<RemoteSessionRequest>(`/api/v1/me/remote-support/${id}/end`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? null }),
+    }),
+  setCiRemoteMapping: (id: string, payload: SetCiRemoteMappingPayload) =>
+    apiFetch<ConfigurationItem>(`/api/v1/cmdb/cis/${id}/remote-mapping`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
 }
 
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */

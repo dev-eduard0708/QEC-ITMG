@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Plus, Search } from 'lucide-react'
-import { ApiError, cmdbApi, type ConfigurationItem } from '@/api/client'
+import { ApiError, cmdbApi, remoteSupportApi, type ConfigurationItem } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { DataTable } from '@/components/shared/data-table'
@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -66,6 +67,9 @@ export function CmdbPage() {
   const [editing, setEditing] = useState<ConfigurationItem | null>(null)
   const [selectedCiId, setSelectedCiId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+  const [remoteNodeId, setRemoteNodeId] = useState('')
+  const [remoteProvider, setRemoteProvider] = useState('')
+  const [unattendedPermitted, setUnattendedPermitted] = useState(false)
 
   const typesQuery = useQuery({
     queryKey: cmdbKeys.types(),
@@ -96,6 +100,12 @@ export function CmdbPage() {
     resolver: zodResolver(relationshipSchema),
     defaultValues: { targetCiId: '', relationshipType: 'DependsOn', notes: '' },
   })
+
+  const syncRemoteMappingFields = (ci: ConfigurationItem) => {
+    setRemoteNodeId(ci.remoteEngineNodeId ?? '')
+    setRemoteProvider(ci.remoteEngineProvider ?? '')
+    setUnattendedPermitted(ci.unattendedRemotePermitted ?? false)
+  }
 
   const createMutation = useMutation({
     mutationFn: (values: CreateForm) =>
@@ -130,6 +140,25 @@ export function CmdbPage() {
     },
     onSuccess: async () => {
       setEditing(null)
+      setFormError(null)
+      await queryClient.invalidateQueries({ queryKey: cmdbKeys.all })
+    },
+    onError: (error) => {
+      setFormError(error instanceof ApiError ? error.message : t('cmdb.error.generic'))
+    },
+  })
+
+  const remoteMappingMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedCi) throw new Error('missing ci')
+      return remoteSupportApi.setCiRemoteMapping(selectedCi.id, {
+        remoteEngineNodeId: remoteNodeId.trim() || null,
+        remoteEngineProvider: remoteProvider.trim() || null,
+        unattendedRemotePermitted: unattendedPermitted,
+        rowVersion: selectedCi.rowVersion,
+      })
+    },
+    onSuccess: async () => {
       setFormError(null)
       await queryClient.invalidateQueries({ queryKey: cmdbKeys.all })
     },
@@ -236,6 +265,7 @@ export function CmdbPage() {
         getRowId={(row) => row.id}
         onRowClick={(row) => {
           setSelectedCiId(row.id)
+          syncRemoteMappingFields(row)
           if (can('cmdb.manage')) {
             setEditing(row)
             editForm.reset({
@@ -260,6 +290,7 @@ export function CmdbPage() {
                 variant="outline"
                 onClick={() => {
                   setEditing(selectedCi)
+                  syncRemoteMappingFields(selectedCi)
                   editForm.reset({
                     name: selectedCi.name,
                     status: selectedCi.status,
@@ -353,6 +384,47 @@ export function CmdbPage() {
                 </div>
               </form>
             ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {selectedCi && can('remote.admin') ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              {t('cmdb.remoteMapping.title')} — {selectedCi.ciNumber}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form
+              className="grid gap-4 sm:grid-cols-2"
+              onSubmit={(event) => {
+                event.preventDefault()
+                remoteMappingMutation.mutate()
+              }}
+            >
+              <div className="space-y-2">
+                <Label>{t('cmdb.remoteMapping.nodeId')}</Label>
+                <Input value={remoteNodeId} onChange={(event) => setRemoteNodeId(event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>{t('cmdb.remoteMapping.provider')}</Label>
+                <Input value={remoteProvider} onChange={(event) => setRemoteProvider(event.target.value)} />
+              </div>
+              <div className="flex items-center gap-2 sm:col-span-2">
+                <Checkbox
+                  id="unattended-permitted"
+                  checked={unattendedPermitted}
+                  onCheckedChange={(checked) => setUnattendedPermitted(checked === true)}
+                />
+                <Label htmlFor="unattended-permitted">{t('cmdb.remoteMapping.unattendedPermitted')}</Label>
+              </div>
+              <div className="sm:col-span-2">
+                <Button type="submit" disabled={remoteMappingMutation.isPending}>
+                  {t('cmdb.remoteMapping.save')}
+                </Button>
+              </div>
+            </form>
           </CardContent>
         </Card>
       ) : null}
