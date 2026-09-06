@@ -24,6 +24,7 @@ public sealed class ComplianceModule : IModule
         services.AddScoped<FrameworkService>();
         services.AddScoped<ControlMappingService>();
         services.AddScoped<CoverageService>();
+        services.AddScoped<ReadinessService>();
         services.AddScoped<ControlAssessmentService>();
         services.AddScoped<ComplianceCalendarService>();
         services.AddScoped<FrameworkImportService>();

@@ -72,6 +72,7 @@ try
     builder.Services.AddCmdbSeed();
     builder.Services.AddDevelopmentAccessDemoSeed();
     builder.Services.AddServiceDeskSeed();
+    builder.Services.AddComplianceReadinessSeed();
     builder.Services.AddScoped<ISharedDbTransaction, SharedSqlTransaction>();
     builder.Services.AddScoped<TicketNotificationService>();
     builder.Services.AddScoped<ChangeNotificationService>();
@@ -147,6 +148,7 @@ try
     await app.RunIdentitySeedAsync();
     await app.RunCmdbSeedAsync();
     await app.RunServiceDeskSeedAsync();
+    await app.RunComplianceReadinessSeedAsync();
     await app.RunDevelopmentAccessDemoSeedAsync();
 
     if (enableHangfire)

@@ -75,6 +75,7 @@ public static class IdentitySeedCatalog
         ("control.manage", "Create and manage internal controls, links, and evidence requirements"),
         ("framework.manage", "Manage compliance frameworks, versions, and requirement content"),
         ("compliance.read", "View frameworks, mappings, coverage, and compliance calendar"),
+        ("compliance.manage", "Manage requirement applicability and operational links for readiness"),
         ("assessment.perform", "Perform and record control assessments"),
         ("evidence.read", "View evidence metadata and authorized attachments"),
         ("evidence.upload", "Create and upload evidence drafts and versions"),

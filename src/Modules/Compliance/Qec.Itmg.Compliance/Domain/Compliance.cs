@@ -49,6 +49,36 @@ public enum CalendarItemStatus
     Cancelled = 3,
 }
 
+public enum FrameworkProfileType
+{
+    Generic = 0,
+    AuditReadiness = 1,
+    CybersecurityReadiness = 2,
+    Governance = 3,
+}
+
+public enum RequirementApplicabilityStatus
+{
+    Applicable = 0,
+    NotApplicable = 1,
+}
+
+public enum OperationalLinkType
+{
+    Module = 0,
+    Feature = 1,
+    Dashboard = 2,
+}
+
+public enum RequirementReadinessState
+{
+    NotApplicable = 0,
+    Unmapped = 1,
+    MappedNeedsAssessment = 2,
+    AssessedNeedsEvidence = 3,
+    ReadyForReview = 4,
+}
+
 public sealed class Framework
 {
     private Framework() { }
@@ -58,13 +88,15 @@ public sealed class Framework
     public string Name { get; private set; } = null!;
     public string Publisher { get; private set; } = null!;
     public string? Description { get; private set; }
+    public FrameworkProfileType ProfileType { get; private set; }
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     public static Framework Create(
-        string code, string name, string publisher, DateTimeOffset utcNow, string? description = null)
+        string code, string name, string publisher, DateTimeOffset utcNow, string? description = null,
+        FrameworkProfileType profileType = FrameworkProfileType.Generic)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
@@ -76,6 +108,7 @@ public sealed class Framework
             Name = name.Trim(),
             Publisher = publisher.Trim(),
             Description = TrimOrNull(description),
+            ProfileType = profileType,
             IsActive = true,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow,
@@ -90,6 +123,12 @@ public sealed class Framework
         Publisher = publisher.Trim();
         Description = TrimOrNull(description);
         IsActive = isActive;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void SetProfileType(FrameworkProfileType profileType, DateTimeOffset utcNow)
+    {
+        ProfileType = profileType;
         UpdatedAtUtc = utcNow;
     }
 
@@ -337,5 +376,202 @@ public sealed class ComplianceCalendarItem
         Status = status;
         CompletedAtUtc = status == CalendarItemStatus.Completed ? utcNow : null;
         UpdatedAtUtc = utcNow;
+    }
+}
+
+public sealed class FrameworkRequirementApplicability
+{
+    private FrameworkRequirementApplicability() { }
+
+    public Guid Id { get; private set; }
+    public Guid FrameworkRequirementId { get; private set; }
+    public RequirementApplicabilityStatus Status { get; private set; }
+    public string? Reason { get; private set; }
+    public Guid SetByUserId { get; private set; }
+    public DateTimeOffset SetAtUtc { get; private set; }
+    public DateTimeOffset UpdatedAtUtc { get; private set; }
+
+    public static FrameworkRequirementApplicability Create(
+        Guid frameworkRequirementId, RequirementApplicabilityStatus status, Guid setByUserId,
+        DateTimeOffset utcNow, string? reason = null)
+    {
+        if (frameworkRequirementId == Guid.Empty)
+            throw new ArgumentException("Requirement required.", nameof(frameworkRequirementId));
+        if (setByUserId == Guid.Empty)
+            throw new ArgumentException("User required.", nameof(setByUserId));
+        if (status == RequirementApplicabilityStatus.NotApplicable && string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Reason is required when marking NotApplicable.", nameof(reason));
+
+        return new FrameworkRequirementApplicability
+        {
+            Id = Guid.CreateVersion7(),
+            FrameworkRequirementId = frameworkRequirementId,
+            Status = status,
+            Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
+            SetByUserId = setByUserId,
+            SetAtUtc = utcNow,
+            UpdatedAtUtc = utcNow,
+        };
+    }
+
+    public void SetStatus(RequirementApplicabilityStatus status, Guid setByUserId, DateTimeOffset utcNow, string? reason)
+    {
+        if (setByUserId == Guid.Empty)
+            throw new ArgumentException("User required.", nameof(setByUserId));
+        if (status == RequirementApplicabilityStatus.NotApplicable && string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("Reason is required when marking NotApplicable.", nameof(reason));
+
+        Status = status;
+        Reason = status == RequirementApplicabilityStatus.NotApplicable
+            ? reason!.Trim()
+            : (string.IsNullOrWhiteSpace(reason) ? null : reason.Trim());
+        SetByUserId = setByUserId;
+        SetAtUtc = utcNow;
+        UpdatedAtUtc = utcNow;
+    }
+}
+
+public sealed class FrameworkRequirementOperationalLink
+{
+    private FrameworkRequirementOperationalLink() { }
+
+    public Guid Id { get; private set; }
+    public Guid FrameworkRequirementId { get; private set; }
+    public OperationalLinkType LinkType { get; private set; }
+    public string TitleEn { get; private set; } = null!;
+    public string TitleAr { get; private set; } = null!;
+    public string InternalRoute { get; private set; } = null!;
+    public string? Notes { get; private set; }
+    public DateTimeOffset CreatedAtUtc { get; private set; }
+    public Guid CreatedByUserId { get; private set; }
+
+    public static FrameworkRequirementOperationalLink Create(
+        Guid frameworkRequirementId, OperationalLinkType linkType, string titleEn, string titleAr,
+        string internalRoute, Guid createdByUserId, DateTimeOffset utcNow, string? notes = null)
+    {
+        if (frameworkRequirementId == Guid.Empty)
+            throw new ArgumentException("Requirement required.", nameof(frameworkRequirementId));
+        if (createdByUserId == Guid.Empty)
+            throw new ArgumentException("User required.", nameof(createdByUserId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(titleEn);
+        ArgumentException.ThrowIfNullOrWhiteSpace(titleAr);
+        string route = ValidateInternalRoute(internalRoute);
+
+        return new FrameworkRequirementOperationalLink
+        {
+            Id = Guid.CreateVersion7(),
+            FrameworkRequirementId = frameworkRequirementId,
+            LinkType = linkType,
+            TitleEn = titleEn.Trim(),
+            TitleAr = titleAr.Trim(),
+            InternalRoute = route,
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+            CreatedAtUtc = utcNow,
+            CreatedByUserId = createdByUserId,
+        };
+    }
+
+    public void Update(OperationalLinkType linkType, string titleEn, string titleAr, string internalRoute, string? notes)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(titleEn);
+        ArgumentException.ThrowIfNullOrWhiteSpace(titleAr);
+        LinkType = linkType;
+        TitleEn = titleEn.Trim();
+        TitleAr = titleAr.Trim();
+        InternalRoute = ValidateInternalRoute(internalRoute);
+        Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+    }
+
+    public static string ValidateInternalRoute(string internalRoute)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(internalRoute);
+        string route = internalRoute.Trim();
+        if (route.Length > 256)
+            throw new ArgumentException("Internal route must be at most 256 characters.", nameof(internalRoute));
+        if (!route.StartsWith('/'))
+            throw new ArgumentException("Internal route must be a relative path starting with '/'.", nameof(internalRoute));
+        if (route.Contains("//", StringComparison.Ordinal))
+            throw new ArgumentException("Internal route must not contain '//'.", nameof(internalRoute));
+        string lower = route.ToLowerInvariant();
+        if (lower.StartsWith("/javascript:", StringComparison.Ordinal)
+            || lower.Contains("javascript:", StringComparison.Ordinal)
+            || lower.StartsWith("http:", StringComparison.Ordinal)
+            || lower.StartsWith("https:", StringComparison.Ordinal)
+            || lower.Contains("://", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Internal route must not be an absolute or script URL.", nameof(internalRoute));
+        }
+
+        return route;
+    }
+}
+
+public sealed class FrameworkTranslation
+{
+    private FrameworkTranslation() { }
+
+    public Guid Id { get; private set; }
+    public Guid FrameworkId { get; private set; }
+    public string LanguageCode { get; private set; } = null!;
+    public string Name { get; private set; } = null!;
+    public string? Description { get; private set; }
+
+    public static FrameworkTranslation Create(Guid frameworkId, string languageCode, string name, string? description = null)
+    {
+        if (frameworkId == Guid.Empty) throw new ArgumentException("Framework required.", nameof(frameworkId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(languageCode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return new FrameworkTranslation
+        {
+            Id = Guid.CreateVersion7(),
+            FrameworkId = frameworkId,
+            LanguageCode = NormalizeLang(languageCode),
+            Name = name.Trim(),
+            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+        };
+    }
+
+    public void Update(string name, string? description)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        Name = name.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+    }
+
+    private static string NormalizeLang(string languageCode) => languageCode.Trim().ToLowerInvariant();
+}
+
+public sealed class FrameworkRequirementTranslation
+{
+    private FrameworkRequirementTranslation() { }
+
+    public Guid Id { get; private set; }
+    public Guid FrameworkRequirementId { get; private set; }
+    public string LanguageCode { get; private set; } = null!;
+    public string Title { get; private set; } = null!;
+    public string? Text { get; private set; }
+
+    public static FrameworkRequirementTranslation Create(
+        Guid frameworkRequirementId, string languageCode, string title, string? text = null)
+    {
+        if (frameworkRequirementId == Guid.Empty)
+            throw new ArgumentException("Requirement required.", nameof(frameworkRequirementId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(languageCode);
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        return new FrameworkRequirementTranslation
+        {
+            Id = Guid.CreateVersion7(),
+            FrameworkRequirementId = frameworkRequirementId,
+            LanguageCode = languageCode.Trim().ToLowerInvariant(),
+            Title = title.Trim(),
+            Text = string.IsNullOrWhiteSpace(text) ? null : text.Trim(),
+        };
+    }
+
+    public void Update(string title, string? text)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(title);
+        Title = title.Trim();
+        Text = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
     }
 }

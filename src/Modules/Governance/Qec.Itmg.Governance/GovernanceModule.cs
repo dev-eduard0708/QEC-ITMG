@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Qec.Itmg.BuildingBlocks.Persistence;
+using Qec.Itmg.Contracts.Governance;
 using Qec.Itmg.Contracts.Modules;
 using Qec.Itmg.Governance.Persistence;
 using Qec.Itmg.Governance.Services;
@@ -23,5 +24,6 @@ public sealed class GovernanceModule : IModule
             GovernanceDbContext.SchemaName);
         services.AddScoped<OrganizationChartService>();
         services.AddScoped<InternalControlService>();
+        services.AddScoped<IInternalControlLookup>(sp => sp.GetRequiredService<InternalControlService>());
     }
 }

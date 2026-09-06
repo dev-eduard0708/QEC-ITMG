@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ComplianceReadinessNav } from '@/features/compliance/readiness-nav'
 
 export function CalendarPage() {
   const { t } = useTranslation()
@@ -76,6 +77,7 @@ export function CalendarPage() {
           </Button>
         }
       />
+      <ComplianceReadinessNav />
       <Select value={bucket} onValueChange={setBucket}>
         <SelectTrigger className="w-48">
           <SelectValue />

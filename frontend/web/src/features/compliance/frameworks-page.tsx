@@ -3,7 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import type { ColumnDef } from '@tanstack/react-table'
-import { complianceApi, type ComplianceFramework, type FrameworkRequirement } from '@/api/client'
+import {
+  complianceApi,
+  complianceReadinessApi,
+  type ComplianceFramework,
+  type FrameworkRequirement,
+} from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { DataTable } from '@/components/shared/data-table'
@@ -17,6 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ComplianceReadinessNav } from '@/features/compliance/readiness-nav'
+import { isReadinessDashboardProfile } from '@/features/compliance/readiness-shared'
 
 export function FrameworksPage() {
   const { t } = useTranslation()
@@ -66,6 +73,7 @@ export function FrameworksPage() {
           </div>
         }
       />
+      <ComplianceReadinessNav />
       <DataTable
         columns={columns}
         data={listQuery.data ?? []}
@@ -78,11 +86,16 @@ export function FrameworksPage() {
 
 export function FrameworkDetailPage() {
   const { id = '' } = useParams()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language?.startsWith('ar') ? 'ar' : 'en'
   const detailQuery = useQuery({
     queryKey: ['compliance', 'frameworks', id],
     queryFn: () => complianceApi.getFramework(id),
     enabled: !!id,
+  })
+  const readinessLandingQuery = useQuery({
+    queryKey: ['compliance', 'readiness', 'landing', locale],
+    queryFn: () => complianceReadinessApi.landing(locale),
   })
   const versions = detailQuery.data?.versions ?? []
   const [versionId, setVersionId] = useState<string>('')
@@ -117,6 +130,12 @@ export function FrameworkDetailPage() {
   if (detailQuery.isLoading) return <p className="text-sm text-muted-foreground">{t('compliance.loading')}</p>
   if (!fw) return <p className="text-sm text-muted-foreground">{t('compliance.notFound')}</p>
   const cov = coverageQuery.data
+  const readinessCard = readinessLandingQuery.data?.cards.find(
+    (c) => c.frameworkId === fw.id || c.frameworkCode === fw.code,
+  )
+  const showReadinessDashboard = readinessCard
+    ? isReadinessDashboardProfile(readinessCard.profileType)
+    : false
 
   return (
     <div className="space-y-6">
@@ -124,11 +143,21 @@ export function FrameworkDetailPage() {
         title={`${fw.code} · ${fw.name}`}
         description={fw.description ?? t('compliance.frameworks.description')}
         actions={
-          <Button asChild variant="outline">
-            <Link to="/it/compliance/frameworks">{t('compliance.nav.backFrameworks')}</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {showReadinessDashboard ? (
+              <Button asChild>
+                <Link to={`/it/compliance/readiness/${encodeURIComponent(fw.code)}`}>
+                  {t('readiness.openDashboard')}
+                </Link>
+              </Button>
+            ) : null}
+            <Button asChild variant="outline">
+              <Link to="/it/compliance/frameworks">{t('compliance.nav.backFrameworks')}</Link>
+            </Button>
+          </div>
         }
       />
+      <ComplianceReadinessNav />
 
       <div className="flex flex-wrap gap-2 items-center">
         <Select

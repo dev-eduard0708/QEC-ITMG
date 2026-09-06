@@ -2242,6 +2242,7 @@ export type ComplianceFramework = {
   publisher: string
   description: string | null
   isActive: boolean
+  profileType: string
   createdAtUtc: string
   updatedAtUtc: string
   rowVersion: string
@@ -2344,6 +2345,203 @@ export type CalendarItem = {
   createdAtUtc: string
   updatedAtUtc: string
   isOverdue: boolean
+}
+
+export type ReadinessResultDistribution = {
+  compliant: number
+  partiallyCompliant: number
+  nonCompliant: number
+  notApplicable: number
+  notTested: number
+}
+
+export type ReadinessMetrics = {
+  applicableRequirements: number
+  notApplicableRequirements: number
+  mappedRequirements: number
+  unmappedRequirements: number
+  mappedCoveragePercent: number
+  assessedRequirements: number
+  unassessedRequirements: number
+  assessmentCoveragePercent: number
+  evidenceAvailable: number
+  evidenceMissing: number
+  evidenceExpired: number
+  evidenceCoveragePercent: number
+  readyForReview: number
+  notReadyForReview: number
+  readinessCoveragePercent: number
+  resultDistribution: ReadinessResultDistribution
+}
+
+export type ReadinessLandingCard = {
+  frameworkId: string
+  frameworkCode: string
+  name: string
+  description: string | null
+  profileType: string
+  versionCode: string | null
+  frameworkVersionId: string | null
+  metrics: ReadinessMetrics
+  openGaps: number
+}
+
+export type ReadinessLanding = {
+  disclaimer: string
+  cards: ReadinessLandingCard[]
+}
+
+export type ReadinessDomain = {
+  domainRequirementId: string
+  code: string
+  title: string
+  applicableCount: number
+  readyForReviewCount: number
+  readinessPercent: number
+  mappedCount: number
+  assessedCount: number
+  evidenceMissingCount: number
+  unmappedCount: number
+}
+
+export type ReadinessFrameworkSummary = {
+  frameworkId: string
+  frameworkCode: string
+  name: string
+  description: string | null
+  profileType: string
+  versionCode: string
+  frameworkVersionId: string
+  disclaimer: string
+  metrics: ReadinessMetrics
+  domains: ReadinessDomain[]
+}
+
+export type ReadinessOperationalLink = {
+  id: string
+  frameworkRequirementId: string
+  linkType: string
+  titleEn: string
+  titleAr: string
+  internalRoute: string
+  notes: string | null
+  createdAtUtc: string
+  createdByUserId: string
+}
+
+export type ReadinessRequirementListItem = {
+  id: string
+  code: string
+  title: string
+  text: string | null
+  requirementType: string
+  parentRequirementId: string | null
+  domainCode: string | null
+  domainTitle: string | null
+  readinessState: string
+  applicabilityStatus: string
+  applicabilityReason: string | null
+  mappedControlCount: number
+  hasCompletedAssessment: boolean
+  hasAvailableEvidence: boolean
+  hasExpiredEvidence: boolean
+  latestAssessmentResult: string | null
+  operationalLinks: ReadinessOperationalLink[]
+}
+
+export type ReadinessMappedControl = {
+  internalControlId: string
+  controlNumber: string | null
+  title: string | null
+  status: string | null
+  primaryOwnerUserId: string | null
+  latestAssessmentStatus: string | null
+  latestAssessmentResult: string | null
+  latestAssessmentDateUtc: string | null
+  hasAvailableEvidence: boolean
+  hasExpiredOnlyEvidence: boolean
+}
+
+export type ReadinessRequirementDetail = {
+  id: string
+  code: string
+  title: string
+  text: string | null
+  requirementType: string
+  frameworkVersionId: string
+  frameworkCode: string
+  parentRequirementId: string | null
+  domainCode: string | null
+  domainTitle: string | null
+  readinessState: string
+  applicabilityStatus: string
+  applicabilityReason: string | null
+  applicabilitySetByUserId: string | null
+  applicabilitySetAtUtc: string | null
+  mappedControls: ReadinessMappedControl[]
+  operationalLinks: ReadinessOperationalLink[]
+}
+
+export const complianceReadinessApi = {
+  landing: (locale?: string) =>
+    apiFetch<ReadinessLanding>(`/api/v1/compliance/readiness${opsQuery({ locale })}`),
+  framework: (
+    frameworkCode: string,
+    params?: { locale?: string; periodStart?: string; periodEnd?: string },
+  ) =>
+    apiFetch<ReadinessFrameworkSummary>(
+      `/api/v1/compliance/readiness/${encodeURIComponent(frameworkCode)}${opsQuery({
+        locale: params?.locale,
+        periodStart: params?.periodStart,
+        periodEnd: params?.periodEnd,
+      })}`,
+    ),
+  listRequirements: (
+    frameworkCode: string,
+    params?: {
+      locale?: string
+      domainRequirementId?: string
+      status?: string
+      search?: string
+      periodStart?: string
+      periodEnd?: string
+    },
+  ) =>
+    apiFetch<ReadinessRequirementListItem[]>(
+      `/api/v1/compliance/readiness/${encodeURIComponent(frameworkCode)}/requirements${opsQuery({
+        locale: params?.locale,
+        domainRequirementId: params?.domainRequirementId,
+        status: params?.status,
+        search: params?.search,
+        periodStart: params?.periodStart,
+        periodEnd: params?.periodEnd,
+      })}`,
+    ),
+  getRequirement: (
+    frameworkCode: string,
+    requirementId: string,
+    params?: { locale?: string; periodStart?: string; periodEnd?: string },
+  ) =>
+    apiFetch<ReadinessRequirementDetail>(
+      `/api/v1/compliance/readiness/${encodeURIComponent(frameworkCode)}/requirements/${requirementId}${opsQuery({
+        locale: params?.locale,
+        periodStart: params?.periodStart,
+        periodEnd: params?.periodEnd,
+      })}`,
+    ),
+  setApplicability: (requirementId: string, payload: { status: string; reason?: string | null }) =>
+    apiFetch<{
+      id: string
+      frameworkRequirementId: string
+      status: string
+      reason: string | null
+      setByUserId: string
+      setAtUtc: string
+      updatedAtUtc: string
+    }>(`/api/v1/compliance/requirements/${requirementId}/applicability`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
 }
 
 export const complianceApi = {

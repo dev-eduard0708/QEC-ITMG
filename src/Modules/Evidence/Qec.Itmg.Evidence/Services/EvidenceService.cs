@@ -357,8 +357,22 @@ public sealed class EvidenceService(
     public async Task<EvidenceCoverageSnapshot> GetForControlsAsync(
         IReadOnlyCollection<Guid> internalControlIds, DateTimeOffset asOfUtc, CancellationToken cancellationToken = default)
     {
-        if (internalControlIds.Count == 0)
+        IReadOnlyList<EvidenceControlCoverageItem> items =
+            await GetPerControlAsync(internalControlIds, asOfUtc, cancellationToken);
+        if (items.Count == 0)
             return new(0, 0, 0);
+
+        int available = items.Count(x => x.HasAvailableEvidence);
+        int expiredOnly = items.Count(x => !x.HasAvailableEvidence && x.HasExpiredOnlyEvidence);
+        int missing = items.Count - available - expiredOnly;
+        return new(available, missing, expiredOnly);
+    }
+
+    public async Task<IReadOnlyList<EvidenceControlCoverageItem>> GetPerControlAsync(
+        IReadOnlyCollection<Guid> internalControlIds, DateTimeOffset asOfUtc, CancellationToken cancellationToken = default)
+    {
+        if (internalControlIds.Count == 0)
+            return [];
 
         Guid[] controlIds = internalControlIds.Distinct().ToArray();
         List<EvidenceLink> links = await db.EvidenceLinks.AsNoTracking()
@@ -377,7 +391,7 @@ public sealed class EvidenceService(
             byControl[link.TargetId].Add(ev);
         }
 
-        int available = 0, missing = 0, expiredOnly = 0;
+        List<EvidenceControlCoverageItem> result = new(controlIds.Length);
         foreach (Guid controlId in controlIds)
         {
             List<EvidenceRecord> list = byControl[controlId];
@@ -389,12 +403,10 @@ public sealed class EvidenceService(
                 e.Status == EvidenceStatus.Expired
                 || (e.Status == EvidenceStatus.Accepted && e.ValidTo is DateTimeOffset vt && vt < asOfUtc));
 
-            if (hasAvailable) available++;
-            else if (hasExpired) expiredOnly++;
-            else missing++;
+            result.Add(new EvidenceControlCoverageItem(controlId, hasAvailable, !hasAvailable && hasExpired));
         }
 
-        return new(available, missing, expiredOnly);
+        return result;
     }
 
     private async Task Ensure(Guid id, CancellationToken ct)

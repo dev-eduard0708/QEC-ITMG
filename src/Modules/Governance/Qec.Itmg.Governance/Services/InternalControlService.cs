@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Contracts.Audit;
+using Qec.Itmg.Contracts.Governance;
 using Qec.Itmg.Contracts.Numbering;
 using Qec.Itmg.Governance.Domain;
 using Qec.Itmg.Governance.Persistence;
@@ -71,7 +72,7 @@ public sealed class InternalControlService(
     INumberSequenceService numbers,
     IClock clock,
     IBusinessAuditWriter businessAudit,
-    ISharedDbTransaction sharedDbTransaction)
+    ISharedDbTransaction sharedDbTransaction) : IInternalControlLookup
 {
     public IReadOnlyList<ControlDomainOption> ListDomains() =>
         ControlDomainCodes.Labels.Select(kv => new ControlDomainOption(kv.Key, kv.Value)).OrderBy(x => x.Label).ToList();
@@ -368,6 +369,21 @@ public sealed class InternalControlService(
             procedures.Select(MapProcedure).ToList(),
             evidence.Select(MapEvidence).ToList(),
             item.CreatedAtUtc, item.UpdatedAtUtc, item.RetiredAtUtc, Convert.ToBase64String(item.RowVersion));
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, InternalControlRefDto>> GetByIdsAsync(
+        IReadOnlyCollection<Guid> internalControlIds, CancellationToken cancellationToken = default)
+    {
+        if (internalControlIds.Count == 0)
+            return new Dictionary<Guid, InternalControlRefDto>();
+
+        Guid[] ids = internalControlIds.Distinct().ToArray();
+        List<InternalControl> items = await db.InternalControls.AsNoTracking()
+            .Where(x => ids.Contains(x.Id))
+            .ToListAsync(cancellationToken);
+        return items.ToDictionary(
+            x => x.Id,
+            x => new InternalControlRefDto(x.Id, x.ControlNumber, x.Title, x.Status.ToString(), x.PrimaryOwnerUserId));
     }
 
     private static ControlListItemDto MapList(InternalControl x)

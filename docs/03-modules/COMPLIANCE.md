@@ -1,14 +1,27 @@
 # Compliance
 
-Related: [../05-compliance/CONTROL-MODEL.md](../05-compliance/CONTROL-MODEL.md) · [../05-compliance/FRAMEWORK-MAPPING.md](../05-compliance/FRAMEWORK-MAPPING.md) · [EVIDENCE-LIBRARY.md](EVIDENCE-LIBRARY.md)
+Related: [../05-compliance/CONTROL-MODEL.md](../05-compliance/CONTROL-MODEL.md) · [../05-compliance/FRAMEWORK-MAPPING.md](../05-compliance/FRAMEWORK-MAPPING.md) · [../05-compliance/ISA-315-AUDIT-PROFILE.md](../05-compliance/ISA-315-AUDIT-PROFILE.md) · [EVIDENCE-LIBRARY.md](EVIDENCE-LIBRARY.md)
 
 ## Purpose
 
-Load frameworks as **data**, map **internal controls**, run assessments, calendar, exceptions. Does not auto-certify QEC.
+Load frameworks as **data**, map **internal controls**, run assessments, calendar, exceptions, and **readiness dashboards**. Does not auto-certify QEC.
 
 ## Entities
 
-Framework, FrameworkVersion, FrameworkRequirement, InternalControl, ControlMapping, ControlOwner (on control), TestProcedure, EvidenceRequirement (template), ControlAssessment, PolicyException, ComplianceCalendarItem.
+Framework (+ ProfileType, translations), FrameworkVersion, FrameworkRequirement (+ translations), FrameworkRequirementApplicability, FrameworkRequirementOperationalLink, InternalControl, ControlMapping, ControlOwner (on control), TestProcedure, EvidenceRequirement (template), ControlAssessment, PolicyException, ComplianceCalendarItem.
+
+## Framework readiness dashboards
+
+UI:
+
+- `/it/compliance/readiness` — landing
+- `/it/compliance/readiness/isa-315` — ISA 315 IT Audit Readiness
+- `/it/compliance/readiness/cyber` — Cybersecurity Readiness
+- `/it/compliance/readiness/:frameworkCode/requirements/:id` — requirement traceability
+
+API: `GET /api/v1/compliance/readiness…`, applicability + operational-link management under `compliance.manage`.
+
+Seeded starter profiles (idempotent, all environments): `ISA315-IT-READINESS`, `QEC-CYBER-READINESS`.
 
 ## Scoring honesty
 
@@ -18,9 +31,10 @@ APIs return breakdowns:
 - Assessed / unassessed
 - Result distribution
 - Evidence missing / expired
+- Ready for review / not ready
 - N/A
 
-A single percentage is allowed **only** with documented methodology stored on the report (weighted or unweighted, which framework version, as-of date). Default dashboards show **counts and states**, not a vanity score.
+Readiness percentages document **control/assessment/evidence coverage**, not statutory compliance or certification. Default wording: “Ready for Audit Review”, never “ISA 315 Passed”.
 
 ## Cybersecurity assessment vs COBIT
 
@@ -28,4 +42,4 @@ Completing an internal cybersecurity checklist **may produce evidence** mapped t
 
 ## Permissions
 
-`framework.manage` (admin), `control.manage`, `assessment.perform`, `compliance.read`
+`compliance.read`, `compliance.manage` (applicability + operational links), `framework.manage` (admin), `control.manage`, `assessment.perform`

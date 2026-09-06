@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ComplianceReadinessNav } from '@/features/compliance/readiness-nav'
 
 export function AssessmentsPage() {
   const { t } = useTranslation()
@@ -89,6 +90,7 @@ export function AssessmentsPage() {
           </Button>
         }
       />
+      <ComplianceReadinessNav />
       {can('assessment.perform') ? (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">

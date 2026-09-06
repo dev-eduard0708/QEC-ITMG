@@ -7,6 +7,7 @@ namespace Qec.Itmg.Compliance.Services;
 
 public sealed record FrameworkDto(
     Guid Id, string Code, string Name, string Publisher, string? Description, bool IsActive,
+    string ProfileType,
     DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc, string RowVersion);
 
 public sealed record FrameworkVersionDto(
@@ -126,7 +127,8 @@ public sealed class FrameworkService(ComplianceDbContext db, IClock clock)
     }
 
     private static FrameworkDto Map(Framework x) => new(
-        x.Id, x.Code, x.Name, x.Publisher, x.Description, x.IsActive, x.CreatedAtUtc, x.UpdatedAtUtc,
+        x.Id, x.Code, x.Name, x.Publisher, x.Description, x.IsActive, x.ProfileType.ToString(),
+        x.CreatedAtUtc, x.UpdatedAtUtc,
         Convert.ToBase64String(x.RowVersion));
 
     private static FrameworkVersionDto MapVersion(FrameworkVersion x) => new(

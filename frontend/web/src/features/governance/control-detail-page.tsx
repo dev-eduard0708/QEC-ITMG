@@ -206,17 +206,35 @@ export function ControlDetailPage() {
       {can('compliance.read') ? (
         <Card>
           <CardHeader>
-            <CardTitle>{t('controls.sections.frameworkMappings')}</CardTitle>
+            <CardTitle>{t('controls.sections.mappedFrameworkRequirements')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             {(mappingsQuery.data ?? []).length === 0 ? (
               <p className="text-muted-foreground">{t('controls.noMappings')}</p>
             ) : (
-              mappingsQuery.data!.map((m) => (
-                <div key={m.id} className="rounded border p-2">
-                  {m.frameworkCode} · {m.requirementCode} · {m.requirementTitle} ({m.relationship})
-                </div>
-              ))
+              mappingsQuery.data!.map((m) => {
+                const readinessHref =
+                  m.frameworkCode && m.frameworkRequirementId
+                    ? `/it/compliance/readiness/${encodeURIComponent(m.frameworkCode)}/requirements/${m.frameworkRequirementId}`
+                    : null
+                return (
+                  <div key={m.id} className="rounded border p-2 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="font-medium">
+                        {m.frameworkCode ?? '—'} · {m.requirementCode ?? '—'}
+                      </div>
+                      <div className="text-muted-foreground">
+                        {m.requirementTitle ?? '—'} ({m.relationship})
+                      </div>
+                    </div>
+                    {readinessHref ? (
+                      <Button asChild size="sm" variant="secondary">
+                        <Link to={readinessHref}>{t('controls.openReadinessRequirement')}</Link>
+                      </Button>
+                    ) : null}
+                  </div>
+                )
+              })
             )}
             <Button asChild variant="secondary" size="sm">
               <Link to="/it/compliance/mappings">{t('controls.openMappings')}</Link>

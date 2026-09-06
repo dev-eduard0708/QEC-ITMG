@@ -12,6 +12,7 @@ namespace Qec.Itmg.Host.Compliance;
 public static class ComplianceEndpoints
 {
     public const string ComplianceRead = "compliance.read";
+    public const string ComplianceManage = "compliance.manage";
     public const string FrameworkManage = "framework.manage";
     public const string AssessmentPerform = "assessment.perform";
 
@@ -21,6 +22,7 @@ public static class ComplianceEndpoints
         MapFrameworks(endpoints);
         MapMappings(endpoints);
         MapCoverage(endpoints);
+        MapReadiness(endpoints);
         MapAssessments(endpoints);
         MapCalendar(endpoints);
         return endpoints;
@@ -186,6 +188,109 @@ public static class ComplianceEndpoints
         }).RequirePermission(ComplianceRead);
     }
 
+    private static void MapReadiness(IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGet("/api/v1/compliance/readiness", async (
+            string? locale, ReadinessService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetLandingAsync(locale, ct))).RequirePermission(ComplianceRead);
+
+        endpoints.MapGet("/api/v1/compliance/readiness/{frameworkCode}", async (
+            string frameworkCode, string? locale, DateOnly? periodStart, DateOnly? periodEnd,
+            ReadinessService svc, CancellationToken ct) =>
+        {
+            ReadinessFrameworkSummaryDto? item =
+                await svc.GetFrameworkSummaryAsync(frameworkCode, locale, periodStart, periodEnd, ct);
+            return item is null ? Results.NotFound() : Results.Ok(item);
+        }).RequirePermission(ComplianceRead);
+
+        endpoints.MapGet("/api/v1/compliance/readiness/{frameworkCode}/requirements", async (
+            string frameworkCode, string? locale, Guid? domainRequirementId, string? status, string? search,
+            DateOnly? periodStart, DateOnly? periodEnd, ReadinessService svc, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await svc.ListRequirementsAsync(
+                    frameworkCode, locale, domainRequirementId, status, search, periodStart, periodEnd, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(ComplianceRead);
+
+        endpoints.MapGet("/api/v1/compliance/readiness/{frameworkCode}/requirements/{id:guid}", async (
+            string frameworkCode, Guid id, string? locale, DateOnly? periodStart, DateOnly? periodEnd,
+            ReadinessService svc, CancellationToken ct) =>
+        {
+            ReadinessRequirementDetailDto? item =
+                await svc.GetRequirementDetailAsync(frameworkCode, id, locale, periodStart, periodEnd, ct);
+            return item is null ? Results.NotFound() : Results.Ok(item);
+        }).RequirePermission(ComplianceRead);
+
+        endpoints.MapPut("/api/v1/compliance/requirements/{id:guid}/applicability", async (
+            Guid id, SetApplicabilityRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            ReadinessService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return Results.Unauthorized();
+            if (!Enum.TryParse(req.Status, true, out RequirementApplicabilityStatus status))
+                return Validation("Valid status required (Applicable or NotApplicable).");
+            try
+            {
+                FrameworkRequirementApplicability entity =
+                    await svc.SetApplicabilityAsync(id, status, req.Reason, session.Id, ct);
+                return Results.Ok(new
+                {
+                    entity.Id,
+                    entity.FrameworkRequirementId,
+                    status = entity.Status.ToString(),
+                    entity.Reason,
+                    entity.SetByUserId,
+                    entity.SetAtUtc,
+                    entity.UpdatedAtUtc,
+                });
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(ComplianceManage);
+
+        endpoints.MapGet("/api/v1/compliance/requirements/{id:guid}/operational-links", async (
+            Guid id, ReadinessService svc, CancellationToken ct) =>
+            Results.Ok(await svc.ListOperationalLinksAsync(id, ct))).RequirePermission(ComplianceRead);
+
+        endpoints.MapPost("/api/v1/compliance/requirements/{id:guid}/operational-links", async (
+            Guid id, UpsertOperationalLinkRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            ReadinessService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return Results.Unauthorized();
+            if (!Enum.TryParse(req.LinkType, true, out OperationalLinkType linkType))
+                return Validation("Valid linkType required.");
+            try
+            {
+                return Results.Ok(await svc.CreateOperationalLinkAsync(
+                    id, linkType, req.TitleEn, req.TitleAr, req.InternalRoute, session.Id, req.Notes, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(ComplianceManage);
+
+        endpoints.MapPut("/api/v1/compliance/operational-links/{linkId:guid}", async (
+            Guid linkId, UpsertOperationalLinkRequest req, ReadinessService svc, CancellationToken ct) =>
+        {
+            if (!Enum.TryParse(req.LinkType, true, out OperationalLinkType linkType))
+                return Validation("Valid linkType required.");
+            try
+            {
+                return Results.Ok(await svc.UpdateOperationalLinkAsync(
+                    linkId, linkType, req.TitleEn, req.TitleAr, req.InternalRoute, req.Notes, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(ComplianceManage);
+
+        endpoints.MapDelete("/api/v1/compliance/operational-links/{linkId:guid}", async (
+            Guid linkId, ReadinessService svc, CancellationToken ct) =>
+        {
+            await svc.DeleteOperationalLinkAsync(linkId, ct);
+            return Results.NoContent();
+        }).RequirePermission(ComplianceManage);
+    }
+
     private static void MapAssessments(IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder read = endpoints.MapGroup("/api/v1/compliance/assessments").RequirePermission(ComplianceRead);
@@ -314,4 +419,7 @@ public static class ComplianceEndpoints
         Guid? FrameworkVersionId, Guid? OwnerUserId, string? Notes);
     private sealed record CalendarStatusRequest(string Status);
     private sealed record ScheduleNextRequest(Guid InternalControlId, string Title, string Frequency, Guid? OwnerUserId);
+    private sealed record SetApplicabilityRequest(string Status, string? Reason);
+    private sealed record UpsertOperationalLinkRequest(
+        string LinkType, string TitleEn, string TitleAr, string InternalRoute, string? Notes);
 }

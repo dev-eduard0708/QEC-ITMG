@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/page-header'
 import { DataTable } from '@/components/shared/data-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ComplianceReadinessNav } from '@/features/compliance/readiness-nav'
 
 export function MappingsPage() {
   const { t } = useTranslation()
@@ -58,6 +59,7 @@ export function MappingsPage() {
           </Button>
         }
       />
+      <ComplianceReadinessNav />
       {can('framework.manage') ? (
         <div className="flex flex-wrap gap-2">
           <Input

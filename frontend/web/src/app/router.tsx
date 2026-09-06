@@ -31,6 +31,9 @@ import { FrameworksPage, FrameworkDetailPage } from '@/features/compliance/frame
 import { MappingsPage } from '@/features/compliance/mappings-page'
 import { AssessmentsPage } from '@/features/compliance/assessments-page'
 import { CalendarPage } from '@/features/compliance/calendar-page'
+import { ReadinessLandingPage } from '@/features/compliance/readiness-landing-page'
+import { ReadinessFrameworkPage } from '@/features/compliance/readiness-framework-page'
+import { ReadinessRequirementPage } from '@/features/compliance/readiness-requirement-page'
 import { EvidencePage, EvidenceNewPage } from '@/features/it/evidence-page'
 import { EvidenceDetailPage } from '@/features/it/evidence-detail-page'
 import { AuditsPage, AuditNewPage } from '@/features/it/audits-page'
@@ -212,6 +215,12 @@ export function AppRouter() {
           </Route>
           <Route element={<RequirePermission permission="compliance.read" />}>
             <Route path="it/compliance" element={<ComplianceHomePage />} />
+            <Route path="it/compliance/readiness" element={<ReadinessLandingPage />} />
+            <Route path="it/compliance/readiness/:frameworkCode" element={<ReadinessFrameworkPage />} />
+            <Route
+              path="it/compliance/readiness/:frameworkCode/requirements/:requirementId"
+              element={<ReadinessRequirementPage />}
+            />
             <Route path="it/compliance/frameworks" element={<FrameworksPage />} />
             <Route path="it/compliance/frameworks/:id" element={<FrameworkDetailPage />} />
             <Route path="it/compliance/mappings" element={<MappingsPage />} />

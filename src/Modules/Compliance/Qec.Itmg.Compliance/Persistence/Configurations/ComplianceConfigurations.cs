@@ -14,8 +14,10 @@ internal sealed class FrameworkConfiguration : IEntityTypeConfiguration<Framewor
         builder.Property(x => x.Name).IsRequired().HasMaxLength(256);
         builder.Property(x => x.Publisher).IsRequired().HasMaxLength(256);
         builder.Property(x => x.Description).HasMaxLength(2000);
+        builder.Property(x => x.ProfileType).IsRequired().HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
         builder.HasIndex(x => x.Code).IsUnique().HasDatabaseName("IX_Framework_Code");
+        builder.HasIndex(x => x.ProfileType).HasDatabaseName("IX_Framework_ProfileType");
     }
 }
 
@@ -97,5 +99,80 @@ internal sealed class ComplianceCalendarItemConfiguration : IEntityTypeConfigura
         builder.HasIndex(x => x.DueAtUtc).HasDatabaseName("IX_ComplianceCalendarItem_DueAt");
         builder.HasIndex(x => x.Status).HasDatabaseName("IX_ComplianceCalendarItem_Status");
         builder.HasIndex(x => x.OwnerUserId).HasDatabaseName("IX_ComplianceCalendarItem_Owner");
+    }
+}
+
+internal sealed class FrameworkRequirementApplicabilityConfiguration
+    : IEntityTypeConfiguration<FrameworkRequirementApplicability>
+{
+    public void Configure(EntityTypeBuilder<FrameworkRequirementApplicability> builder)
+    {
+        builder.ToTable("FrameworkRequirementApplicability");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.Reason).HasMaxLength(2000);
+        builder.HasIndex(x => x.FrameworkRequirementId)
+            .IsUnique()
+            .HasDatabaseName("IX_FrameworkRequirementApplicability_Requirement");
+        builder.HasOne<FrameworkRequirement>().WithMany()
+            .HasForeignKey(x => x.FrameworkRequirementId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class FrameworkRequirementOperationalLinkConfiguration
+    : IEntityTypeConfiguration<FrameworkRequirementOperationalLink>
+{
+    public void Configure(EntityTypeBuilder<FrameworkRequirementOperationalLink> builder)
+    {
+        builder.ToTable("FrameworkRequirementOperationalLink");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.LinkType).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.TitleEn).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.TitleAr).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.InternalRoute).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.Notes).HasMaxLength(2000);
+        builder.HasIndex(x => x.FrameworkRequirementId)
+            .HasDatabaseName("IX_FrameworkRequirementOperationalLink_Requirement");
+        builder.HasOne<FrameworkRequirement>().WithMany()
+            .HasForeignKey(x => x.FrameworkRequirementId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class FrameworkTranslationConfiguration : IEntityTypeConfiguration<FrameworkTranslation>
+{
+    public void Configure(EntityTypeBuilder<FrameworkTranslation> builder)
+    {
+        builder.ToTable("FrameworkTranslation");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.LanguageCode).IsRequired().HasMaxLength(16);
+        builder.Property(x => x.Name).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.Description).HasMaxLength(2000);
+        builder.HasIndex(x => new { x.FrameworkId, x.LanguageCode })
+            .IsUnique()
+            .HasDatabaseName("IX_FrameworkTranslation_Framework_Language");
+        builder.HasOne<Framework>().WithMany()
+            .HasForeignKey(x => x.FrameworkId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class FrameworkRequirementTranslationConfiguration
+    : IEntityTypeConfiguration<FrameworkRequirementTranslation>
+{
+    public void Configure(EntityTypeBuilder<FrameworkRequirementTranslation> builder)
+    {
+        builder.ToTable("FrameworkRequirementTranslation");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.LanguageCode).IsRequired().HasMaxLength(16);
+        builder.Property(x => x.Title).IsRequired().HasMaxLength(512);
+        builder.Property(x => x.Text).HasMaxLength(8000);
+        builder.HasIndex(x => new { x.FrameworkRequirementId, x.LanguageCode })
+            .IsUnique()
+            .HasDatabaseName("IX_FrameworkRequirementTranslation_Requirement_Language");
+        builder.HasOne<FrameworkRequirement>().WithMany()
+            .HasForeignKey(x => x.FrameworkRequirementId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
