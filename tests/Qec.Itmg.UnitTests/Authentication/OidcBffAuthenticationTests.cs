@@ -124,6 +124,27 @@ public sealed class OidcBffAuthenticationTests
     }
 
     [Fact]
+    public async Task Logout_ClearsCookieSession_WhenOidcEnabled()
+    {
+        // Google OIDC often has no end_session_endpoint; logout must still clear the app cookie.
+        await using AuthWebApplicationFactory factory = new(oidcEnabled: true);
+        using HttpClient client = factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = false,
+            HandleCookies = true,
+        });
+
+        HttpResponseMessage signIn = await client.GetAsync("/__test__/signin");
+        Assert.Equal(HttpStatusCode.NoContent, signIn.StatusCode);
+
+        HttpResponseMessage logout = await client.PostAsync("/auth/logout", content: null);
+        Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
+
+        HttpResponseMessage after = await client.GetAsync("/__test__/auth-state");
+        Assert.Equal("anonymous", await after.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public void OidcPrincipalMapper_DropsIdpRolesAndGroups()
     {
         ClaimsIdentity inbound = new("oidc");

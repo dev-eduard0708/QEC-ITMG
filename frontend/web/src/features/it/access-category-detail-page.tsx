@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { AccessNavTabs } from '@/features/it/access-nav'
 import { AccessStageDualList } from '@/features/it/access-stage-dual-list'
 import { useAccessUsers } from '@/features/it/access-users'
+import { toast } from '@/components/ui/toast-store'
 
 function stageIds(participantsByStage: Record<string, string[]> | undefined, stage: string): string[] {
   return participantsByStage?.[stage] ?? []
@@ -78,8 +79,13 @@ export function AccessCategoryDetailPage() {
     onSuccess: async () => {
       setError(null)
       await invalidate()
+      toast.success(t('access.categories.detailsSaved'))
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : t('access.error.generic')),
+    onError: (err) => {
+      const message = err instanceof ApiError ? err.message : t('access.error.generic')
+      setError(message)
+      toast.error(message)
+    },
   })
 
   const saveRouting = useMutation({
@@ -94,8 +100,13 @@ export function AccessCategoryDetailPage() {
     onSuccess: async () => {
       setError(null)
       await invalidate()
+      toast.success(t('access.categories.routingSaved'))
     },
-    onError: (err) => setError(err instanceof ApiError ? err.message : t('access.error.generic')),
+    onError: (err) => {
+      const message = err instanceof ApiError ? err.message : t('access.categories.routingFailed')
+      setError(message)
+      toast.error(message)
+    },
   })
 
   if (categoryQuery.isLoading) return <p className="text-sm text-muted-foreground">{t('access.loading')}</p>

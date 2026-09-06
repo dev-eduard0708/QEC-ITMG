@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Qec.Itmg.BuildingBlocks.Persistence;
 
@@ -33,6 +34,10 @@ public static class QecDbContextServiceCollectionExtensions
                     sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", migrationsHistorySchema));
             }
         });
+
+        // So SharedSqlTransaction can enlist every module context that shares the connection.
+        services.TryAddEnumerable(
+            ServiceDescriptor.Scoped<ISharedTransactionDbContext, SharedTransactionDbContextAdapter<TContext>>());
 
         return services;
     }

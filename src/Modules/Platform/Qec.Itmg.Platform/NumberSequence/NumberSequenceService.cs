@@ -101,6 +101,12 @@ public sealed class NumberSequenceService(
             }
 
             await using System.Data.Common.DbCommand command = connection.CreateCommand();
+            IDbContextTransaction? currentTransaction = db.Database.CurrentTransaction;
+            if (currentTransaction is not null)
+            {
+                command.Transaction = currentTransaction.GetDbTransaction();
+            }
+
             command.CommandText = @"
 DECLARE @Out TABLE (Issued bigint);
 

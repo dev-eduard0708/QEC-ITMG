@@ -205,22 +205,14 @@ public static class IdentityAuthenticationExtensions
             return Results.Challenge(properties, [OidcScheme]);
         });
 
-        endpoints.MapPost("/auth/logout", async (
-            HttpContext httpContext,
-            IOptions<OidcAuthenticationOptions> options) =>
+        endpoints.MapPost("/auth/logout", async (HttpContext httpContext) =>
         {
             await SecurityAuditHooks.LogLogoutAsync(httpContext);
 
-            if (options.Value.Enabled)
-            {
-                AuthenticationProperties properties = new()
-                {
-                    RedirectUri = "/",
-                };
-
-                return Results.SignOut(properties, [CookieScheme, OidcScheme]);
-            }
-
+            // SPA logout uses fetch + JSON. Always clear the app cookie.
+            // Do not SignOut the OIDC scheme here: Google (and some IdPs) lack a usable
+            // end_session_endpoint, which throws and leaves the user stuck signed in.
+            // Remote IdP logout would also return a redirect that breaks the SPA client.
             await httpContext.SignOutAsync(CookieScheme);
             return Results.Ok(new { signedOut = true });
         });
