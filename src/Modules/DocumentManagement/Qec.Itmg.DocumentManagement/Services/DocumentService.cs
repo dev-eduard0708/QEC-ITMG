@@ -23,7 +23,14 @@ public sealed record DocumentDto(
     DateTimeOffset? CurrentSubmittedAtUtc = null,
     Guid? CurrentPublishedByUserId = null,
     int? AssignedEmployeeCount = null,
-    int? OutstandingAcknowledgementCount = null);
+    int? OutstandingAcknowledgementCount = null,
+    string? TitleAr = null,
+    string? ContentTextAr = null,
+    string? ChangeSummary = null,
+    string? ChangeSummaryAr = null,
+    bool HasEnglishContent = false,
+    bool HasArabicContent = false,
+    bool TranslationComplete = false);
 
 public sealed record DocumentListResult(
     IReadOnlyList<DocumentDto> Items, int TotalCount, int Page, int PageSize,
@@ -100,11 +107,13 @@ public sealed class DocumentService(
 
     public async Task<DocumentListResult> ListAsync(
         int page, int pageSize, string? search, DocumentType? type, DocumentStatus? status,
-        bool publishedOnly, bool includeConfidential, bool reviewOverdueOnly, CancellationToken ct)
+        bool publishedOnly, bool includeConfidential, bool reviewOverdueOnly, CancellationToken ct,
+        string? language = null)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
         DateTimeOffset now = clock.UtcNow;
+        string displayLang = DocumentLanguageCodes.Normalize(language);
         IQueryable<ManagedDocument> q = db.ManagedDocuments.AsNoTracking();
 
         if (publishedOnly) q = q.Where(x => x.Status == DocumentStatus.Published);
@@ -117,7 +126,8 @@ public sealed class DocumentService(
         if (!string.IsNullOrWhiteSpace(search))
         {
             string term = search.Trim();
-            q = q.Where(x => x.Title.Contains(term) || x.DocumentNumber.Contains(term));
+            q = q.Where(x => x.Title.Contains(term) || x.DocumentNumber.Contains(term)
+                || db.ManagedDocumentTranslations.Any(tr => tr.ManagedDocumentId == x.Id && tr.Title.Contains(term)));
         }
 
         int total = await q.CountAsync(ct);
@@ -152,13 +162,17 @@ public sealed class DocumentService(
         if (type is null or DocumentType.Policy)
             ackOutstanding = await CountPolicyAcknowledgementOutstandingAsync(ct);
 
+        List<DocumentDto> mapped = [];
+        foreach (ManagedDocument x in items)
+        {
+            DocumentVersion? v = x.CurrentVersionId is Guid vid && versions.TryGetValue(vid, out DocumentVersion? found) ? found : null;
+            ackCounts.TryGetValue(x.Id, out (int Assigned, int Outstanding) counts);
+            DocumentLocalizationBundle loc = await DocumentLocalization.LoadBundleAsync(db, x.Id, x.CurrentVersionId, x, v, ct);
+            mapped.Add(Map(x, v, now, counts.Assigned, counts.Outstanding, loc, displayLang));
+        }
+
         return new(
-            items.Select(x =>
-            {
-                DocumentVersion? v = x.CurrentVersionId is Guid vid && versions.TryGetValue(vid, out DocumentVersion? found) ? found : null;
-                ackCounts.TryGetValue(x.Id, out (int Assigned, int Outstanding) counts);
-                return Map(x, v, now, counts.Assigned, counts.Outstanding);
-            }).ToList(),
+            mapped,
             total, page, pageSize, overdueCount, dueSoonCount,
             draftCount, inReviewCount, approvedCount, publishedCount, ackOutstanding);
     }
@@ -175,7 +189,8 @@ public sealed class DocumentService(
             await CountPolicyAcknowledgementOutstandingAsync(ct));
     }
 
-    public async Task<DocumentDto?> GetAsync(Guid id, bool includeConfidential, bool allowUnpublished, CancellationToken ct)
+    public async Task<DocumentDto?> GetAsync(Guid id, bool includeConfidential, bool allowUnpublished, CancellationToken ct,
+        string? language = null)
     {
         ManagedDocument? item = await db.ManagedDocuments.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
         if (item is null) return null;
@@ -184,14 +199,17 @@ public sealed class DocumentService(
         DocumentVersion? version = null;
         if (item.CurrentVersionId is Guid vid)
             version = await db.DocumentVersions.AsNoTracking().FirstOrDefaultAsync(x => x.Id == vid, ct);
-        return Map(item, version, clock.UtcNow);
+        DocumentLocalizationBundle loc = await DocumentLocalization.LoadBundleAsync(
+            db, item.Id, item.CurrentVersionId, item, version, ct);
+        return Map(item, version, clock.UtcNow, loc: loc, displayLanguage: language);
     }
 
     public async Task<DocumentDto> CreateAsync(
         string title, DocumentType type, Guid ownerUserId, DocumentClassification classification,
         Guid? designatedApproverUserId, DateTimeOffset? effectiveDate, DateTimeOffset? reviewDate,
         bool requiresAcknowledgement, Guid actorUserId, string? changeSummary, CancellationToken ct,
-        string? contentText = null, Guid? reviewerUserId = null, Guid? publisherUserId = null)
+        string? contentText = null, Guid? reviewerUserId = null, Guid? publisherUserId = null,
+        string? titleAr = null, string? contentTextAr = null, string? changeSummaryAr = null)
     {
         DocumentDto? created = null;
         await sharedDbTransaction.ExecuteAsync(async innerCt =>
@@ -205,9 +223,28 @@ public sealed class DocumentService(
                 doc.Id, 1, actorUserId, clock.UtcNow, changeSummary, contentText: contentText);
             db.DocumentVersions.Add(version);
             doc.SetCurrentVersion(version.Id, clock.UtcNow);
+            await DocumentLocalization.UpsertDocumentTitleAsync(
+                db, doc.Id, DocumentLanguageCodes.English, title, clock.UtcNow, innerCt);
+            if (!string.IsNullOrWhiteSpace(contentText))
+            {
+                await DocumentLocalization.UpsertVersionContentAsync(
+                    db, version, DocumentLanguageCodes.English, contentText, changeSummary, clock.UtcNow, innerCt);
+            }
+            if (!string.IsNullOrWhiteSpace(titleAr))
+            {
+                await DocumentLocalization.UpsertDocumentTitleAsync(
+                    db, doc.Id, DocumentLanguageCodes.Arabic, titleAr, clock.UtcNow, innerCt);
+            }
+            if (!string.IsNullOrWhiteSpace(contentTextAr))
+            {
+                await DocumentLocalization.UpsertVersionContentAsync(
+                    db, version, DocumentLanguageCodes.Arabic, contentTextAr, changeSummaryAr, clock.UtcNow, innerCt);
+            }
             await businessAudit.AppendAsync(DocumentAudit.Created(doc.Id, doc.DocumentNumber), innerCt);
             await db.SaveChangesAsync(innerCt);
-            created = Map(doc, version, clock.UtcNow);
+            DocumentLocalizationBundle loc = await DocumentLocalization.LoadBundleAsync(
+                db, doc.Id, version.Id, doc, version, innerCt);
+            created = Map(doc, version, clock.UtcNow, loc: loc);
         }, ct);
         return created!;
     }
@@ -216,7 +253,9 @@ public sealed class DocumentService(
         Guid id, string title, Guid ownerUserId, Guid? designatedApproverUserId,
         DocumentClassification classification, DateTimeOffset? effectiveDate, DateTimeOffset? reviewDate,
         bool requiresAcknowledgement, bool requireReAcknowledgement, CancellationToken ct,
-        Guid? reviewerUserId = null, Guid? publisherUserId = null, string? contentText = null)
+        Guid? reviewerUserId = null, Guid? publisherUserId = null, string? contentText = null,
+        string? titleAr = null, string? contentTextAr = null, string? changeSummary = null,
+        string? changeSummaryAr = null)
     {
         ManagedDocument doc = await LoadAsync(id, ct);
         string? oldTitle = doc.Title;
@@ -243,11 +282,63 @@ public sealed class DocumentService(
         if (oldPublisher != doc.PublisherUserId)
             await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "PolicyPublisherAssigned", oldPublisher?.ToString(), doc.PublisherUserId?.ToString()), ct);
 
-        if (contentText is not null && doc.Status == DocumentStatus.Draft && doc.CurrentVersionId is Guid versionId)
+        await DocumentLocalization.UpsertDocumentTitleAsync(
+            db, doc.Id, DocumentLanguageCodes.English, doc.Title, clock.UtcNow, ct);
+
+        if (titleAr is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(titleAr))
+            {
+                await DocumentLocalization.UpsertDocumentTitleAsync(
+                    db, doc.Id, DocumentLanguageCodes.Arabic, titleAr, clock.UtcNow, ct);
+                await businessAudit.AppendAsync(DocumentAudit.Field(
+                    doc.Id, doc.DocumentNumber, "PolicyArabicContentUpdated", null,
+                    $"lang=ar;field=title"), ct);
+            }
+        }
+
+        if (doc.Status == DocumentStatus.Draft && doc.CurrentVersionId is Guid versionId)
         {
             DocumentVersion version = await db.DocumentVersions.FirstAsync(x => x.Id == versionId, ct);
-            version.SetContentText(contentText);
-            await businessAudit.AppendAsync(DocumentAudit.Field(doc.Id, doc.DocumentNumber, "ContentText", null, "updated"), ct);
+            if (contentText is not null)
+            {
+                version.SetContentText(contentText);
+                if (changeSummary is not null)
+                    version.SetChangeSummary(changeSummary);
+                if (!string.IsNullOrWhiteSpace(contentText))
+                {
+                    await DocumentLocalization.UpsertVersionContentAsync(
+                        db, version, DocumentLanguageCodes.English, contentText,
+                        changeSummary ?? version.ChangeSummary, clock.UtcNow, ct);
+                }
+                await businessAudit.AppendAsync(DocumentAudit.Field(
+                    doc.Id, doc.DocumentNumber, "PolicyEnglishContentUpdated", null,
+                    $"lang=en;version={version.VersionNumber}"), ct);
+            }
+            else if (changeSummary is not null)
+            {
+                version.SetChangeSummary(changeSummary);
+            }
+
+            if (contentTextAr is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(contentTextAr))
+                {
+                    await DocumentLocalization.UpsertVersionContentAsync(
+                        db, version, DocumentLanguageCodes.Arabic, contentTextAr, changeSummaryAr, clock.UtcNow, ct);
+                    await businessAudit.AppendAsync(DocumentAudit.Field(
+                        doc.Id, doc.DocumentNumber, "PolicyArabicContentUpdated", null,
+                        $"lang=ar;version={version.VersionNumber}"), ct);
+                }
+            }
+            else if (changeSummaryAr is not null)
+            {
+                DocumentVersionTranslation? ar = await db.DocumentVersionTranslations
+                    .FirstOrDefaultAsync(x => x.DocumentVersionId == version.Id
+                        && x.LanguageCode == DocumentLanguageCodes.Arabic, ct);
+                if (ar is not null)
+                    ar.Update(ar.ContentText, changeSummaryAr, clock.UtcNow);
+            }
         }
 
         await db.SaveChangesAsync(ct);
@@ -399,6 +490,17 @@ public sealed class DocumentService(
         DocumentVersion version = await db.DocumentVersions.FirstAsync(x => x.Id == doc.CurrentVersionId, ct);
         if (version.ApprovedAtUtc is null)
             throw new InvalidOperationException("Current version is not approved.");
+
+        if (doc.DocumentType == DocumentType.Policy)
+        {
+            DocumentLocalizationBundle loc = await DocumentLocalization.LoadBundleAsync(
+                db, doc.Id, version.Id, doc, version, ct);
+            if (!loc.HasEnglishContent || !loc.HasArabicContent)
+            {
+                throw new InvalidOperationException(
+                    "Arabic policy content is required before publication. / المحتوى العربي للسياسة مطلوب قبل النشر.");
+            }
+        }
 
         version.MarkPublished(actorUserId, clock.UtcNow);
         if (doc.PublisherUserId is null)
@@ -587,23 +689,79 @@ public sealed class DocumentService(
                 "Purpose\nReduce exposure of sensitive information in workspaces.\n\nEmployee responsibilities\n- Lock screens when leaving the workstation.\n- Store printed sensitive documents securely.\n- Do not leave badges or tokens unattended.\n- Clear whiteboards containing sensitive notes.\n\nNote\nStarter template requiring local policy review before publication."),
         ];
 
+        string changeSummaryEn = "Starter policy template — requires QEC management review before approval/publication.";
+
         foreach ((string number, string title, string body) in catalog)
         {
-            bool exists = await db.ManagedDocuments.AnyAsync(
-                x => x.DocumentType == DocumentType.Policy && x.DocumentNumber == number, ct);
-            if (exists) continue;
+            ManagedDocument? existing = await db.ManagedDocuments
+                .FirstOrDefaultAsync(x => x.DocumentType == DocumentType.Policy && x.DocumentNumber == number, ct);
 
-            ManagedDocument doc = ManagedDocument.Create(
-                number, title, DocumentType.Policy, ownerUserId, DocumentClassification.Internal, clock.UtcNow,
-                requiresAcknowledgement: true, requireReAcknowledgement: true);
-            db.ManagedDocuments.Add(doc);
-            DocumentVersion version = DocumentVersion.Create(
-                doc.Id, 1, ownerUserId, clock.UtcNow,
-                changeSummary: "Starter policy template — requires QEC management review before approval/publication.",
-                contentText: body);
-            db.DocumentVersions.Add(version);
-            doc.SetCurrentVersion(version.Id, clock.UtcNow);
-            await businessAudit.AppendAsync(DocumentAudit.Created(doc.Id, doc.DocumentNumber), ct);
+            if (existing is null)
+            {
+                ManagedDocument doc = ManagedDocument.Create(
+                    number, title, DocumentType.Policy, ownerUserId, DocumentClassification.Internal, clock.UtcNow,
+                    requiresAcknowledgement: true, requireReAcknowledgement: true);
+                db.ManagedDocuments.Add(doc);
+                DocumentVersion version = DocumentVersion.Create(
+                    doc.Id, 1, ownerUserId, clock.UtcNow,
+                    changeSummary: changeSummaryEn,
+                    contentText: body);
+                db.DocumentVersions.Add(version);
+                doc.SetCurrentVersion(version.Id, clock.UtcNow);
+
+                await DocumentLocalization.UpsertDocumentTitleAsync(
+                    db, doc.Id, DocumentLanguageCodes.English, title, clock.UtcNow, ct);
+                await DocumentLocalization.UpsertVersionContentAsync(
+                    db, version, DocumentLanguageCodes.English, body, changeSummaryEn, clock.UtcNow, ct);
+
+                if (PolicyStarterArabicCatalog.TryGet(number, out string titleAr, out string bodyAr))
+                {
+                    await DocumentLocalization.UpsertDocumentTitleAsync(
+                        db, doc.Id, DocumentLanguageCodes.Arabic, titleAr, clock.UtcNow, ct);
+                    await DocumentLocalization.UpsertVersionContentAsync(
+                        db, version, DocumentLanguageCodes.Arabic, bodyAr,
+                        PolicyStarterArabicCatalog.ChangeSummaryAr, clock.UtcNow, ct);
+                }
+
+                await businessAudit.AppendAsync(DocumentAudit.Created(doc.Id, doc.DocumentNumber), ct);
+                continue;
+            }
+
+            // Existing starter: backfill EN from legacy; add missing AR without overwriting admin AR.
+            DocumentVersion? versionExisting = existing.CurrentVersionId is Guid vid
+                ? await db.DocumentVersions.FirstOrDefaultAsync(x => x.Id == vid, ct)
+                : null;
+            await DocumentLocalization.EnsureEnglishFromLegacyAsync(db, existing, versionExisting, clock.UtcNow, ct);
+
+            if (versionExisting is null || versionExisting.IsImmutable) continue;
+            if (!PolicyStarterArabicCatalog.TryGet(number, out string seedTitleAr, out string seedBodyAr)) continue;
+
+            bool hasArTitle = await db.ManagedDocumentTranslations.AnyAsync(
+                x => x.ManagedDocumentId == existing.Id && x.LanguageCode == DocumentLanguageCodes.Arabic, ct);
+            if (!hasArTitle)
+            {
+                await DocumentLocalization.UpsertDocumentTitleAsync(
+                    db, existing.Id, DocumentLanguageCodes.Arabic, seedTitleAr, clock.UtcNow, ct);
+            }
+
+            bool hasArBody = await db.DocumentVersionTranslations.AnyAsync(
+                x => x.DocumentVersionId == versionExisting.Id && x.LanguageCode == DocumentLanguageCodes.Arabic, ct);
+            if (!hasArBody)
+            {
+                await DocumentLocalization.UpsertVersionContentAsync(
+                    db, versionExisting, DocumentLanguageCodes.Arabic, seedBodyAr,
+                    PolicyStarterArabicCatalog.ChangeSummaryAr, clock.UtcNow, ct, allowOverwriteExisting: false);
+            }
+        }
+
+        // Backfill English translations for any other existing documents (custom policies: no fabricated AR).
+        List<ManagedDocument> allDocs = await db.ManagedDocuments.ToListAsync(ct);
+        foreach (ManagedDocument doc in allDocs)
+        {
+            DocumentVersion? version = doc.CurrentVersionId is Guid vid
+                ? await db.DocumentVersions.FirstOrDefaultAsync(x => x.Id == vid, ct)
+                : null;
+            await DocumentLocalization.EnsureEnglishFromLegacyAsync(db, doc, version, clock.UtcNow, ct);
         }
 
         await db.SaveChangesAsync(ct);
@@ -691,16 +849,36 @@ public sealed class DocumentService(
         DocumentVersion? version,
         DateTimeOffset now,
         int? assignedCount = null,
-        int? outstandingCount = null) =>
-        new(x.Id, x.DocumentNumber, x.Title, x.DocumentType.ToString(), x.OwnerUserId, x.DesignatedApproverUserId,
+        int? outstandingCount = null,
+        DocumentLocalizationBundle? loc = null,
+        string? displayLanguage = null)
+    {
+        loc ??= new DocumentLocalizationBundle(
+            x.Title, null, version?.ContentText, null, version?.ChangeSummary, null,
+            DocumentLocalization.HasCompleteContent(x.Title, version?.ContentText), false);
+
+        string titleEn = loc.TitleEn ?? x.Title;
+        // Admin DTOs keep Title as English/default; TitleAr carries Arabic. List UIs pick display language.
+        _ = displayLanguage;
+
+        return new(
+            x.Id, x.DocumentNumber, titleEn, x.DocumentType.ToString(), x.OwnerUserId, x.DesignatedApproverUserId,
             x.Classification.ToString(), x.Status.ToString(), x.CurrentVersionId, x.EffectiveDate, x.ReviewDate,
             x.RequiresAcknowledgement, x.RequireReAcknowledgement, x.RetirementReason, x.CreatedAtUtc, x.UpdatedAtUtc,
             Convert.ToBase64String(x.RowVersion), x.DaysToReview(now), x.IsReviewDueSoon(now), x.IsReviewOverdue(now),
             version?.VersionNumber, version?.AttachmentId, version?.ApprovedByUserId, version?.ApprovedAtUtc, version?.PublishedAtUtc,
-            version?.ContentText,
+            loc.ContentEn ?? version?.ContentText,
             x.ReviewerUserId, x.PublisherUserId,
             version?.SubmittedByUserId, version?.SubmittedAtUtc, version?.PublishedByUserId,
-            assignedCount, outstandingCount);
+            assignedCount, outstandingCount,
+            loc.TitleAr,
+            loc.ContentAr,
+            loc.ChangeSummaryEn ?? version?.ChangeSummary,
+            loc.ChangeSummaryAr,
+            loc.HasEnglishContent,
+            loc.HasArabicContent,
+            loc.HasEnglishContent && loc.HasArabicContent);
+    }
 
     private static DocumentVersionDto Map(DocumentVersion x) =>
         new(x.Id, x.ManagedDocumentId, x.VersionNumber, x.CreatedByUserId, x.CreatedAtUtc, x.ChangeSummary,

@@ -302,10 +302,15 @@ function ContentSection({
   onSaved: (message: string) => Promise<void> | void
   onError: (message: string | null) => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [editing, setEditing] = useState(false)
+  const [langTab, setLangTab] = useState<'en' | 'ar'>('en')
   const [title, setTitle] = useState(doc.title)
+  const [titleAr, setTitleAr] = useState(doc.titleAr ?? '')
   const [content, setContent] = useState(doc.currentContentText ?? '')
+  const [contentAr, setContentAr] = useState(doc.contentTextAr ?? '')
+  const [changeSummary, setChangeSummary] = useState(doc.changeSummary ?? '')
+  const [changeSummaryAr, setChangeSummaryAr] = useState(doc.changeSummaryAr ?? '')
   const [effectiveDate, setEffectiveDate] = useState(toDateInput(doc.effectiveDate))
   const [reviewDate, setReviewDate] = useState(toDateInput(doc.reviewDate))
   const [requiresAck, setRequiresAck] = useState(doc.requiresAcknowledgement)
@@ -314,12 +319,19 @@ function ContentSection({
   useEffect(() => {
     if (editing) return
     setTitle(doc.title)
+    setTitleAr(doc.titleAr ?? '')
     setContent(doc.currentContentText ?? '')
+    setContentAr(doc.contentTextAr ?? '')
+    setChangeSummary(doc.changeSummary ?? '')
+    setChangeSummaryAr(doc.changeSummaryAr ?? '')
     setEffectiveDate(toDateInput(doc.effectiveDate))
     setReviewDate(toDateInput(doc.reviewDate))
     setRequiresAck(doc.requiresAcknowledgement)
     setRequireReAck(doc.requireReAcknowledgement ?? true)
   }, [doc, editing])
+
+  const enComplete = Boolean(title.trim() && content.trim())
+  const arComplete = Boolean(titleAr.trim() && contentAr.trim())
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -335,6 +347,10 @@ function ContentSection({
         requiresAcknowledgement: requiresAck,
         requireReAcknowledgement: requireReAck,
         contentText: content,
+        titleAr: titleAr.trim() || null,
+        contentTextAr: contentAr.trim() || null,
+        changeSummary: changeSummary.trim() || null,
+        changeSummaryAr: changeSummaryAr.trim() || null,
       }),
     onSuccess: async () => {
       onError(null)
@@ -344,12 +360,32 @@ function ContentSection({
     onError: (err) => onError(err instanceof ApiError ? err.message : t('docs.error.generic')),
   })
 
+  const previewLang = langTab === 'ar' ? 'ar' : 'en'
+  const previewTitle = previewLang === 'ar' ? titleAr || doc.titleAr : title || doc.title
+  const previewBody =
+    previewLang === 'ar' ? contentAr || doc.contentTextAr : content || doc.currentContentText
+
   return (
     <Card>
       <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
         <div className="space-y-1.5">
           <CardTitle className="text-base">{t('policyMgmt.content.title')}</CardTitle>
           <CardDescription>{t('policyMgmt.content.description')}</CardDescription>
+          <div className="flex flex-wrap gap-2 pt-1 text-xs">
+            <Badge variant={enComplete || doc.hasEnglishContent ? 'success' : 'warning'}>
+              {t('policyMgmt.i18n.english')}{' '}
+              {enComplete || doc.hasEnglishContent ? '✓' : t('policyMgmt.i18n.missingShort')}
+            </Badge>
+            <Badge variant={arComplete || doc.hasArabicContent ? 'success' : 'warning'}>
+              {t('policyMgmt.i18n.arabic')}{' '}
+              {arComplete || doc.hasArabicContent ? '✓' : t('policyMgmt.i18n.missingShort')}
+            </Badge>
+            {!(doc.translationComplete || (enComplete && arComplete)) ? (
+              <Badge variant="outline">{t('policyMgmt.i18n.incomplete')}</Badge>
+            ) : (
+              <Badge variant="outline">{t('policyMgmt.i18n.complete')}</Badge>
+            )}
+          </div>
         </div>
         {canEdit && !editing ? (
           <Button type="button" variant="secondary" size="sm" onClick={() => setEditing(true)}>
@@ -358,17 +394,92 @@ function ContentSection({
         ) : null}
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={langTab === 'en' ? 'default' : 'outline'}
+            onClick={() => setLangTab('en')}
+          >
+            {t('policyMgmt.i18n.english')}
+            {(enComplete || doc.hasEnglishContent) ? ' ✓' : ''}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={langTab === 'ar' ? 'default' : 'outline'}
+            onClick={() => setLangTab('ar')}
+          >
+            {t('policyMgmt.i18n.arabic')}
+            {(arComplete || doc.hasArabicContent) ? ' ✓' : ` — ${t('policyMgmt.i18n.arMissing')}`}
+          </Button>
+        </div>
+
         {editing ? (
           <>
-            <div className="space-y-1">
-              <Label htmlFor="edit-title">{t('docs.columns.title')}</Label>
-              <Input
-                id="edit-title"
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-              />
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            {langTab === 'en' ? (
+              <div className="space-y-3" dir="ltr">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-title">{t('policyMgmt.i18n.editEnglish')}</Label>
+                  <Input
+                    id="edit-title"
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-content">{t('policyMgmt.fields.content')}</Label>
+                  <Textarea
+                    id="edit-content"
+                    className="min-h-64 font-mono"
+                    value={content}
+                    onChange={(event) => setContent(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-change">{t('docs.columns.changeSummary', { defaultValue: 'Change summary' })}</Label>
+                  <Textarea
+                    id="edit-change"
+                    className="min-h-20"
+                    value={changeSummary}
+                    onChange={(event) => setChangeSummary(event.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3" dir="rtl">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-title-ar">{t('policyMgmt.i18n.editArabic')}</Label>
+                  <Input
+                    id="edit-title-ar"
+                    className="text-right"
+                    value={titleAr}
+                    onChange={(event) => setTitleAr(event.target.value)}
+                    placeholder="عنوان السياسة"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-content-ar">{t('policyMgmt.fields.content')}</Label>
+                  <Textarea
+                    id="edit-content-ar"
+                    className="min-h-64 text-right"
+                    value={contentAr}
+                    onChange={(event) => setContentAr(event.target.value)}
+                    placeholder="محتوى السياسة"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-change-ar">ملخص التغيير</Label>
+                  <Textarea
+                    id="edit-change-ar"
+                    className="min-h-20 text-right"
+                    value={changeSummaryAr}
+                    onChange={(event) => setChangeSummaryAr(event.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2" dir={i18n.language === 'ar' ? 'rtl' : 'ltr'}>
               <div className="space-y-1">
                 <Label htmlFor="edit-effective">{t('docs.columns.effective')}</Label>
                 <Input
@@ -387,15 +498,6 @@ function ContentSection({
                   onChange={(event) => setReviewDate(event.target.value)}
                 />
               </div>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="edit-content">{t('policyMgmt.fields.content')}</Label>
-              <Textarea
-                id="edit-content"
-                className="min-h-64 font-mono"
-                value={content}
-                onChange={(event) => setContent(event.target.value)}
-              />
             </div>
             <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2 text-sm">
@@ -426,12 +528,21 @@ function ContentSection({
               </Button>
             </div>
           </>
-        ) : doc.currentContentText ? (
-          <pre className="max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/20 p-4 text-sm">
-            {doc.currentContentText}
-          </pre>
+        ) : previewBody ? (
+          <div dir={previewLang === 'ar' ? 'rtl' : 'ltr'} className="space-y-2">
+            {previewTitle ? <p className="text-sm font-medium">{previewTitle}</p> : null}
+            <pre
+              className={`max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/20 p-4 text-sm ${
+                previewLang === 'ar' ? 'text-right' : ''
+              }`}
+            >
+              {previewBody}
+            </pre>
+          </div>
         ) : (
-          <p className="text-sm text-muted-foreground">{t('policyMgmt.content.empty')}</p>
+          <p className="text-sm text-muted-foreground">
+            {langTab === 'ar' ? t('policyMgmt.i18n.arMissing') : t('policyMgmt.content.empty')}
+          </p>
         )}
       </CardContent>
     </Card>

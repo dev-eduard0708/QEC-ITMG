@@ -141,6 +141,43 @@ namespace Qec.Itmg.DocumentManagement.Persistence.Migrations
                     b.ToTable("DocumentVersion", "doc");
                 });
 
+            modelBuilder.Entity("Qec.Itmg.DocumentManagement.Domain.DocumentVersionTranslation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ChangeSummary")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ContentText")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("DocumentVersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentVersionId", "LanguageCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_DocumentVersionTranslation_Version_Language");
+
+                    b.ToTable("DocumentVersionTranslation", "doc");
+                });
+
             modelBuilder.Entity("Qec.Itmg.DocumentManagement.Domain.ManagedDocument", b =>
                 {
                     b.Property<Guid>("Id")
@@ -239,6 +276,40 @@ namespace Qec.Itmg.DocumentManagement.Persistence.Migrations
                     b.ToTable("ManagedDocument", "doc");
                 });
 
+            modelBuilder.Entity("Qec.Itmg.DocumentManagement.Domain.ManagedDocumentTranslation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("LanguageCode")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
+                    b.Property<Guid>("ManagedDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManagedDocumentId", "LanguageCode")
+                        .IsUnique()
+                        .HasDatabaseName("IX_ManagedDocumentTranslation_Document_Language");
+
+                    b.ToTable("ManagedDocumentTranslation", "doc");
+                });
+
             modelBuilder.Entity("Qec.Itmg.DocumentManagement.Domain.PolicyAcknowledgement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -247,6 +318,10 @@ namespace Qec.Itmg.DocumentManagement.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("AcknowledgedAtUtc")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("AcknowledgedLanguage")
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
 
                     b.Property<string>("AcknowledgementStatementVersion")
                         .IsRequired()
@@ -431,6 +506,24 @@ namespace Qec.Itmg.DocumentManagement.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Qec.Itmg.DocumentManagement.Domain.DocumentVersion", b =>
+                {
+                    b.HasOne("Qec.Itmg.DocumentManagement.Domain.ManagedDocument", null)
+                        .WithMany()
+                        .HasForeignKey("ManagedDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Qec.Itmg.DocumentManagement.Domain.DocumentVersionTranslation", b =>
+                {
+                    b.HasOne("Qec.Itmg.DocumentManagement.Domain.DocumentVersion", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentVersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Qec.Itmg.DocumentManagement.Domain.ManagedDocumentTranslation", b =>
                 {
                     b.HasOne("Qec.Itmg.DocumentManagement.Domain.ManagedDocument", null)
                         .WithMany()

@@ -1552,6 +1552,13 @@ export type ManagedDocument = {
   currentPublishedByUserId: string | null
   assignedEmployeeCount: number | null
   outstandingAcknowledgementCount: number | null
+  titleAr?: string | null
+  contentTextAr?: string | null
+  changeSummary?: string | null
+  changeSummaryAr?: string | null
+  hasEnglishContent?: boolean
+  hasArabicContent?: boolean
+  translationComplete?: boolean
 }
 
 export type DocumentListResult = OpsPaged<ManagedDocument> & {
@@ -1617,6 +1624,9 @@ export type EmployeePolicyItem = {
   status: string
   acknowledgedAtUtc: string | null
   isOverdue: boolean
+  language?: string
+  requestedLanguage?: string
+  translationFallbackUsed?: boolean
 }
 
 export type PolicyAckStats = {
@@ -1730,6 +1740,10 @@ export type UpdatePolicyPayload = {
   requiresAcknowledgement: boolean
   requireReAcknowledgement?: boolean
   contentText?: string | null
+  titleAr?: string | null
+  contentTextAr?: string | null
+  changeSummary?: string | null
+  changeSummaryAr?: string | null
 }
 
 export type PolicyResponsibilitiesPayload = {
@@ -1804,20 +1818,22 @@ export const policiesApi = {
   acknowledgementRows: (id: string) =>
     apiFetch<PolicyEmployeeAckRow[]>(`/api/v1/policies/${id}/acknowledgements`),
   acknowledgementExportUrl: (id: string) => `/api/v1/policies/${id}/acknowledgements/export.csv`,
-  acknowledge: (id: string, acceptedStatement: boolean) =>
+  acknowledge: (id: string, acceptedStatement: boolean, language?: string) =>
     apiFetch(`/api/v1/policies/${id}/acknowledge`, {
       method: 'POST',
-      body: JSON.stringify({ acceptedStatement }),
+      body: JSON.stringify({ acceptedStatement, language }),
     }),
-  mine: (filter?: string) =>
-    apiFetch<EmployeePolicyItem[]>(`/api/v1/me/policies${opsQuery({ filter })}`),
-  mineGet: (id: string) => apiFetch<EmployeePolicyItem>(`/api/v1/me/policies/${id}`),
-  mineAcknowledge: (id: string, acceptedStatement: boolean) =>
+  mine: (filter?: string, lang?: string) =>
+    apiFetch<EmployeePolicyItem[]>(`/api/v1/me/policies${opsQuery({ filter, lang })}`),
+  mineGet: (id: string, lang?: string) =>
+    apiFetch<EmployeePolicyItem>(`/api/v1/me/policies/${id}${opsQuery({ lang })}`),
+  mineAcknowledge: (id: string, acceptedStatement: boolean, language?: string) =>
     apiFetch(`/api/v1/me/policies/${id}/acknowledge`, {
       method: 'POST',
-      body: JSON.stringify({ acceptedStatement }),
+      body: JSON.stringify({ acceptedStatement, language }),
     }),
-  outstanding: () => apiFetch<EmployeePolicyItem[]>('/api/v1/me/policies/outstanding'),
+  outstanding: (lang?: string) =>
+    apiFetch<EmployeePolicyItem[]>(`/api/v1/me/policies/outstanding${opsQuery({ lang })}`),
   summary: () => apiFetch<AcknowledgementSummary>('/api/v1/me/policies/summary'),
 }
 

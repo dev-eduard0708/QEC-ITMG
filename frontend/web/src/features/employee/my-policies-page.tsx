@@ -12,16 +12,17 @@ import { cn } from '@/lib/utils'
 type FilterKey = 'outstanding' | 'acknowledged' | 'all'
 
 export function MyPoliciesPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [filter, setFilter] = useState<FilterKey>('outstanding')
+  const lang = i18n.language?.startsWith('ar') ? 'ar' : 'en'
 
   const summaryQuery = useQuery({
     queryKey: ['me', 'policies', 'summary'],
     queryFn: () => policiesApi.summary(),
   })
   const listQuery = useQuery({
-    queryKey: ['me', 'policies', filter],
-    queryFn: () => policiesApi.mine(filter),
+    queryKey: ['me', 'policies', filter, lang],
+    queryFn: () => policiesApi.mine(filter, lang),
   })
 
   const required = summaryQuery.data?.required ?? summaryQuery.data?.totalOutstandingVersions ?? 0

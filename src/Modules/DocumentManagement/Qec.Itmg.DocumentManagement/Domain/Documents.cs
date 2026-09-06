@@ -275,6 +275,15 @@ public sealed class DocumentVersion
         ContentText = string.IsNullOrWhiteSpace(contentText) ? null : contentText.Trim();
     }
 
+    public void SetChangeSummary(string? changeSummary)
+    {
+        if (ApprovedAtUtc is not null || PublishedAtUtc is not null)
+            throw new InvalidOperationException("Published or approved versions are immutable.");
+        ChangeSummary = string.IsNullOrWhiteSpace(changeSummary) ? null : changeSummary.Trim();
+    }
+
+    public bool IsImmutable => ApprovedAtUtc is not null || PublishedAtUtc is not null;
+
     public void Attach(Guid attachmentId)
     {
         if (ApprovedAtUtc is not null || PublishedAtUtc is not null)
@@ -395,6 +404,8 @@ public sealed class PolicyAcknowledgement
     public string Source { get; private set; } = null!;
     public string? ClientIp { get; private set; }
     public string? UserAgent { get; private set; }
+    /// <summary>Language rendition the employee was viewing when acknowledging (en|ar).</summary>
+    public string? AcknowledgedLanguage { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public static PolicyAcknowledgement Create(
@@ -412,7 +423,8 @@ public sealed class PolicyAcknowledgement
         string? userAgent = null,
         string statementVersion = StatementKeyV1,
         string? acknowledgementText = null,
-        string source = SourceWeb)
+        string source = SourceWeb,
+        string? acknowledgedLanguage = null)
     {
         if (managedDocumentId == Guid.Empty) throw new ArgumentException("Document is required.", nameof(managedDocumentId));
         if (documentVersionId == Guid.Empty) throw new ArgumentException("Version is required.", nameof(documentVersionId));
@@ -441,6 +453,9 @@ public sealed class PolicyAcknowledgement
             Source = string.IsNullOrWhiteSpace(source) ? SourceWeb : source.Trim(),
             ClientIp = Truncate(clientIp, 64),
             UserAgent = Truncate(userAgent, 512),
+            AcknowledgedLanguage = string.IsNullOrWhiteSpace(acknowledgedLanguage)
+                ? null
+                : DocumentLanguageCodes.Normalize(acknowledgedLanguage),
             CreatedAtUtc = utcNow,
         };
     }

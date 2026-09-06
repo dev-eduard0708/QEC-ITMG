@@ -10,20 +10,21 @@ import { Label } from '@/components/ui/label'
 
 export function EmployeePolicyDetailPage() {
   const { id = '' } = useParams()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const qc = useQueryClient()
   const [accepted, setAccepted] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const lang = i18n.language?.startsWith('ar') ? 'ar' : 'en'
 
   const policyQuery = useQuery({
-    queryKey: ['me', 'policies', 'detail', id],
-    queryFn: () => policiesApi.mineGet(id),
+    queryKey: ['me', 'policies', 'detail', id, lang],
+    queryFn: () => policiesApi.mineGet(id, lang),
     enabled: Boolean(id),
   })
 
   const ackMutation = useMutation({
-    mutationFn: () => policiesApi.mineAcknowledge(id, true),
+    mutationFn: () => policiesApi.mineAcknowledge(id, true, lang),
     onSuccess: async () => {
       setError(null)
       setSuccess(t('employee.policies.ackSuccess', { date: new Date().toLocaleString() }))
@@ -45,6 +46,7 @@ export function EmployeePolicyDetailPage() {
 
   const needsAck = policy.status === 'NeedsAcknowledgement' || policy.status === 'Overdue'
   const body = policy.contentText ?? policy.summary
+  const isRtl = lang === 'ar' && !policy.translationFallbackUsed
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -67,7 +69,16 @@ export function EmployeePolicyDetailPage() {
               ? t('employee.policies.badge.overdue')
               : t('employee.policies.badge.needs')}
         </Badge>
+        <Badge variant="outline" dir="ltr">
+          {policy.documentNumber}
+        </Badge>
       </div>
+
+      {policy.translationFallbackUsed ? (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          {t('employee.policies.fallbackWarning')}
+        </div>
+      ) : null}
 
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <div>
@@ -80,10 +91,19 @@ export function EmployeePolicyDetailPage() {
         </div>
       </dl>
 
-      <article className="prose prose-sm dark:prose-invert max-w-none rounded-2xl border bg-card p-5">
+      <article
+        className="prose prose-sm dark:prose-invert max-w-none rounded-2xl border bg-card p-5"
+        dir={isRtl ? 'rtl' : 'ltr'}
+      >
         <h2 className="text-base font-semibold">{t('employee.policies.readPolicy')}</h2>
         {body ? (
-          <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">{body}</pre>
+          <pre
+            className={`whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground ${
+              isRtl ? 'text-right' : ''
+            }`}
+          >
+            {body}
+          </pre>
         ) : (
           <p className="text-sm text-muted-foreground">{t('employee.policies.noBody')}</p>
         )}
@@ -118,7 +138,6 @@ export function EmployeePolicyDetailPage() {
           </div>
           <Button
             type="button"
-            size="lg"
             disabled={!accepted || ackMutation.isPending}
             onClick={() => ackMutation.mutate()}
           >

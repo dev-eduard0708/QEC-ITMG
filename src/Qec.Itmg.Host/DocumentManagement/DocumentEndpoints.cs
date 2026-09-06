@@ -183,7 +183,10 @@ public static class DocumentEndpoints
                     req.RequiresAcknowledgement ?? true, session.Id, req.ChangeSummary, ct,
                     contentText: req.ContentText,
                     reviewerUserId: req.ReviewerUserId,
-                    publisherUserId: req.PublisherUserId);
+                    publisherUserId: req.PublisherUserId,
+                    titleAr: req.TitleAr,
+                    contentTextAr: req.ContentTextAr,
+                    changeSummaryAr: req.ChangeSummaryAr);
                 return Results.Created($"/api/v1/policies/{created.Id}", created);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
@@ -201,7 +204,11 @@ public static class DocumentEndpoints
                     req.EffectiveDate, req.ReviewDate, req.RequiresAcknowledgement, req.RequireReAcknowledgement, ct,
                     reviewerUserId: req.ReviewerUserId,
                     publisherUserId: req.PublisherUserId,
-                    contentText: req.ContentText));
+                    contentText: req.ContentText,
+                    titleAr: req.TitleAr,
+                    contentTextAr: req.ContentTextAr,
+                    changeSummary: req.ChangeSummary,
+                    changeSummaryAr: req.ChangeSummaryAr));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(PolicyManage);
@@ -260,7 +267,7 @@ public static class DocumentEndpoints
                 string? ip = http.Connection.RemoteIpAddress?.ToString();
                 string? ua = http.Request.Headers.UserAgent.ToString();
                 PolicyAcknowledgementDto ack = await ackSvc.AcknowledgeAsync(
-                    id, session.Id, body?.AcceptedStatement == true, ip, ua, ct);
+                    id, session.Id, body?.AcceptedStatement == true, ip, ua, ct, body?.Language);
                 await notifications.NotifyAcknowledgedAsync(ack, ct);
                 return Results.Ok(ack);
             }
@@ -314,20 +321,20 @@ public static class DocumentEndpoints
     private static void MapMePolicies(IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/v1/me/policies/outstanding", async (
-            ClaimsPrincipal principal, ICurrentUserService currentUser, PolicyAcknowledgementService ackSvc, CancellationToken ct) =>
+            string? lang, ClaimsPrincipal principal, ICurrentUserService currentUser, PolicyAcknowledgementService ackSvc, CancellationToken ct) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
-            return Results.Ok(await ackSvc.ListEmployeePoliciesAsync(session.Id, "outstanding", ct));
+            return Results.Ok(await ackSvc.ListEmployeePoliciesAsync(session.Id, "outstanding", ct, lang));
         }).RequireAuthorization();
 
         endpoints.MapGet("/api/v1/me/policies", async (
-            string? filter, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            string? filter, string? lang, ClaimsPrincipal principal, ICurrentUserService currentUser,
             PolicyAcknowledgementService ackSvc, CancellationToken ct) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
-            return Results.Ok(await ackSvc.ListEmployeePoliciesAsync(session.Id, filter ?? "outstanding", ct));
+            return Results.Ok(await ackSvc.ListEmployeePoliciesAsync(session.Id, filter ?? "outstanding", ct, lang));
         }).RequireAuthorization();
 
         endpoints.MapGet("/api/v1/me/policies/summary", async (
@@ -341,12 +348,12 @@ public static class DocumentEndpoints
         }).RequireAuthorization();
 
         endpoints.MapGet("/api/v1/me/policies/{id:guid}", async (
-            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            Guid id, string? lang, ClaimsPrincipal principal, ICurrentUserService currentUser,
             PolicyAcknowledgementService ackSvc, CancellationToken ct) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
-            EmployeePolicyItemDto? item = await ackSvc.GetEmployeePolicyAsync(session.Id, id, ct);
+            EmployeePolicyItemDto? item = await ackSvc.GetEmployeePolicyAsync(session.Id, id, ct, lang);
             return item is null ? Results.NotFound() : Results.Ok(item);
         }).RequireAuthorization();
 
@@ -361,7 +368,7 @@ public static class DocumentEndpoints
                 string? ip = http.Connection.RemoteIpAddress?.ToString();
                 string? ua = http.Request.Headers.UserAgent.ToString();
                 return Results.Ok(await ackSvc.AcknowledgeAsync(
-                    id, session.Id, body?.AcceptedStatement == true, ip, ua, ct));
+                    id, session.Id, body?.AcceptedStatement == true, ip, ua, ct, body?.Language));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequireAuthorization();
@@ -678,13 +685,15 @@ public sealed class PolicyAcknowledgementReminderJob(
 public sealed record CreateDocumentRequest(
     string Title, string? DocumentType, string? Classification, Guid? OwnerUserId, Guid? DesignatedApproverUserId,
     DateTimeOffset? EffectiveDate, DateTimeOffset? ReviewDate, bool? RequiresAcknowledgement, string? ChangeSummary,
-    string? ContentText = null, Guid? ReviewerUserId = null, Guid? PublisherUserId = null);
+    string? ContentText = null, Guid? ReviewerUserId = null, Guid? PublisherUserId = null,
+    string? TitleAr = null, string? ContentTextAr = null, string? ChangeSummaryAr = null);
 
 public sealed record UpdateDocumentRequest(
     string Title, Guid OwnerUserId, Guid? DesignatedApproverUserId, string Classification,
     DateTimeOffset? EffectiveDate, DateTimeOffset? ReviewDate, bool RequiresAcknowledgement,
     bool RequireReAcknowledgement = true,
-    Guid? ReviewerUserId = null, Guid? PublisherUserId = null, string? ContentText = null);
+    Guid? ReviewerUserId = null, Guid? PublisherUserId = null, string? ContentText = null,
+    string? TitleAr = null, string? ContentTextAr = null, string? ChangeSummary = null, string? ChangeSummaryAr = null);
 
 public sealed record AssignPolicyResponsibilitiesRequest(
     Guid? OwnerUserId,
@@ -695,7 +704,7 @@ public sealed record AssignPolicyResponsibilitiesRequest(
 
 public sealed record RevisionRequest(string? ChangeSummary);
 public sealed record ReasonRequest(string? Reason);
-public sealed record AcknowledgePolicyRequest(bool AcceptedStatement);
+public sealed record AcknowledgePolicyRequest(bool AcceptedStatement, string? Language = null);
 public sealed record AssignPolicyRequest(
     string Scope,
     Guid[]? UserIds,

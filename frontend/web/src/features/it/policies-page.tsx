@@ -67,11 +67,12 @@ function formatDate(value: string | null): string {
 }
 
 export function PoliciesPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { can } = useAuth()
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { nameFor } = usePolicyUsers()
+  const uiLang = i18n.language?.startsWith('ar') ? 'ar' : 'en'
 
   const [tab, setTab] = useState<FilterTab>('all')
   const [searchInput, setSearchInput] = useState('')
@@ -150,7 +151,29 @@ export function PoliciesPage() {
       {
         accessorKey: 'title',
         header: t('docs.columns.title'),
-        cell: ({ row }) => <span className="font-medium">{row.original.title}</span>,
+        cell: ({ row }) => {
+          const display =
+            uiLang === 'ar' && row.original.titleAr
+              ? row.original.titleAr
+              : row.original.title
+          return <span className="font-medium">{display}</span>
+        },
+      },
+      {
+        id: 'translation',
+        header: t('policyMgmt.i18n.translation'),
+        cell: ({ row }) => {
+          const enOk = row.original.hasEnglishContent ?? Boolean(row.original.title)
+          const arOk = row.original.hasArabicContent ?? Boolean(row.original.titleAr)
+          return (
+            <div className="flex flex-wrap gap-1 text-xs">
+              <Badge variant={enOk ? 'success' : 'warning'}>EN {enOk ? '✓' : '—'}</Badge>
+              <Badge variant={arOk ? 'success' : 'warning'}>
+                {arOk ? 'AR ✓' : t('policyMgmt.i18n.arMissing')}
+              </Badge>
+            </div>
+          )
+        },
       },
       {
         id: 'version',
@@ -224,7 +247,7 @@ export function PoliciesPage() {
         },
       },
     ],
-    [nameFor, t],
+    [nameFor, t, uiLang],
   )
 
   return (

@@ -39,6 +39,38 @@ internal sealed class DocumentVersionConfiguration : IEntityTypeConfiguration<Do
             .IsUnique()
             .HasDatabaseName("IX_DocumentVersion_Document_Version");
         builder.HasOne<ManagedDocument>().WithMany().HasForeignKey(x => x.ManagedDocumentId).OnDelete(DeleteBehavior.Cascade);
+        builder.Ignore(x => x.IsImmutable);
+    }
+}
+
+internal sealed class ManagedDocumentTranslationConfiguration : IEntityTypeConfiguration<ManagedDocumentTranslation>
+{
+    public void Configure(EntityTypeBuilder<ManagedDocumentTranslation> builder)
+    {
+        builder.ToTable("ManagedDocumentTranslation");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.LanguageCode).IsRequired().HasMaxLength(8);
+        builder.Property(x => x.Title).IsRequired().HasMaxLength(512);
+        builder.HasIndex(x => new { x.ManagedDocumentId, x.LanguageCode })
+            .IsUnique()
+            .HasDatabaseName("IX_ManagedDocumentTranslation_Document_Language");
+        builder.HasOne<ManagedDocument>().WithMany().HasForeignKey(x => x.ManagedDocumentId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class DocumentVersionTranslationConfiguration : IEntityTypeConfiguration<DocumentVersionTranslation>
+{
+    public void Configure(EntityTypeBuilder<DocumentVersionTranslation> builder)
+    {
+        builder.ToTable("DocumentVersionTranslation");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.LanguageCode).IsRequired().HasMaxLength(8);
+        builder.Property(x => x.ContentText).IsRequired();
+        builder.Property(x => x.ChangeSummary).HasMaxLength(2000);
+        builder.HasIndex(x => new { x.DocumentVersionId, x.LanguageCode })
+            .IsUnique()
+            .HasDatabaseName("IX_DocumentVersionTranslation_Version_Language");
+        builder.HasOne<DocumentVersion>().WithMany().HasForeignKey(x => x.DocumentVersionId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 
@@ -74,6 +106,7 @@ internal sealed class PolicyAcknowledgementConfiguration : IEntityTypeConfigurat
         builder.Property(x => x.Source).IsRequired().HasMaxLength(32);
         builder.Property(x => x.ClientIp).HasMaxLength(64);
         builder.Property(x => x.UserAgent).HasMaxLength(512);
+        builder.Property(x => x.AcknowledgedLanguage).HasMaxLength(8);
         builder.HasIndex(x => new { x.DocumentVersionId, x.UserId })
             .IsUnique()
             .HasDatabaseName("IX_PolicyAcknowledgement_Version_User");

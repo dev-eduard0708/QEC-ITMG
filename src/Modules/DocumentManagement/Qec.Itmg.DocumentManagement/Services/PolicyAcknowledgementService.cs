@@ -27,7 +27,10 @@ public sealed record EmployeePolicyItemDto(
     bool IsRequired,
     string Status,
     DateTimeOffset? AcknowledgedAtUtc,
-    bool IsOverdue);
+    bool IsOverdue,
+    string Language = "en",
+    string RequestedLanguage = "en",
+    bool TranslationFallbackUsed = false);
 
 public sealed record EmployeePolicySummaryDto(
     int Required,
@@ -190,8 +193,9 @@ public sealed class PolicyAcknowledgementService(
     }
 
     public async Task<IReadOnlyList<EmployeePolicyItemDto>> ListEmployeePoliciesAsync(
-        Guid userId, string filter, CancellationToken ct)
+        Guid userId, string filter, CancellationToken ct, string? language = null)
     {
+        string requested = DocumentLanguageCodes.Normalize(language);
         List<PolicyAssignment> assignments = await LoadAssignmentsForUserAsync(userId, ct);
         if (assignments.Count == 0) return [];
 
@@ -235,11 +239,15 @@ public sealed class PolicyAcknowledgementService(
             if (!acknowledged && !isCurrent)
                 continue; // unacked historical assignment for superseded version — skip from employee list
 
+            (string? title, string? content, string? summary, bool fallback) =
+                await DocumentLocalization.ResolveEmployeeContentAsync(db, doc, version, requested, ct);
+
             items.Add(new EmployeePolicyItemDto(
-                assignment.Id, doc.Id, version.Id, doc.DocumentNumber, doc.Title, version.VersionNumber,
-                version.ChangeSummary, version.ContentText, version.AttachmentId, doc.Classification.ToString(),
+                assignment.Id, doc.Id, version.Id, doc.DocumentNumber, title ?? doc.Title, version.VersionNumber,
+                summary, content, version.AttachmentId, doc.Classification.ToString(),
                 doc.EffectiveDate, doc.OwnerUserId, assignment.AssignedAtUtc, assignment.DueAtUtc,
-                assignment.IsRequired && isCurrent, status, ack?.AcknowledgedAtUtc, overdue));
+                assignment.IsRequired && isCurrent, status, ack?.AcknowledgedAtUtc, overdue,
+                fallback ? DocumentLanguageCodes.English : requested, requested, fallback));
         }
 
         // Also include historical acknowledgements for superseded versions not in current assignments list
@@ -261,12 +269,18 @@ public sealed class PolicyAcknowledgementService(
             DocumentVersion? version = await db.DocumentVersions.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == hist.DocumentVersionId, ct);
             if (version is null) continue;
+
+            (string? title, string? content, string? summary, bool fallback) =
+                await DocumentLocalization.ResolveEmployeeContentAsync(db, doc, version, requested, ct);
+            string histTitle = hist.PolicyTitleSnapshot ?? title ?? doc.Title;
+
             items.Add(new EmployeePolicyItemDto(
                 Guid.Empty, doc.Id, version.Id, hist.PolicyNumberSnapshot ?? doc.DocumentNumber,
-                hist.PolicyTitleSnapshot ?? doc.Title, hist.VersionNumber,
-                version.ChangeSummary, version.ContentText, version.AttachmentId, doc.Classification.ToString(),
+                histTitle, hist.VersionNumber,
+                summary, content, version.AttachmentId, doc.Classification.ToString(),
                 doc.EffectiveDate, doc.OwnerUserId, hist.AssignedAtUtc ?? hist.AcknowledgedAtUtc, hist.DueAtUtc,
-                false, "Acknowledged", hist.AcknowledgedAtUtc, false));
+                false, "Acknowledged", hist.AcknowledgedAtUtc, false,
+                fallback ? DocumentLanguageCodes.English : requested, requested, fallback));
         }
 
         filter = (filter ?? "outstanding").Trim().ToLowerInvariant();
@@ -279,9 +293,10 @@ public sealed class PolicyAcknowledgementService(
         };
     }
 
-    public async Task<EmployeePolicyItemDto?> GetEmployeePolicyAsync(Guid userId, Guid documentId, CancellationToken ct)
+    public async Task<EmployeePolicyItemDto?> GetEmployeePolicyAsync(
+        Guid userId, Guid documentId, CancellationToken ct, string? language = null)
     {
-        IReadOnlyList<EmployeePolicyItemDto> all = await ListEmployeePoliciesAsync(userId, "all", ct);
+        IReadOnlyList<EmployeePolicyItemDto> all = await ListEmployeePoliciesAsync(userId, "all", ct, language);
         EmployeePolicyItemDto? current = all
             .Where(x => x.ManagedDocumentId == documentId)
             .OrderByDescending(x => x.VersionNumber)
@@ -298,11 +313,13 @@ public sealed class PolicyAcknowledgementService(
         bool acceptedStatement,
         string? clientIp,
         string? userAgent,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? language = null)
     {
         if (!acceptedStatement)
             throw new InvalidOperationException("You must confirm that you have read and understood this policy.");
 
+        string ackLang = DocumentLanguageCodes.Normalize(language);
         ManagedDocument doc = await db.ManagedDocuments.AsNoTracking().FirstOrDefaultAsync(x => x.Id == documentId, ct)
             ?? throw new InvalidOperationException("Document not found.");
         if (doc.DocumentType != DocumentType.Policy || !doc.RequiresAcknowledgement)
@@ -326,9 +343,14 @@ public sealed class PolicyAcknowledgementService(
         PolicyAssignment? assignment = await FindAssignmentForUserAsync(userId, version.Id, ct)
             ?? throw new InvalidOperationException("This policy is not assigned to you.");
 
+        (string? localizedTitle, _, _, _) =
+            await DocumentLocalization.ResolveEmployeeContentAsync(db, doc, version, ackLang, ct);
+
         PolicyAcknowledgement ack = PolicyAcknowledgement.Create(
-            documentId, version.Id, userId, clock.UtcNow, doc.DocumentNumber, doc.Title, version.VersionNumber,
-            assignment.Id, assignment.AssignedAtUtc, assignment.DueAtUtc, clientIp, userAgent);
+            documentId, version.Id, userId, clock.UtcNow, doc.DocumentNumber,
+            localizedTitle ?? doc.Title, version.VersionNumber,
+            assignment.Id, assignment.AssignedAtUtc, assignment.DueAtUtc, clientIp, userAgent,
+            acknowledgedLanguage: ackLang);
         db.PolicyAcknowledgements.Add(ack);
         await businessAudit.AppendAsync(new BusinessAuditEntry
         {
@@ -337,7 +359,7 @@ public sealed class PolicyAcknowledgementService(
             BusinessNumber = doc.DocumentNumber,
             Action = BusinessAuditAction.Updated,
             FieldName = "PolicyAcknowledged",
-            NewValue = $"{userId}:{version.VersionNumber}",
+            NewValue = $"{userId}:{version.VersionNumber}:lang={ackLang}",
             Source = AuditSource.Api,
         }, ct);
         await db.SaveChangesAsync(ct);
