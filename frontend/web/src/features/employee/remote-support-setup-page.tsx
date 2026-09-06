@@ -15,8 +15,8 @@ import { remoteSupportKeys } from '@/features/it/query-keys'
 
 function endpointStatusVariant(endpoint: RemoteEndpoint) {
   if (isRemoteEndpointReady(endpoint)) return 'success' as const
-  if (endpoint.connectionStatus === 'Offline') return 'warning' as const
-  if (endpoint.connectionStatus === 'Failed') return 'warning' as const
+  if (endpoint.connectionStatus === 'Offline' || endpoint.connectionStatus === 'Failed')
+    return 'warning' as const
   return 'outline' as const
 }
 
@@ -52,11 +52,7 @@ function EndpointRow({
             ? t('employee.remote.readyForSupport')
             : endpoint.connectionStatus === 'Offline'
               ? t('employee.remote.offline')
-              : endpoint.connectionStatus === 'WaitingForAgent' ||
-                  endpoint.connectionStatus === 'AgentInstalling' ||
-                  endpoint.connectionStatus === 'Registering'
-                ? t('employee.remote.waitingForAgent')
-                : endpoint.connectionStatus}
+              : t('employee.remote.waitingForAgent')}
         </Badge>
       </div>
       {ready ? (
@@ -96,7 +92,7 @@ export function EmployeeRemoteSupportSetupPage() {
           e.connectionStatus !== 'Offline' &&
           e.connectionStatus !== 'Failed',
       )
-      return waiting ? 5_000 : false
+      return waiting || endpoints.length === 0 ? 5_000 : 10_000
     },
   })
 
@@ -133,8 +129,8 @@ export function EmployeeRemoteSupportSetupPage() {
 
   const setup = setupQuery.data
   const endpoints = setup?.endpoints ?? []
-  const hasReady = endpoints.some(isRemoteEndpointReady)
-  const showDownload = !hasReady
+  const readyEndpoints = endpoints.filter(isRemoteEndpointReady)
+  const hasReady = readyEndpoints.length > 0
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -143,6 +139,33 @@ export function EmployeeRemoteSupportSetupPage() {
         description={t('employee.remote.setupHint')}
         actions={backButton}
       />
+
+      {hasReady ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('employee.remote.readyBanner')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <ul className="space-y-3">
+              {readyEndpoints.map((endpoint) => (
+                <li key={endpoint.id} className="space-y-1">
+                  <p className="font-medium">
+                    <span className="me-2" aria-hidden>
+                      ●
+                    </span>
+                    {endpoint.deviceName}
+                  </p>
+                  <Badge variant="success">{t('employee.remote.online')}</Badge>
+                </li>
+              ))}
+            </ul>
+            <p className="text-sm text-muted-foreground">{t('employee.remote.noInstallRequired')}</p>
+            <Button asChild>
+              <Link to="/employee/remote-support/new">{t('employee.remote.getHelp')}</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -164,48 +187,39 @@ export function EmployeeRemoteSupportSetupPage() {
             </ul>
           )}
 
-          {showDownload ? (
-            <div className="space-y-3 border-t border-border/60 pt-4">
-              <p className="text-sm font-medium">{t('employee.remote.setupRequired')}</p>
-              <Button
-                type="button"
-                disabled={!setup?.helperAvailable || downloadMutation.isPending}
-                onClick={() => downloadMutation.mutate()}
-              >
-                {t('employee.remote.downloadQecHelper')}
-              </Button>
-              {!setup?.helperAvailable ? (
-                <p className="text-sm text-muted-foreground">{t('employee.remote.helperUnavailable')}</p>
-              ) : null}
-              {downloadMutation.isError ? (
-                <p className="text-sm text-destructive">
-                  {downloadMutation.error instanceof Error
-                    ? downloadMutation.error.message
-                    : t('employee.remote.downloadFailed')}
-                </p>
-              ) : null}
+          <div className="space-y-3 border-t border-border/60 pt-4">
+            <p className="text-sm font-medium">
+              {hasReady
+                ? t('employee.remote.setupAnotherComputer')
+                : t('employee.remote.setupRequired')}
+            </p>
+            <Button
+              type="button"
+              variant={hasReady ? 'outline' : 'default'}
+              disabled={!setup?.helperAvailable || downloadMutation.isPending}
+              onClick={() => downloadMutation.mutate()}
+            >
+              {t('employee.remote.downloadQecHelper')}
+            </Button>
+            {!setup?.helperAvailable ? (
+              <p className="text-sm text-muted-foreground">{t('employee.remote.helperUnavailable')}</p>
+            ) : null}
+            {downloadMutation.isError ? (
+              <p className="text-sm text-destructive">
+                {downloadMutation.error instanceof Error
+                  ? downloadMutation.error.message
+                  : t('employee.remote.downloadFailed')}
+              </p>
+            ) : null}
+            {!hasReady ? (
               <ol className="list-decimal space-y-1 ps-5 text-sm text-muted-foreground">
                 <li>{t('employee.remote.setupSteps.download')}</li>
                 <li>{t('employee.remote.setupSteps.run')}</li>
                 <li>{t('employee.remote.setupSteps.pair')}</li>
                 <li>{t('employee.remote.setupSteps.waitReady')}</li>
               </ol>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">{t('employee.remote.noSetupNeeded')}</p>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('employee.remote.setupStep3')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm text-muted-foreground">{t('employee.remote.consentAlwaysHint')}</p>
-          <Button asChild>
-            <Link to="/employee/remote-support/new">{t('employee.remote.getHelp')}</Link>
-          </Button>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
     </div>

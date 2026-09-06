@@ -41,6 +41,7 @@ export function RemoteSupportDetailPage() {
     queryKey: remoteSupportKeys.detail(id),
     queryFn: () => remoteSupportApi.getSession(id),
     enabled: Boolean(id),
+    refetchInterval: 5_000,
   })
 
   const readinessQuery = useQuery({
@@ -270,15 +271,19 @@ export function RemoteSupportDetailPage() {
             ) : null}
             <DetailRow
               label={t('remote.fields.requestedBy')}
-              value={session.requestedByUserId.slice(0, 8)}
+              value={session.employeeDisplayName?.trim() || session.employeeEmail || '—'}
             />
             <DetailRow
               label={t('remote.fields.targetUser')}
-              value={session.targetUserId?.slice(0, 8) ?? '—'}
+              value={
+                session.employeeDisplayName?.trim()
+                  ? `${session.employeeDisplayName}${session.employeeEmail ? ` (${session.employeeEmail})` : ''}`
+                  : session.employeeEmail || '—'
+              }
             />
             <DetailRow
               label={t('remote.fields.technician')}
-              value={session.technicianUserId?.slice(0, 8) ?? '—'}
+              value={session.technicianDisplayName?.trim() || t('remote.queue.unassigned')}
             />
             <DetailRow
               label={t('remote.fields.privileges')}
@@ -292,7 +297,10 @@ export function RemoteSupportDetailPage() {
             <CardTitle className="text-base">{t('remote.sections.consent')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <DetailRow label={t('remote.fields.consentUser')} value={session.consentUserId?.slice(0, 8) ?? '—'} />
+            <DetailRow
+              label={t('remote.fields.consentUser')}
+              value={session.employeeDisplayName?.trim() || '—'}
+            />
             <DetailRow label={t('remote.fields.consentIp')} value={session.consentIpAddress ?? '—'} />
             <DetailRow label={t('remote.fields.expiresAt')} value={formatTime(session.expiresAtUtc)} />
             <DetailRow label={t('remote.fields.allowedAt')} value={formatTime(session.allowedAtUtc)} />
@@ -375,7 +383,7 @@ export function RemoteSupportDetailPage() {
             ) : null}
             {canStart ? (
               <Button type="button" onClick={() => startMutation.mutate()} disabled={startMutation.isPending}>
-                {t('remote.actions.openSession')}
+                {t('remote.actions.connect')}
               </Button>
             ) : null}
             {canEnd ? (

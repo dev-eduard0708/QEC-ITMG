@@ -44,7 +44,17 @@ public sealed record RemoteSessionRequestDto(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
     string RowVersion,
-    int? DurationSeconds);
+    int? DurationSeconds,
+    string? EmployeeDisplayName = null,
+    string? EmployeeEmail = null,
+    string? TechnicianDisplayName = null,
+    string? EndpointDeviceName = null,
+    string? EndpointOperatingSystem = null,
+    string? EndpointArchitecture = null,
+    string? EndpointConnectionStatus = null,
+    string? EndpointKind = null,
+    bool? EndpointIsReady = null,
+    DateTimeOffset? EndpointLastSeenAtUtc = null);
 
 public sealed record RemoteSessionListResult(
     IReadOnlyList<RemoteSessionRequestDto> Items,

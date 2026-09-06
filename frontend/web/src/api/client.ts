@@ -3720,6 +3720,16 @@ export type RemoteSessionRequest = {
   updatedAtUtc: string
   rowVersion: string
   durationSeconds: number | null
+  employeeDisplayName?: string | null
+  employeeEmail?: string | null
+  technicianDisplayName?: string | null
+  endpointDeviceName?: string | null
+  endpointOperatingSystem?: string | null
+  endpointArchitecture?: string | null
+  endpointConnectionStatus?: string | null
+  endpointKind?: string | null
+  endpointIsReady?: boolean | null
+  endpointLastSeenAtUtc?: string | null
 }
 
 export type RemoteSessionListResult = {
@@ -3924,7 +3934,11 @@ export const remoteSupportApi = {
         body: JSON.stringify({ endpointId }),
       },
     ),
-  createSelfHelp: (payload: { reason: string; configurationItemId?: string | null }) =>
+  createSelfHelp: (payload: {
+    reason: string
+    configurationItemId?: string | null
+    remoteEndpointId?: string | null
+  }) =>
     apiFetch<RemoteSessionRequest>('/api/v1/me/remote-support', {
       method: 'POST',
       body: JSON.stringify(payload),

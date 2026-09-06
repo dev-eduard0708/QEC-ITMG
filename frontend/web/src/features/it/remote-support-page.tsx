@@ -77,78 +77,201 @@ function sessionStatusVariant(status: string): 'default' | 'secondary' | 'succes
 }
 
 function filterByTab(tab: TabKey, session: RemoteSessionRequest): boolean {
+  const closed = ['Ended', 'Declined', 'Expired'].includes(session.status)
+  const deviceReady = session.endpointIsReady === true
   switch (tab) {
     case 'waiting':
       return session.status === 'Requested' && !session.technicianUserId
     case 'assigned':
-      return session.status === 'Requested' && Boolean(session.technicianUserId)
+      return (
+        session.status === 'Requested' &&
+        Boolean(session.technicianUserId) &&
+        deviceReady
+      )
     case 'waitingDevice':
-      return !session.remoteEndpointId && !['Ended', 'Declined', 'Expired'].includes(session.status)
+      // Assigned (or self-help in progress) but no confirmed ready endpoint yet.
+      return (
+        !closed &&
+        !deviceReady &&
+        session.status === 'Requested' &&
+        Boolean(session.technicianUserId || session.remoteEndpointId || session.endpointDeviceName)
+      )
     case 'waitingApproval':
       return session.status === 'NotifyUser'
     case 'ready':
-      return session.status === 'Allowed' || session.status === 'Authorized'
+      return (
+        (session.status === 'Allowed' || session.status === 'Authorized') && deviceReady
+      )
     case 'connecting':
       return session.status === 'Connecting'
     case 'inSession':
       return session.status === 'InSession'
     case 'completed':
-      return ['Ended', 'Declined', 'Expired'].includes(session.status)
+      return closed
     default:
       return false
   }
 }
 
+function deviceSummary(session: RemoteSessionRequest, t: (key: string) => string) {
+  if (session.endpointIsReady && session.endpointDeviceName) {
+    return {
+      marker: '●',
+      title: session.endpointDeviceName,
+      detail: session.endpointOperatingSystem ?? t('remote.device.ready'),
+      label: t('remote.queue.deviceReady'),
+    }
+  }
+  if (session.endpointDeviceName) {
+    return {
+      marker: session.endpointConnectionStatus === 'Offline' ? '○' : '◐',
+      title: session.endpointDeviceName,
+      detail: session.endpointOperatingSystem ?? session.endpointConnectionStatus ?? '',
+      label:
+        session.endpointConnectionStatus === 'Offline'
+          ? t('employee.remote.offline')
+          : t('remote.queue.deviceSetupInProgress'),
+    }
+  }
+  return {
+    marker: '○',
+    title: t('remote.queue.noReadyComputer'),
+    detail: '',
+    label: t('remote.queue.deviceSetupInProgress'),
+  }
+}
+
 function SessionRow({ session }: { session: RemoteSessionRequest }) {
   const { t } = useTranslation()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const device = deviceSummary(session, t)
+  const isMine = session.technicianUserId === user?.id
+  const deviceReady = session.endpointIsReady === true
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: remoteSupportKeys.all })
+
   const takeMutation = useMutation({
     mutationFn: () => remoteSupportApi.takeSession(session.id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: remoteSupportKeys.all }),
+    onSuccess: invalidate,
+  })
+  const requestAccessMutation = useMutation({
+    mutationFn: () => remoteSupportApi.requestAccess(session.id),
+    onSuccess: invalidate,
+  })
+  const connectMutation = useMutation({
+    mutationFn: () => remoteSupportApi.start(session.id),
+    onSuccess: async (started) => {
+      await invalidate()
+      if (started.engineJoinUrl) {
+        window.open(started.engineJoinUrl, '_blank', 'noopener,noreferrer')
+      }
+    },
   })
 
+  const openChat = () => navigate(`/it/remote-support/${session.id}#chat`)
+
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 py-3 last:border-0">
-      <div className="min-w-0 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to={`/it/remote-support/${session.id}`}
-            className="font-medium text-foreground hover:underline"
-          >
-            {session.remoteNumber}
-          </Link>
-          <Badge variant={sessionStatusVariant(session.status)}>
-            {t(`remote.status.${session.status}`, { defaultValue: session.status })}
-          </Badge>
-          <Badge variant="outline">{session.sessionType}</Badge>
-        </div>
-        <p className="truncate text-sm text-muted-foreground">{session.reason}</p>
-        <p className="text-xs text-muted-foreground">
-          {t('remote.fields.requestedAt')}: {new Date(session.requestedAtUtc).toLocaleString()}
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {!session.technicianUserId ? (
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => takeMutation.mutate()}
-            disabled={takeMutation.isPending}
-          >
-            {t('remote.actions.take')}
-          </Button>
-        ) : null}
-        {can('remote.admin') && session.configurationItemId ? (
-          <Button asChild size="sm" variant="ghost">
-            <Link to={`/it/cmdb?ci=${session.configurationItemId}`}>
-              {t('remote.openCiMapping')}
+    <li className="space-y-3 border-b border-border/60 py-4 last:border-0">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={`/it/remote-support/${session.id}`}
+              className="font-medium text-foreground hover:underline"
+            >
+              {session.remoteNumber}
             </Link>
+            <Badge variant={sessionStatusVariant(session.status)}>
+              {t(`remote.status.${session.status}`, { defaultValue: session.status })}
+            </Badge>
+          </div>
+          <p className="text-sm font-medium">
+            {session.employeeDisplayName?.trim() || t('remote.queue.unknownEmployee')}
+          </p>
+          {session.employeeEmail ? (
+            <p className="text-xs text-muted-foreground">{session.employeeEmail}</p>
+          ) : null}
+          <p className="text-sm text-muted-foreground">{session.reason}</p>
+          <p className="text-sm">
+            <span className="me-2" aria-hidden>
+              {device.marker}
+            </span>
+            {device.title}
+            {device.detail ? (
+              <span className="ms-2 text-muted-foreground">{device.detail}</span>
+            ) : null}
+            <Badge variant="outline" className="ms-2">
+              {device.label}
+            </Badge>
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t('remote.fields.requestedAt')}: {new Date(session.requestedAtUtc).toLocaleString()}
+            {' · '}
+            {t('remote.fields.technician')}:{' '}
+            {session.technicianDisplayName?.trim() ||
+              (session.technicianUserId ? t('remote.queue.assigned') : t('remote.queue.unassigned'))}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {!session.technicianUserId ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => takeMutation.mutate()}
+              disabled={takeMutation.isPending}
+            >
+              {t('remote.actions.take')}
+            </Button>
+          ) : null}
+
+          {session.technicianUserId &&
+          session.status === 'Requested' &&
+          deviceReady &&
+          (isMine || can('remote.admin')) &&
+          can('remote.attended') ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => requestAccessMutation.mutate()}
+              disabled={requestAccessMutation.isPending}
+            >
+              {t('remote.actions.requestAccess')}
+            </Button>
+          ) : null}
+
+          {session.status === 'NotifyUser' ? (
+            <Badge variant="outline">{t('remote.queue.waitingApproval')}</Badge>
+          ) : null}
+
+          {(session.status === 'Allowed' || session.status === 'Authorized') &&
+          deviceReady &&
+          (isMine || can('remote.admin')) &&
+          can('remote.attended') ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => connectMutation.mutate()}
+              disabled={connectMutation.isPending}
+            >
+              {t('remote.actions.connect')}
+            </Button>
+          ) : null}
+
+          {session.status === 'InSession' ? (
+            <Button asChild size="sm">
+              <Link to={`/it/remote-support/${session.id}`}>{t('remote.actions.openSession')}</Link>
+            </Button>
+          ) : null}
+
+          <Button type="button" size="sm" variant="outline" onClick={openChat}>
+            {t('remote.actions.openChat')}
           </Button>
-        ) : null}
-        <Button asChild size="sm" variant="outline">
-          <Link to={`/it/remote-support/${session.id}`}>{t('remote.viewDetail')}</Link>
-        </Button>
+          <Button asChild size="sm" variant="ghost">
+            <Link to={`/it/remote-support/${session.id}`}>{t('remote.viewDetail')}</Link>
+          </Button>
+        </div>
       </div>
     </li>
   )
@@ -184,6 +307,7 @@ export function RemoteSupportPage() {
       can('remote.audit.read') ||
       can('remote.attended') ||
       can('remote.admin'),
+    refetchInterval: 8_000,
   })
 
   const cisQuery = useQuery({

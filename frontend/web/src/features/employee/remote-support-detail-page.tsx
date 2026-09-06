@@ -54,14 +54,14 @@ export function EmployeeRemoteSupportDetailPage() {
     queryKey: remoteSupportKeys.mineDetail(id),
     queryFn: () => remoteSupportApi.myGet(id),
     enabled: Boolean(id),
+    refetchInterval: 5_000,
   })
 
   const endpointQuery = useQuery({
     queryKey: [...remoteSupportKeys.mineDetail(id), 'endpoint'],
     queryFn: () => remoteSupportApi.getMyEndpoint(id),
     enabled: Boolean(id),
-    refetchInterval: (query) =>
-      isRemoteEndpointReady(query.state.data) ? false : 5_000,
+    refetchInterval: 5_000,
   })
 
   const ticketId = sessionQuery.data?.ticketId
@@ -111,9 +111,7 @@ export function EmployeeRemoteSupportDetailPage() {
 
   const helperDownloadMutation = useMutation({
     mutationFn: () => remoteSupportApi.downloadHelperPackage(id),
-    onSuccess: () => {
-      setFormError(null)
-    },
+    onSuccess: () => setFormError(null),
     onError: (error) => {
       setFormError(
         error instanceof ApiError && (error.status === 404 || error.status === 503)
@@ -122,17 +120,6 @@ export function EmployeeRemoteSupportDetailPage() {
             ? error.message
             : t('remote.error.generic'),
       )
-    },
-  })
-
-  const mockMutation = useMutation({
-    mutationFn: () => remoteSupportApi.devMockEndpoint(id),
-    onSuccess: async () => {
-      setFormError(null)
-      await endpointQuery.refetch()
-    },
-    onError: (error) => {
-      setFormError(error instanceof ApiError ? error.message : t('remote.error.generic'))
     },
   })
 
@@ -146,14 +133,19 @@ export function EmployeeRemoteSupportDetailPage() {
   }
 
   const awaitingConsent = session.status === 'NotifyUser'
+  const allowed = session.status === 'Allowed' || session.status === 'Authorized'
   const inSession = session.status === 'InSession'
+  const ended = session.status === 'Ended'
+  const declined = session.status === 'Declined'
   const endpoint = endpointQuery.data
   const preparingThisComputer = !endpoint && !session.configurationItemId
+  const technicianLabel =
+    session.technicianDisplayName?.trim() || t('employee.remote.waitingForIt')
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
-        title={t('employee.remote.connectTitle')}
+        title={t('employee.remote.requestTitle')}
         description={session.remoteNumber}
         actions={
           <Button asChild variant="outline">
@@ -162,11 +154,43 @@ export function EmployeeRemoteSupportDetailPage() {
         }
       />
 
-      <Badge variant={sessionStatusVariant(session.status)}>
-        {t(friendlySessionStatusKey(session.status))}
-      </Badge>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant={sessionStatusVariant(session.status)}>
+          {t(friendlySessionStatusKey(session.status))}
+        </Badge>
+        {endpoint ? (
+          <Badge variant={isRemoteEndpointReady(endpoint) ? 'success' : 'outline'}>
+            {endpoint.deviceName} ·{' '}
+            {isRemoteEndpointReady(endpoint)
+              ? t('employee.remote.readyForSupport')
+              : t('employee.remote.waitingForAgent')}
+          </Badge>
+        ) : null}
+      </div>
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('employee.remote.requestSummary')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <DetailRow label={t('remote.fields.technician')} value={technicianLabel} />
+          <DetailRow
+            label={t('employee.remote.deviceLabel')}
+            value={
+              endpoint?.deviceName ??
+              session.endpointDeviceName ??
+              t('employee.remote.deviceSetupInProgress')
+            }
+          />
+          <DetailRow label={t('remote.fields.reason')} value={session.reason} />
+          <DetailRow
+            label={t('employee.remote.relatedRequest')}
+            value={ticketQuery.data?.ticketNumber ?? t('employee.remote.noRelatedRequest')}
+          />
+        </CardContent>
+      </Card>
 
       {endpoint ? <RemoteDeviceCard endpoint={endpoint} variant="employee" /> : null}
 
@@ -176,12 +200,7 @@ export function EmployeeRemoteSupportDetailPage() {
             <CardTitle className="text-base">{t('employee.remote.prepare.title')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              {t('employee.remote.prepare.privacy')}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {t('employee.remote.prepare.oneTimeWarning')}
-            </p>
+            <p className="text-sm text-muted-foreground">{t('employee.remote.prepare.privacy')}</p>
             <Button
               type="button"
               onClick={() => helperDownloadMutation.mutate()}
@@ -189,19 +208,9 @@ export function EmployeeRemoteSupportDetailPage() {
             >
               {t('employee.remote.prepare.download')}
             </Button>
-            {import.meta.env.DEV ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => mockMutation.mutate()}
-                disabled={mockMutation.isPending}
-              >
-                {t('employee.remote.prepare.developmentMock')}
-              </Button>
-            ) : null}
-            <p className="text-xs text-muted-foreground">
-              {t('employee.remote.prepare.waiting')}
-            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/employee/remote-support/setup">{t('employee.remote.setupCta')}</Link>
+            </Button>
           </CardContent>
         </Card>
       ) : null}
@@ -212,7 +221,12 @@ export function EmployeeRemoteSupportDetailPage() {
             <CardTitle className="text-base">{t('employee.remote.consentPrompt')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm">{t('remote.consent.warning')}</p>
+            <DetailRow label={t('remote.fields.technician')} value={technicianLabel} />
+            <DetailRow
+              label={t('employee.remote.deviceLabel')}
+              value={endpoint?.deviceName ?? t('employee.remote.yourDevice')}
+            />
+            <DetailRow label={t('remote.fields.reason')} value={session.reason} />
             <p className="text-sm text-muted-foreground">{t('employee.remote.chatNotConsent')}</p>
             <div className="flex flex-wrap gap-2">
               <AlertDialog>
@@ -248,42 +262,26 @@ export function EmployeeRemoteSupportDetailPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('employee.remote.connectTitle')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <DetailRow label={t('remote.fields.technician')} value={t('employee.remote.itTechnician')} />
-          <DetailRow label={t('remote.fields.reason')} value={session.reason} />
-          <DetailRow
-            label={t('employee.remote.device')}
-            value={endpoint?.deviceName ?? t('employee.remote.yourDevice')}
-          />
-          <DetailRow
-            label={t('employee.remote.relatedRequest')}
-            value={ticketQuery.data?.ticketNumber ?? t('employee.remote.noRelatedRequest')}
-          />
-          <DetailRow
-            label={t('remote.fields.privileges')}
-            value={session.requestedPrivileges ?? t('employee.remote.standardAccess')}
-          />
-          <DetailRow
-            label={t('remote.fields.expiresAt')}
-            value={session.expiresAtUtc ? new Date(session.expiresAtUtc).toLocaleString() : '—'}
-          />
-        </CardContent>
-      </Card>
-
-      <RemoteSessionChat
-        sessionId={session.id}
-        currentUserId={user?.id ?? null}
-        canPost={isChatOpen(session)}
-      />
+      {allowed && !inSession ? (
+        <Card>
+          <CardContent className="space-y-2 pt-6">
+            <p className="font-medium">{t('employee.remote.accessApproved')}</p>
+            <p className="text-sm text-muted-foreground">{t('employee.remote.accessApprovedHint')}</p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {inSession ? (
         <Card>
           <CardContent className="space-y-2 pt-6">
-            <p className="text-sm text-muted-foreground">{t('employee.remote.endHint')}</p>
+            <p className="font-medium">{t('employee.remote.sessionConnected')}</p>
+            <p className="text-sm text-muted-foreground">
+              {t('employee.remote.sessionStartedAt', {
+                time: session.startedAtUtc
+                  ? new Date(session.startedAtUtc).toLocaleString()
+                  : '—',
+              })}
+            </p>
             <Button
               type="button"
               variant="secondary"
@@ -295,6 +293,29 @@ export function EmployeeRemoteSupportDetailPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      {ended || declined ? (
+        <Card>
+          <CardContent className="space-y-2 pt-6">
+            <p className="font-medium">
+              {declined
+                ? t('employee.remote.accessDeclined')
+                : t('employee.remote.sessionCompleted')}
+            </p>
+            {ended && session.durationSeconds != null ? (
+              <p className="text-sm text-muted-foreground">
+                {t('remote.fields.duration')}: {session.durationSeconds}s · {technicianLabel}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <RemoteSessionChat
+        sessionId={session.id}
+        currentUserId={user?.id ?? null}
+        canPost={isChatOpen(session)}
+      />
     </div>
   )
 }

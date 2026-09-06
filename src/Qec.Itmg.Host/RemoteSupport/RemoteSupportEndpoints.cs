@@ -146,24 +146,28 @@ public static class RemoteSupportEndpoints
 
         it.MapGet(string.Empty, async (
             int? page, int? pageSize, string? status, Guid? ticketId, Guid? configurationItemId,
-            ClaimsPrincipal principal, ICurrentUserService currentUser, RemoteSessionService svc, CancellationToken ct) =>
+            ClaimsPrincipal principal, ICurrentUserService currentUser, RemoteSessionService svc,
+            RemoteSessionEnrichmentService enrichment, CancellationToken ct) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
             bool canAudit = session.Permissions.Contains(RemoteAuditRead) || session.Permissions.Contains(RemoteRequest);
             if (!canAudit) return Results.Forbid();
-            return Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 25, status, null, null, ticketId, configurationItemId, ct));
+            RemoteSessionListResult list = await svc.ListAsync(page ?? 1, pageSize ?? 25, status, null, null, ticketId, configurationItemId, ct);
+            IReadOnlyList<RemoteSessionRequestDto> enriched = await enrichment.EnrichManyAsync(list.Items, ct);
+            return Results.Ok(list with { Items = enriched });
         }).RequirePermission(RemoteRequest);
 
         it.MapGet("/{id:guid}", async (
-            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser, RemoteSessionService svc, CancellationToken ct) =>
+            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser, RemoteSessionService svc,
+            RemoteSessionEnrichmentService enrichment, CancellationToken ct) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
             RemoteSessionRequestDto? item = await svc.GetAsync(id, ct);
             if (item is null) return Results.NotFound();
             if (!CanView(session, item)) return Results.Forbid();
-            return Results.Ok(item);
+            return Results.Ok(await enrichment.EnrichAsync(item, ct));
         }).RequireAuthorization();
 
         endpoints.MapPost("/api/v1/remote-support/sessions/attended", async (
@@ -607,6 +611,30 @@ public static class RemoteSupportEndpoints
                             ct);
                     }
                 }
+                else if (req.RemoteEndpointId is Guid endpointId)
+                {
+                    await endpointsSvc.BindEndpointToSessionAsync(
+                        created.Id, endpointId, session.Id, actorIsSupport: false, ct);
+                    RemoteEndpointDto? bound = await endpointsSvc.GetAsync(endpointId, ct);
+                    if (bound?.IsReadyForRemote == true)
+                    {
+                        await chat.PostSystemMessageAsync(
+                            created.Id,
+                            RemoteSessionChatService.SystemEvents.DeviceReady,
+                            $"Computer ready: {bound.DeviceName}",
+                            ct);
+                    }
+                    else
+                    {
+                        await chat.PostSystemMessageAsync(
+                            created.Id,
+                            RemoteSessionChatService.SystemEvents.AgentPreparing,
+                            bound is null
+                                ? "Waiting for remote agent readiness."
+                                : $"{bound.DeviceName}: waiting for remote agent.",
+                            ct);
+                    }
+                }
                 else
                 {
                     await chat.PostSystemMessageAsync(
@@ -617,7 +645,8 @@ public static class RemoteSupportEndpoints
                 }
 
                 await notifications.NotifySelfRequestedAsync(created, session.DisplayName, ct);
-                return Results.Created($"/api/v1/me/remote-support/{created.Id}", created);
+                RemoteSessionRequestDto? refreshed = await svc.GetAsync(created.Id, ct);
+                return Results.Created($"/api/v1/me/remote-support/{created.Id}", refreshed ?? created);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
             {
@@ -834,22 +863,26 @@ public static class RemoteSupportEndpoints
 
         endpoints.MapGet("/api/v1/me/remote-support", async (
             int? page, int? pageSize, string? status,
-            ClaimsPrincipal principal, ICurrentUserService currentUser, RemoteSessionService svc, CancellationToken ct) =>
+            ClaimsPrincipal principal, ICurrentUserService currentUser, RemoteSessionService svc,
+            RemoteSessionEnrichmentService enrichment, CancellationToken ct) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
-            return Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 25, status, session.Id, null, null, null, ct));
+            RemoteSessionListResult list = await svc.ListAsync(page ?? 1, pageSize ?? 25, status, session.Id, null, null, null, ct);
+            IReadOnlyList<RemoteSessionRequestDto> enriched = await enrichment.EnrichManyAsync(list.Items, ct);
+            return Results.Ok(list with { Items = enriched });
         }).RequireAuthorization();
 
         endpoints.MapGet("/api/v1/me/remote-support/{id:guid}", async (
-            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser, RemoteSessionService svc, CancellationToken ct) =>
+            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser, RemoteSessionService svc,
+            RemoteSessionEnrichmentService enrichment, CancellationToken ct) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
             RemoteSessionRequestDto? item = await svc.GetAsync(id, ct);
             if (item is null) return Results.NotFound();
             if (item.TargetUserId != session.Id) return Results.Forbid();
-            return Results.Ok(item);
+            return Results.Ok(await enrichment.EnrichAsync(item, ct));
         }).RequireAuthorization();
 
         endpoints.MapPost("/api/v1/me/remote-support/{id:guid}/allow", async (
@@ -1447,7 +1480,8 @@ public static class RemoteSupportEndpoints
 
     public sealed record CreateEmployeeRemoteHelpRequest(
         string Reason,
-        Guid? ConfigurationItemId);
+        Guid? ConfigurationItemId,
+        Guid? RemoteEndpointId);
 
     public sealed record SelectManagedDeviceRequest(Guid ConfigurationItemId);
 
