@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Qec.Itmg.AccessManagement.Domain;
+using Qec.Itmg.AccessManagement.Persistence;
 using Qec.Itmg.AccessManagement.Services;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Identity.Domain;
@@ -18,7 +20,11 @@ public interface IDevelopmentAccessDemoSeedRunner
 public sealed class DevelopmentAccessDemoSeedRunner(
     IHostEnvironment environment,
     IdentityDbContext identityDb,
+    AccessManagementDbContext accessDb,
     AccessCategoryService categories,
+    AccessEntitlementService entitlements,
+    UserAccessService userAccess,
+    IAccessCatalogSeedRunner catalogSeed,
     IClock clock,
     ILogger<DevelopmentAccessDemoSeedRunner> logger) : IDevelopmentAccessDemoSeedRunner
 {
@@ -31,6 +37,23 @@ public sealed class DevelopmentAccessDemoSeedRunner(
         ("it-admin2", "demo.it.admin2@qec.local", "Demo IT Admin 2", ["access.fulfill"]),
         ("finance-employee", "demo.finance.employee@qec.local", "Demo Finance Employee", ["access.request"]),
         ("facilities", "demo.facilities@qec.local", "Demo Facilities Officer", ["access.request", "access.approve", "access.fulfill", "admin.users"]),
+    ];
+
+    private static readonly (string Key, string NameEn, string NameAr, AccessRevokeAction Revoke)[] DevEntitlements =
+    [
+        ("FINANCE_SHARED_FOLDER", "Finance Shared Folder", "المجلد المشترك للمالية", AccessRevokeAction.Remove),
+        ("HR_SHARED_FOLDER", "HR Shared Folder", "المجلد المشترك للموارد البشرية", AccessRevokeAction.Remove),
+    ];
+
+    private static readonly string[] FinanceEmployeeActiveKeys =
+    [
+        "GOOGLE_WORKSPACE",
+        "AD_DOMAIN_USER",
+        "COMPANY_SHARED_FOLDER",
+        "ATTENDANCE_SYSTEM",
+        "DOOR_ACCESS",
+        "ERP_ACCESS",
+        "FINANCE_SHARED_FOLDER",
     ];
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
@@ -61,7 +84,61 @@ public sealed class DevelopmentAccessDemoSeedRunner(
 
         await identityDb.SaveChangesAsync(cancellationToken);
         await categories.EnsureDevelopmentCatalogAsync(usersByUpn, cancellationToken);
+
+        // Categories now exist — ensure global catalog mappings, then Dev-only extras.
+        await catalogSeed.RunAsync(cancellationToken);
+        await EnsureDevEntitlementsAndMappingsAsync(cancellationToken);
+        await EnsureFinanceEmployeeCurrentAccessAsync(usersByUpn, cancellationToken);
+
         logger.LogInformation("Development access demo personas and categories ensured ({Count} users).", Personas.Length);
+    }
+
+    private async Task EnsureDevEntitlementsAndMappingsAsync(CancellationToken ct)
+    {
+        AccessCategory? itAccess = await accessDb.AccessCategories.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Key == "IT_ACCESS", ct);
+        if (itAccess is null) return;
+
+        int sort = 90;
+        foreach ((string key, string nameEn, string nameAr, AccessRevokeAction revoke) in DevEntitlements)
+        {
+            AccessEntitlement? existing = await accessDb.AccessEntitlements.FirstOrDefaultAsync(x => x.Key == key, ct);
+            Guid entitlementId;
+            if (existing is null)
+            {
+                AccessEntitlementDto created = await entitlements.CreateAsync(
+                    key, nameEn, nameAr, null, null, revoke, isPrivileged: false, isActive: true, ct);
+                entitlementId = created.Id;
+            }
+            else
+            {
+                entitlementId = existing.Id;
+            }
+
+            await categories.EnsureCategoryEntitlementMappingAsync(
+                itAccess.Id, entitlementId, isDefaultForJoiner: false, sortOrder: sort, ct);
+            sort += 10;
+        }
+    }
+
+    private async Task EnsureFinanceEmployeeCurrentAccessAsync(
+        IReadOnlyDictionary<string, Guid> usersByUpn,
+        CancellationToken ct)
+    {
+        if (!usersByUpn.TryGetValue("demo.finance.employee@qec.local", out Guid userId))
+            return;
+
+        Dictionary<string, AccessEntitlement> byKey = await accessDb.AccessEntitlements.AsNoTracking()
+            .Where(x => FinanceEmployeeActiveKeys.Contains(x.Key))
+            .ToDictionaryAsync(x => x.Key, ct);
+
+        foreach (string key in FinanceEmployeeActiveKeys)
+        {
+            if (!byKey.TryGetValue(key, out AccessEntitlement? entitlement)) continue;
+            await userAccess.EnsureActiveAsync(userId, entitlement.Id, entitlement.Key, entitlement.NameEn, ct);
+        }
+
+        await accessDb.SaveChangesAsync(ct);
     }
 
     private async Task<Role> EnsureRoleAsync(string name, string description, CancellationToken ct)

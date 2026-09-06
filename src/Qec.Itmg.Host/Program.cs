@@ -70,6 +70,7 @@ try
     builder.Services.AddIdentityAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddIdentitySeed(builder.Configuration);
     builder.Services.AddCmdbSeed();
+    builder.Services.AddAccessCatalogSeed();
     builder.Services.AddDevelopmentAccessDemoSeed();
     builder.Services.AddServiceDeskSeed();
     builder.Services.AddComplianceReadinessSeed();
@@ -149,6 +150,7 @@ try
     await app.RunCmdbSeedAsync();
     await app.RunServiceDeskSeedAsync();
     await app.RunComplianceReadinessSeedAsync();
+    await app.RunAccessCatalogSeedAsync();
     await app.RunDevelopmentAccessDemoSeedAsync();
 
     if (enableHangfire)

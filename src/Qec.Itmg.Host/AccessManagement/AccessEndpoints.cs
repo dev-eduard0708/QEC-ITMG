@@ -25,10 +25,55 @@ public static class AccessEndpoints
     {
         MapCases(endpoints);
         MapCategories(endpoints);
+        MapEntitlements(endpoints);
         MapReviews(endpoints);
         MapAccounts(endpoints);
         MapSod(endpoints);
         return endpoints;
+    }
+
+    private static void MapEntitlements(IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGet("/api/v1/access/entitlements", async (
+            bool? activeOnly, string? search, AccessEntitlementService svc, CancellationToken ct) =>
+            Results.Ok(await svc.ListAsync(activeOnly ?? true, search, ct)))
+            .RequirePermission(AccessRequest);
+
+        endpoints.MapPost("/api/v1/access/entitlements", async (
+            UpsertAccessEntitlementRequest req, AccessEntitlementService svc, CancellationToken ct) =>
+        {
+            if (!Enum.TryParse(req.DefaultRevokeAction, true, out AccessRevokeAction revoke))
+                return Validation("A valid defaultRevokeAction is required (Remove|Disable).");
+            try
+            {
+                AccessEntitlementDto created = await svc.CreateAsync(
+                    req.Key, req.NameEn, req.NameAr, req.DescriptionEn, req.DescriptionAr,
+                    revoke, req.IsPrivileged ?? false, req.IsActive ?? true, ct);
+                return Results.Created($"/api/v1/access/entitlements/{created.Id}", created);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessConfigure);
+
+        endpoints.MapPut("/api/v1/access/entitlements/{id:guid}", async (
+            Guid id, UpsertAccessEntitlementRequest req, AccessEntitlementService svc, CancellationToken ct) =>
+        {
+            if (!Enum.TryParse(req.DefaultRevokeAction, true, out AccessRevokeAction revoke))
+                return Validation("A valid defaultRevokeAction is required (Remove|Disable).");
+            try
+            {
+                return Results.Ok(await svc.UpdateAsync(
+                    id, req.NameEn, req.NameAr, req.DescriptionEn, req.DescriptionAr,
+                    revoke, req.IsPrivileged ?? false, req.IsActive ?? true, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessConfigure);
+
+        endpoints.MapGet("/api/v1/access/users/{userId:guid}/current-access", async (
+            Guid userId, bool? activeOnly, UserAccessService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.GetCurrentAccessAsync(userId, ct, activeOnly ?? true)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessRequest);
     }
 
     private static void MapCategories(IEndpointRouteBuilder endpoints)
@@ -87,6 +132,27 @@ public static class AccessEndpoints
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessConfigure);
+
+        endpoints.MapGet("/api/v1/access/categories/{id:guid}/entitlements", async (
+            Guid id, bool? activeOnly, AccessCategoryService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.ListEntitlementsAsync(id, ct, activeOnly ?? false)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessRequest);
+
+        endpoints.MapPut("/api/v1/access/categories/{id:guid}/entitlements", async (
+            Guid id, ReplaceCategoryEntitlementsRequest req, AccessCategoryService svc, CancellationToken ct) =>
+        {
+            try
+            {
+                IReadOnlyList<AccessCategoryEntitlementSpec> specs = (req.Items ?? [])
+                    .Select(x => new AccessCategoryEntitlementSpec(
+                        x.AccessEntitlementId, x.IsDefaultForJoiner, x.SortOrder, x.IsActive))
+                    .ToList();
+                return Results.Ok(await svc.ReplaceEntitlementsAsync(id, specs, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessConfigure);
     }
 
     private static void MapCases(IEndpointRouteBuilder endpoints)
@@ -137,11 +203,29 @@ public static class AccessEndpoints
                 return Validation("A valid type is required.");
             try
             {
+                List<AccessCaseItemCreateSpec>? itemSpecs = null;
+                if (req.Items is { Count: > 0 })
+                {
+                    itemSpecs = [];
+                    foreach (CreateAccessCaseItemRequest item in req.Items)
+                    {
+                        if (!Enum.TryParse(item.Action, true, out AccessItemAction action))
+                            return Validation("Each item requires a valid action.");
+                        itemSpecs.Add(new AccessCaseItemCreateSpec(
+                            item.AccessEntitlementId,
+                            item.CustomName,
+                            action,
+                            item.Notes,
+                            item.IsSelected ?? true));
+                    }
+                }
+
                 AccessCaseDto created = await svc.CreateAsync(
                     type, session.Id, req.Reason, req.SubjectUserId, req.SubjectName, req.SubjectEmail,
                     req.DepartmentId, req.ManagerUserId, req.DesignatedApproverUserId, req.EffectiveAtUtc, ct,
                     accessCategoryId: req.AccessCategoryId,
-                    hasConfigureOverride: session.Permissions.Contains(AccessConfigure));
+                    hasConfigureOverride: session.Permissions.Contains(AccessConfigure),
+                    items: itemSpecs);
                 return Results.Created($"/api/v1/access/cases/{created.Id}", created);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
@@ -539,7 +623,15 @@ public sealed class AccessNotificationService(INotificationService notifications
 public sealed record CreateAccessCaseRequest(
     string Type, string Reason, Guid? SubjectUserId, string? SubjectName, string? SubjectEmail,
     Guid? DepartmentId, Guid? ManagerUserId, Guid? DesignatedApproverUserId, DateTimeOffset? EffectiveAtUtc,
-    Guid? AccessCategoryId = null);
+    Guid? AccessCategoryId = null,
+    IReadOnlyList<CreateAccessCaseItemRequest>? Items = null);
+
+public sealed record CreateAccessCaseItemRequest(
+    Guid? AccessEntitlementId,
+    string? CustomName,
+    string Action,
+    string? Notes,
+    bool? IsSelected);
 
 public sealed record UpdateAccessCaseRequest(
     string Reason, Guid? SubjectUserId, string? SubjectName, string? SubjectEmail,
@@ -561,6 +653,25 @@ public sealed record ReplaceCategoryRoutingRequest(
     Guid[]? FulfillerUserIds,
     Guid[]? VerifierUserIds,
     Guid[]? CloserUserIds);
+
+public sealed record ReplaceCategoryEntitlementsRequest(
+    IReadOnlyList<ReplaceCategoryEntitlementItemRequest>? Items);
+
+public sealed record ReplaceCategoryEntitlementItemRequest(
+    Guid AccessEntitlementId,
+    bool IsDefaultForJoiner,
+    int SortOrder,
+    bool IsActive);
+
+public sealed record UpsertAccessEntitlementRequest(
+    string Key,
+    string NameEn,
+    string NameAr,
+    string? DescriptionEn,
+    string? DescriptionAr,
+    string DefaultRevokeAction,
+    bool? IsPrivileged,
+    bool? IsActive);
 
 public sealed record VerifyAccessCaseRequest(
     string? Mode,

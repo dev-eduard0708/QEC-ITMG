@@ -332,7 +332,11 @@ public sealed class AccessCaseItem
     public Guid Id { get; private set; }
     public Guid AccessCaseId { get; private set; }
     public Guid? ConfigurationItemId { get; private set; }
+    public Guid? AccessEntitlementId { get; private set; }
     public string EntitlementKey { get; private set; } = null!;
+    public string? EntitlementNameEnSnapshot { get; private set; }
+    public string? EntitlementNameArSnapshot { get; private set; }
+    public bool IsCustom { get; private set; }
     public AccessItemAction Action { get; private set; }
     public bool IsPrivileged { get; private set; }
     public bool IsMandatory { get; private set; }
@@ -350,7 +354,11 @@ public sealed class AccessCaseItem
         Guid? configurationItemId = null,
         bool isPrivileged = false,
         bool isMandatory = false,
-        string? notes = null)
+        string? notes = null,
+        Guid? accessEntitlementId = null,
+        string? entitlementNameEnSnapshot = null,
+        string? entitlementNameArSnapshot = null,
+        bool isCustom = false)
     {
         if (accessCaseId == Guid.Empty) throw new ArgumentException("Case is required.", nameof(accessCaseId));
         ArgumentException.ThrowIfNullOrWhiteSpace(entitlementKey);
@@ -360,7 +368,11 @@ public sealed class AccessCaseItem
             Id = Guid.CreateVersion7(),
             AccessCaseId = accessCaseId,
             ConfigurationItemId = configurationItemId is null || configurationItemId == Guid.Empty ? null : configurationItemId,
+            AccessEntitlementId = accessEntitlementId is null || accessEntitlementId == Guid.Empty ? null : accessEntitlementId,
             EntitlementKey = entitlementKey.Trim(),
+            EntitlementNameEnSnapshot = string.IsNullOrWhiteSpace(entitlementNameEnSnapshot) ? null : entitlementNameEnSnapshot.Trim(),
+            EntitlementNameArSnapshot = string.IsNullOrWhiteSpace(entitlementNameArSnapshot) ? null : entitlementNameArSnapshot.Trim(),
+            IsCustom = isCustom,
             Action = action,
             IsPrivileged = isPrivileged,
             IsMandatory = isMandatory,

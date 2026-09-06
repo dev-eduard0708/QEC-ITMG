@@ -26,6 +26,27 @@ public sealed record AccessCategoryParticipantUserDto(
     string? DisplayName,
     string? Upn);
 
+public sealed record AccessCategoryEntitlementDto(
+    Guid Id,
+    Guid AccessCategoryId,
+    Guid AccessEntitlementId,
+    string EntitlementKey,
+    string NameEn,
+    string NameAr,
+    string DefaultRevokeAction,
+    bool IsPrivileged,
+    bool IsDefaultForJoiner,
+    int SortOrder,
+    bool IsActive,
+    DateTimeOffset CreatedAtUtc,
+    DateTimeOffset UpdatedAtUtc);
+
+public sealed record AccessCategoryEntitlementSpec(
+    Guid AccessEntitlementId,
+    bool IsDefaultForJoiner,
+    int SortOrder,
+    bool IsActive);
+
 public sealed class AccessCategoryService(
     AccessManagementDbContext db,
     IClock clock,
@@ -123,6 +144,125 @@ public sealed class AccessCategoryService(
         return (await GetAsync(id, ct))!;
     }
 
+    public async Task<IReadOnlyList<AccessCategoryEntitlementDto>> ListEntitlementsAsync(
+        Guid categoryId,
+        CancellationToken ct,
+        bool activeOnly = false)
+    {
+        _ = await db.AccessCategories.AsNoTracking().FirstOrDefaultAsync(x => x.Id == categoryId, ct)
+            ?? throw new InvalidOperationException("Access category not found.");
+
+        IQueryable<AccessCategoryEntitlement> q = db.AccessCategoryEntitlements.AsNoTracking()
+            .Where(x => x.AccessCategoryId == categoryId);
+        if (activeOnly) q = q.Where(x => x.IsActive);
+
+        List<AccessCategoryEntitlement> mappings = await q.OrderBy(x => x.SortOrder).ThenBy(x => x.CreatedAtUtc).ToListAsync(ct);
+        List<Guid> entitlementIds = mappings.Select(x => x.AccessEntitlementId).Distinct().ToList();
+        Dictionary<Guid, AccessEntitlement> entitlements = entitlementIds.Count == 0
+            ? []
+            : await db.AccessEntitlements.AsNoTracking()
+                .Where(x => entitlementIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+
+        return mappings.Select(m =>
+        {
+            AccessEntitlement ent = entitlements.GetValueOrDefault(m.AccessEntitlementId)
+                ?? throw new InvalidOperationException("Mapped entitlement is missing.");
+            return MapCategoryEntitlement(m, ent);
+        }).ToList();
+    }
+
+    public async Task<IReadOnlyList<AccessCategoryEntitlementDto>> ReplaceEntitlementsAsync(
+        Guid categoryId,
+        IReadOnlyList<AccessCategoryEntitlementSpec> specs,
+        CancellationToken ct)
+    {
+        AccessCategory category = await db.AccessCategories.FirstOrDefaultAsync(x => x.Id == categoryId, ct)
+            ?? throw new InvalidOperationException("Access category not found.");
+
+        List<Guid> requestedIds = specs.Select(x => x.AccessEntitlementId).Distinct().ToList();
+        if (requestedIds.Count != specs.Count)
+            throw new InvalidOperationException("Duplicate entitlement mappings are not allowed.");
+
+        Dictionary<Guid, AccessEntitlement> catalog = requestedIds.Count == 0
+            ? []
+            : await db.AccessEntitlements.Where(x => requestedIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, ct);
+        foreach (Guid id in requestedIds)
+        {
+            if (!catalog.ContainsKey(id))
+                throw new InvalidOperationException("Access entitlement not found.");
+        }
+
+        List<AccessCategoryEntitlement> existing = await db.AccessCategoryEntitlements
+            .Where(x => x.AccessCategoryId == categoryId).ToListAsync(ct);
+        Dictionary<Guid, AccessCategoryEntitlement> byEntitlement = existing
+            .ToDictionary(x => x.AccessEntitlementId);
+        List<Guid> existingEntitlementIds = existing.Select(x => x.AccessEntitlementId).Distinct().ToList();
+        Dictionary<Guid, string> existingKeys = existingEntitlementIds.Count == 0
+            ? []
+            : await db.AccessEntitlements.AsNoTracking()
+                .Where(x => existingEntitlementIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, x => x.Key, ct);
+
+        HashSet<Guid> keep = [];
+        foreach (AccessCategoryEntitlementSpec spec in specs)
+        {
+            keep.Add(spec.AccessEntitlementId);
+            if (byEntitlement.TryGetValue(spec.AccessEntitlementId, out AccessCategoryEntitlement? row))
+            {
+                bool changed = row.IsDefaultForJoiner != spec.IsDefaultForJoiner
+                    || row.SortOrder != spec.SortOrder
+                    || row.IsActive != spec.IsActive;
+                if (changed)
+                {
+                    row.Update(spec.IsDefaultForJoiner, spec.SortOrder, spec.IsActive, clock.UtcNow);
+                    await businessAudit.AppendAsync(AccessAudit.Field(
+                        category.Id, category.Key, "CategoryEntitlementUpdated",
+                        catalog[spec.AccessEntitlementId].Key,
+                        $"{spec.IsDefaultForJoiner}|{spec.SortOrder}|{spec.IsActive}"), ct);
+                }
+            }
+            else
+            {
+                AccessCategoryEntitlement created = AccessCategoryEntitlement.Create(
+                    categoryId, spec.AccessEntitlementId, spec.IsDefaultForJoiner, spec.SortOrder,
+                    clock.UtcNow, spec.IsActive);
+                db.AccessCategoryEntitlements.Add(created);
+                await businessAudit.AppendAsync(AccessAudit.Field(
+                    category.Id, category.Key, "CategoryEntitlementAdded",
+                    null, catalog[spec.AccessEntitlementId].Key, BusinessAuditAction.Created), ct);
+            }
+        }
+
+        foreach (AccessCategoryEntitlement row in existing.Where(x => !keep.Contains(x.AccessEntitlementId)))
+        {
+            await businessAudit.AppendAsync(AccessAudit.Field(
+                category.Id, category.Key, "CategoryEntitlementRemoved",
+                existingKeys.GetValueOrDefault(row.AccessEntitlementId) ?? row.AccessEntitlementId.ToString(),
+                null), ct);
+            db.AccessCategoryEntitlements.Remove(row);
+        }
+
+        await db.SaveChangesAsync(ct);
+        return await ListEntitlementsAsync(categoryId, ct);
+    }
+
+    public async Task EnsureCategoryEntitlementMappingAsync(
+        Guid categoryId,
+        Guid entitlementId,
+        bool isDefaultForJoiner,
+        int sortOrder,
+        CancellationToken ct)
+    {
+        bool exists = await db.AccessCategoryEntitlements.AnyAsync(
+            x => x.AccessCategoryId == categoryId && x.AccessEntitlementId == entitlementId, ct);
+        if (exists) return; // do not overwrite DefaultForJoiner after first insert
+
+        db.AccessCategoryEntitlements.Add(AccessCategoryEntitlement.Create(
+            categoryId, entitlementId, isDefaultForJoiner, sortOrder, clock.UtcNow));
+        await db.SaveChangesAsync(ct);
+    }
+
     public async Task EnsureDevelopmentCatalogAsync(
         IReadOnlyDictionary<string, Guid> usersByUpn,
         CancellationToken ct)
@@ -205,4 +345,22 @@ public sealed class AccessCategoryService(
             item.IsActive, item.PreferSubjectEmployeeVerification, item.CreatedAtUtc, item.UpdatedAtUtc,
             Convert.ToBase64String(item.RowVersion), byStage);
     }
+
+    private static AccessCategoryEntitlementDto MapCategoryEntitlement(
+        AccessCategoryEntitlement mapping,
+        AccessEntitlement entitlement) =>
+        new(
+            mapping.Id,
+            mapping.AccessCategoryId,
+            mapping.AccessEntitlementId,
+            entitlement.Key,
+            entitlement.NameEn,
+            entitlement.NameAr,
+            entitlement.DefaultRevokeAction.ToString(),
+            entitlement.IsPrivileged,
+            mapping.IsDefaultForJoiner,
+            mapping.SortOrder,
+            mapping.IsActive,
+            mapping.CreatedAtUtc,
+            mapping.UpdatedAtUtc);
 }

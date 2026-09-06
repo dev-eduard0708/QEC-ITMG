@@ -23,6 +23,8 @@ public sealed class AccessManagementModule : IModule
             AccessManagementDbContext.SchemaName);
         services.AddScoped<AccessCaseService>();
         services.AddScoped<AccessCategoryService>();
+        services.AddScoped<AccessEntitlementService>();
+        services.AddScoped<UserAccessService>();
         services.AddScoped<AccessReviewService>();
         services.AddScoped<ManagedAccountService>();
         services.AddScoped<SodService>();

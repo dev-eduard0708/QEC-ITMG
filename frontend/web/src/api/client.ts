@@ -1349,6 +1349,67 @@ export type AccessCaseItem = {
   fulfilledAtUtc: string | null
   notes: string | null
   createdAtUtc: string
+  accessEntitlementId?: string | null
+  nameEn?: string | null
+  nameAr?: string | null
+  isCustom?: boolean
+}
+
+export type AccessEntitlement = {
+  id: string
+  key: string
+  nameEn: string
+  nameAr: string
+  descriptionEn: string | null
+  descriptionAr: string | null
+  defaultRevokeAction: string
+  isPrivileged: boolean
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+}
+
+export type AccessCategoryEntitlement = {
+  id: string
+  accessCategoryId: string
+  accessEntitlementId: string
+  entitlementKey: string
+  nameEn: string
+  nameAr: string
+  defaultRevokeAction: string
+  isPrivileged: boolean
+  isDefaultForJoiner: boolean
+  sortOrder: number
+  isActive: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type UserAccessEntitlement = {
+  id: string
+  userId: string
+  accessEntitlementId: string | null
+  entitlementKey: string
+  nameEn: string
+  nameAr: string
+  status: string
+  defaultRevokeAction: string | null
+  isPrivileged: boolean
+  isCustom: boolean
+  grantedFromAccessCaseId: string | null
+  lastChangedFromAccessCaseId: string | null
+  grantedAtUtc: string | null
+  revokedAtUtc: string | null
+  updatedAtUtc: string
+}
+
+export type AccessCaseItemCreate = {
+  accessEntitlementId?: string | null
+  customName?: string | null
+  action: string
+  notes?: string | null
+  isSelected?: boolean | null
 }
 
 export type ExistingAccessItem = {
@@ -1455,6 +1516,7 @@ export const accessApi = {
     designatedApproverUserId?: string | null
     effectiveAtUtc?: string | null
     accessCategoryId?: string | null
+    items?: AccessCaseItemCreate[] | null
   }) =>
     apiFetch<AccessCase>('/api/v1/access/cases', { method: 'POST', body: JSON.stringify(payload) }),
   listCategories: (params?: { activeOnly?: boolean }) =>
@@ -1507,6 +1569,69 @@ export const accessApi = {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
+  listCategoryEntitlements: (id: string, params?: { activeOnly?: boolean }) =>
+    apiFetch<AccessCategoryEntitlement[]>(
+      `/api/v1/access/categories/${id}/entitlements${opsQuery({
+        activeOnly: params?.activeOnly === undefined ? undefined : String(params.activeOnly),
+      })}`,
+    ),
+  replaceCategoryEntitlements: (
+    id: string,
+    items: Array<{
+      accessEntitlementId: string
+      isDefaultForJoiner: boolean
+      sortOrder: number
+      isActive: boolean
+    }>,
+  ) =>
+    apiFetch<AccessCategoryEntitlement[]>(`/api/v1/access/categories/${id}/entitlements`, {
+      method: 'PUT',
+      body: JSON.stringify({ items }),
+    }),
+  listEntitlements: (params?: { activeOnly?: boolean; search?: string }) =>
+    apiFetch<AccessEntitlement[]>(
+      `/api/v1/access/entitlements${opsQuery({
+        activeOnly: params?.activeOnly === undefined ? undefined : String(params.activeOnly),
+        search: params?.search,
+      })}`,
+    ),
+  createEntitlement: (payload: {
+    key: string
+    nameEn: string
+    nameAr: string
+    descriptionEn?: string | null
+    descriptionAr?: string | null
+    defaultRevokeAction: string
+    isPrivileged?: boolean | null
+    isActive?: boolean | null
+  }) =>
+    apiFetch<AccessEntitlement>('/api/v1/access/entitlements', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateEntitlement: (
+    id: string,
+    payload: {
+      key?: string
+      nameEn: string
+      nameAr: string
+      descriptionEn?: string | null
+      descriptionAr?: string | null
+      defaultRevokeAction: string
+      isPrivileged?: boolean | null
+      isActive?: boolean | null
+    },
+  ) =>
+    apiFetch<AccessEntitlement>(`/api/v1/access/entitlements/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  getCurrentAccess: (userId: string, params?: { activeOnly?: boolean }) =>
+    apiFetch<UserAccessEntitlement[]>(
+      `/api/v1/access/users/${userId}/current-access${opsQuery({
+        activeOnly: params?.activeOnly === undefined ? undefined : String(params.activeOnly),
+      })}`,
+    ),
   submit: (id: string) => apiFetch<AccessCase>(`/api/v1/access/cases/${id}/submit`, { method: 'POST' }),
   startApproval: (id: string) =>
     apiFetch<AccessCase>(`/api/v1/access/cases/${id}/start-approval`, { method: 'POST' }),

@@ -87,12 +87,76 @@ internal sealed class AccessCaseItemConfiguration : IEntityTypeConfiguration<Acc
         builder.ToTable("AccessCaseItem");
         builder.HasKey(x => x.Id);
         builder.Property(x => x.EntitlementKey).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.EntitlementNameEnSnapshot).HasMaxLength(256);
+        builder.Property(x => x.EntitlementNameArSnapshot).HasMaxLength(256);
         builder.Property(x => x.Action).IsRequired().HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.Notes).HasMaxLength(2000);
         builder.HasIndex(x => new { x.AccessCaseId, x.Status }).HasDatabaseName("IX_AccessCaseItem_Case_Status");
         builder.HasIndex(x => x.EntitlementKey).HasDatabaseName("IX_AccessCaseItem_EntitlementKey");
+        builder.HasIndex(x => x.AccessEntitlementId).HasDatabaseName("IX_AccessCaseItem_AccessEntitlementId");
         builder.HasOne<AccessCase>().WithMany().HasForeignKey(x => x.AccessCaseId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<AccessEntitlement>().WithMany().HasForeignKey(x => x.AccessEntitlementId)
+            .OnDelete(DeleteBehavior.SetNull);
+    }
+}
+
+internal sealed class AccessEntitlementConfiguration : IEntityTypeConfiguration<AccessEntitlement>
+{
+    public void Configure(EntityTypeBuilder<AccessEntitlement> builder)
+    {
+        builder.ToTable("AccessEntitlement");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Key).IsRequired().HasMaxLength(64);
+        builder.Property(x => x.NameEn).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.NameAr).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.DescriptionEn).HasMaxLength(2000);
+        builder.Property(x => x.DescriptionAr).HasMaxLength(2000);
+        builder.Property(x => x.DefaultRevokeAction).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
+        builder.HasIndex(x => x.Key).IsUnique().HasDatabaseName("IX_AccessEntitlement_Key");
+        builder.HasIndex(x => x.IsActive).HasDatabaseName("IX_AccessEntitlement_IsActive");
+    }
+}
+
+internal sealed class AccessCategoryEntitlementConfiguration : IEntityTypeConfiguration<AccessCategoryEntitlement>
+{
+    public void Configure(EntityTypeBuilder<AccessCategoryEntitlement> builder)
+    {
+        builder.ToTable("AccessCategoryEntitlement");
+        builder.HasKey(x => x.Id);
+        builder.HasIndex(x => new { x.AccessCategoryId, x.AccessEntitlementId })
+            .IsUnique()
+            .HasDatabaseName("IX_AccessCategoryEntitlement_Category_Entitlement");
+        builder.HasIndex(x => new { x.AccessCategoryId, x.SortOrder })
+            .HasDatabaseName("IX_AccessCategoryEntitlement_Category_Sort");
+        builder.HasOne<AccessCategory>().WithMany().HasForeignKey(x => x.AccessCategoryId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<AccessEntitlement>().WithMany().HasForeignKey(x => x.AccessEntitlementId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class UserAccessEntitlementConfiguration : IEntityTypeConfiguration<UserAccessEntitlement>
+{
+    public void Configure(EntityTypeBuilder<UserAccessEntitlement> builder)
+    {
+        builder.ToTable("UserAccessEntitlement");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.EntitlementKeySnapshot).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.EntitlementNameSnapshot).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.HasIndex(x => new { x.UserId, x.Status }).HasDatabaseName("IX_UserAccessEntitlement_User_Status");
+        builder.HasIndex(x => new { x.UserId, x.AccessEntitlementId })
+            .IsUnique()
+            .HasFilter("[AccessEntitlementId] IS NOT NULL AND [Status] = N'Active'")
+            .HasDatabaseName("IX_UserAccessEntitlement_User_Entitlement_Active");
+        builder.HasIndex(x => new { x.UserId, x.EntitlementKeySnapshot })
+            .IsUnique()
+            .HasFilter("[AccessEntitlementId] IS NULL AND [Status] = N'Active'")
+            .HasDatabaseName("IX_UserAccessEntitlement_User_Key_Active");
+        builder.HasOne<AccessEntitlement>().WithMany().HasForeignKey(x => x.AccessEntitlementId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 

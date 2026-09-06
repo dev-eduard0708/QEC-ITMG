@@ -2,7 +2,13 @@ import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ApiError, accessApi, type AccessCaseRouteParticipant, type AccessEvidenceProjection } from '@/api/client'
+import {
+  ApiError,
+  accessApi,
+  type AccessCaseItem,
+  type AccessCaseRouteParticipant,
+  type AccessEvidenceProjection,
+} from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
@@ -19,8 +25,16 @@ import {
 } from '@/components/ui/select'
 import { AccessNavTabs } from '@/features/it/access-nav'
 import { useAccessUsers } from '@/features/it/access-users'
+import { isAppLanguage } from '@/i18n'
 
 type StageKey = 'Requester' | 'Approver' | 'Fulfiller' | 'Verifier' | 'Closer'
+
+const actionGroups: Array<{ action: string; titleKey: string }> = [
+  { action: 'Grant', titleKey: 'access.groups.toGrant' },
+  { action: 'Remove', titleKey: 'access.groups.toRemove' },
+  { action: 'Disable', titleKey: 'access.groups.toDisable' },
+  { action: 'Reassign', titleKey: 'access.groups.toReassign' },
+]
 
 function participantsFor(
   routes: AccessCaseRouteParticipant[] | null | undefined,
@@ -34,9 +48,15 @@ function formatWhen(value: string | null | undefined): string {
   return new Date(value).toLocaleString()
 }
 
+function itemLabel(item: AccessCaseItem, language: string): string {
+  const name = language === 'ar' ? item.nameAr || item.nameEn : item.nameEn || item.nameAr
+  return name || item.entitlementKey
+}
+
 export function AccessDetailPage() {
   const { id = '' } = useParams()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const language = isAppLanguage(i18n.language) ? i18n.language : 'en'
   const { can, user } = useAuth()
   const { nameFor } = useAccessUsers()
   const qc = useQueryClient()
@@ -63,6 +83,11 @@ export function AccessDetailPage() {
     queryFn: () => accessApi.listExistingAccess(id),
     enabled: !!id && caseQuery.data?.type === 'Mover',
   })
+  const currentAccessQuery = useQuery({
+    queryKey: ['access', 'users', caseQuery.data?.subjectUserId, 'current-access'],
+    queryFn: () => accessApi.getCurrentAccess(caseQuery.data!.subjectUserId!, { activeOnly: true }),
+    enabled: Boolean(caseQuery.data?.subjectUserId),
+  })
 
   const invalidate = async () => {
     await qc.invalidateQueries({ queryKey: ['access', 'case', id] })
@@ -80,6 +105,16 @@ export function AccessDetailPage() {
 
   const accessCase = caseQuery.data
   const routes = accessCase?.routeParticipants
+
+  const groupedItems = useMemo(() => {
+    const items = itemsQuery.data ?? []
+    return actionGroups
+      .map((group) => ({
+        ...group,
+        items: items.filter((item) => item.action === group.action),
+      }))
+      .filter((group) => group.items.length > 0)
+  }, [itemsQuery.data])
 
   const workflowStages = useMemo(() => {
     if (!accessCase) return []
@@ -192,6 +227,36 @@ export function AccessDetailPage() {
     can('access.request') &&
     !isSubject
   const showClose = Boolean(accessCase.isReadyToClose) && accessCase.status !== 'Closed' && can('access.fulfill')
+
+  const renderItemRow = (item: AccessCaseItem) => (
+    <li key={item.id} className="flex flex-wrap items-center gap-2">
+      <span className="font-medium">{itemLabel(item, language)}</span>
+      {item.isCustom ? (
+        <Badge variant="secondary">{t('access.custom')}</Badge>
+      ) : (
+        <Badge variant="outline">{t('access.catalog')}</Badge>
+      )}
+      {item.isPrivileged ? <Badge variant="outline">{t('access.privileged')}</Badge> : null}
+      {item.isMandatory ? <Badge variant="warning">{t('access.mandatory')}</Badge> : null}
+      <Badge variant="secondary">{item.status}</Badge>
+      {can('access.fulfill') && item.status === 'Pending' ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          className="ms-auto"
+          onClick={() =>
+            run.mutate(async () => {
+              await accessApi.completeItem(id, item.id)
+              await qc.invalidateQueries({ queryKey: ['access', 'case', id, 'items'] })
+            })
+          }
+        >
+          {t('access.actions.completeItem')}
+        </Button>
+      ) : null}
+    </li>
+  )
 
   return (
     <div className="space-y-6">
@@ -390,6 +455,34 @@ export function AccessDetailPage() {
         </Card>
       )}
 
+      {accessCase.subjectUserId ? (
+        <section className="space-y-3">
+          <h2 className="text-base font-medium">{t('access.currentAccess')}</h2>
+          {currentAccessQuery.isLoading ? (
+            <p className="text-sm text-muted-foreground">{t('access.loading')}</p>
+          ) : (currentAccessQuery.data ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('access.currentAccessEmpty')}</p>
+          ) : (
+            <ul className="space-y-1 text-sm">
+              {(currentAccessQuery.data ?? []).map((row) => (
+                <li key={row.id} className="flex flex-wrap items-center gap-2">
+                  <span>
+                    {language === 'ar' ? row.nameAr || row.nameEn : row.nameEn || row.nameAr}
+                  </span>
+                  {row.isCustom ? (
+                    <Badge variant="secondary">{t('access.custom')}</Badge>
+                  ) : (
+                    <Badge variant="outline">{t('access.catalog')}</Badge>
+                  )}
+                  {row.isPrivileged ? <Badge variant="outline">{t('access.privileged')}</Badge> : null}
+                  <Badge variant="secondary">{row.status}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
       {accessCase.type === 'Mover' ? (
         <section className="space-y-3">
           <h2 className="text-base font-medium">{t('access.existingTitle')}</h2>
@@ -397,7 +490,7 @@ export function AccessDetailPage() {
             {(existingQuery.data ?? []).map((item) => (
               <li key={item.id}>
                 <Badge variant="outline" className="me-2">
-                  Existing
+                  {t('access.existing')}
                 </Badge>
                 {item.entitlementKey}
                 {item.accessSummary ? ` — ${item.accessSummary}` : ''}
@@ -439,34 +532,18 @@ export function AccessDetailPage() {
         </section>
       ) : null}
 
-      <section className="space-y-3">
+      <section className="space-y-4">
         <h2 className="text-base font-medium">{t('access.itemsTitle')}</h2>
-        <ul className="space-y-2 text-sm">
-          {(itemsQuery.data ?? []).map((item) => (
-            <li key={item.id} className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{item.action}</Badge>
-              <span>{item.entitlementKey}</span>
-              <Badge variant="secondary">{item.status}</Badge>
-              {item.isMandatory ? <Badge variant="warning">{t('access.mandatory')}</Badge> : null}
-              {item.isPrivileged ? <Badge variant="outline">{t('access.privileged')}</Badge> : null}
-              {can('access.fulfill') && item.status === 'Pending' ? (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() =>
-                    run.mutate(async () => {
-                      await accessApi.completeItem(id, item.id)
-                      await qc.invalidateQueries({ queryKey: ['access', 'case', id, 'items'] })
-                    })
-                  }
-                >
-                  {t('access.actions.completeItem')}
-                </Button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
+        {groupedItems.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t('access.itemsEmpty')}</p>
+        ) : (
+          groupedItems.map((group) => (
+            <div key={group.action} className="space-y-2">
+              <h3 className="text-sm font-medium text-muted-foreground">{t(group.titleKey)}</h3>
+              <ul className="space-y-2 text-sm">{group.items.map(renderItemRow)}</ul>
+            </div>
+          ))
+        )}
         {can('access.request') && !['Closed', 'Rejected', 'Cancelled'].includes(accessCase.status) ? (
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">

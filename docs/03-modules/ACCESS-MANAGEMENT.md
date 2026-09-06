@@ -8,6 +8,19 @@ Joiner / Mover / Leaver (JML), access requests, privileged and service accounts,
 
 This module **does not** replace Entra ID. It records intent, approvals, execution evidence, and reviews. Execution against AD may be checklist in early phases and automated later.
 
+## Access entitlement catalog
+
+Global reusable `AccessEntitlement` records (bilingual names, `DefaultRevokeAction` Remove|Disable, privileged flag) are mapped to categories via `AccessCategoryEntitlement` with `IsDefaultForJoiner` and sort order.
+
+- **Default for Joiner** means pre-selected on Joiner create — not mandatory; requesters may uncheck.
+- One entitlement may belong to multiple categories.
+- Case items snapshot entitlement id and friendly names so later catalog edits do not rewrite history.
+- Custom case-specific access (`IsCustom`) does not pollute the global catalog.
+
+## Current access register
+
+`UserAccessEntitlement` is ITMG's governed record of what access a subject currently has, updated **only when an AccessCase reaches Closed** after verification (Grant→Active, Remove→Removed, Disable→Disabled). It is **not** authoritative AD/Google/ERP directory state.
+
 ## Practical QEC workflow (category routing)
 
 1. **Configure** an Access Category (IT Access, Door Access, CCTV, …) with bilingual names.

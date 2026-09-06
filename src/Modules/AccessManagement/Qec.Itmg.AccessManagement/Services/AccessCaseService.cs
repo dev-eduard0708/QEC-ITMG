@@ -42,7 +42,18 @@ public sealed record AccessCaseListResult(IReadOnlyList<AccessCaseDto> Items, in
 public sealed record AccessCaseItemDto(
     Guid Id, Guid AccessCaseId, Guid? ConfigurationItemId, string EntitlementKey, string Action,
     bool IsPrivileged, bool IsMandatory, string Status, Guid? FulfilledByUserId,
-    DateTimeOffset? FulfilledAtUtc, string? Notes, DateTimeOffset CreatedAtUtc);
+    DateTimeOffset? FulfilledAtUtc, string? Notes, DateTimeOffset CreatedAtUtc,
+    Guid? AccessEntitlementId = null,
+    string? NameEn = null,
+    string? NameAr = null,
+    bool IsCustom = false);
+
+public sealed record AccessCaseItemCreateSpec(
+    Guid? AccessEntitlementId,
+    string? CustomName,
+    AccessItemAction Action,
+    string? Notes,
+    bool IsSelected = true);
 
 public sealed record ExistingAccessItemDto(
     Guid Id, Guid AccessCaseId, Guid? ConfigurationItemId, string EntitlementKey,
@@ -86,7 +97,8 @@ public sealed class AccessCaseService(
     INumberSequenceService numbers,
     IClock clock,
     IBusinessAuditWriter businessAudit,
-    ISharedDbTransaction sharedDbTransaction)
+    ISharedDbTransaction sharedDbTransaction,
+    UserAccessService userAccess)
 {
     public const string SequenceKey = "access";
     public const string Prefix = "AC";
@@ -210,7 +222,8 @@ public sealed class AccessCaseService(
         Guid? departmentId, Guid? managerUserId, Guid? designatedApproverUserId,
         DateTimeOffset? effectiveAtUtc, CancellationToken ct,
         Guid? accessCategoryId = null,
-        bool hasConfigureOverride = false)
+        bool hasConfigureOverride = false,
+        IReadOnlyList<AccessCaseItemCreateSpec>? items = null)
     {
         AccessCaseDto? created = null;
         await sharedDbTransaction.ExecuteAsync(async innerCt =>
@@ -242,22 +255,211 @@ public sealed class AccessCaseService(
                 designatedApproverUserId, effectiveAtUtc, accessCategoryId);
             db.AccessCases.Add(entity);
 
-            if (type == AccessCaseType.Leaver)
-            {
-                foreach ((string key, AccessItemAction action, bool privileged) in LeaverDefaults)
-                {
-                    db.AccessCaseItems.Add(AccessCaseItem.Create(
-                        entity.Id, key, action, clock.UtcNow, isPrivileged: privileged, isMandatory: true));
-                }
-            }
+            int itemCount = await AddCaseItemsOnCreateAsync(
+                entity, type, accessCategoryId, items, innerCt);
+
+            if (type == AccessCaseType.Mover && subjectUserId is Guid moverSubject && moverSubject != Guid.Empty)
+                await SnapshotCurrentAccessAsync(entity.Id, moverSubject, innerCt);
 
             await businessAudit.AppendAsync(AccessAudit.Created(entity.Id, entity.CaseNumber), innerCt);
             await db.SaveChangesAsync(innerCt);
-            created = Map(entity, type == AccessCaseType.Leaver ? LeaverDefaults.Length : 0,
-                type == AccessCaseType.Leaver ? LeaverDefaults.Length : 0);
+            int pendingMandatory = type == AccessCaseType.Leaver ? itemCount : 0;
+            created = Map(entity, itemCount, pendingMandatory);
         }, ct);
 
         return created!;
+    }
+
+    private async Task<int> AddCaseItemsOnCreateAsync(
+        AccessCase entity,
+        AccessCaseType type,
+        Guid? accessCategoryId,
+        IReadOnlyList<AccessCaseItemCreateSpec>? items,
+        CancellationToken ct)
+    {
+        List<AccessCaseItemCreateSpec> selected = (items ?? [])
+            .Where(x => x.IsSelected)
+            .ToList();
+
+        if (selected.Count > 0)
+        {
+            await MaterializeClientItemsAsync(entity, type, selected, ct);
+            return selected.Count;
+        }
+
+        if (type != AccessCaseType.Leaver)
+            return 0;
+
+        if (accessCategoryId is Guid categoryId)
+        {
+            List<AccessCategoryEntitlement> mappings = await db.AccessCategoryEntitlements.AsNoTracking()
+                .Where(x => x.AccessCategoryId == categoryId && x.IsActive)
+                .OrderBy(x => x.SortOrder)
+                .ToListAsync(ct);
+            if (mappings.Count > 0)
+            {
+                List<Guid> entitlementIds = mappings.Select(x => x.AccessEntitlementId).ToList();
+                Dictionary<Guid, AccessEntitlement> catalog = await db.AccessEntitlements.AsNoTracking()
+                    .Where(x => entitlementIds.Contains(x.Id) && x.IsActive)
+                    .ToDictionaryAsync(x => x.Id, ct);
+                int added = 0;
+                foreach (AccessCategoryEntitlement mapping in mappings)
+                {
+                    if (!catalog.TryGetValue(mapping.AccessEntitlementId, out AccessEntitlement? entitlement))
+                        continue;
+                    AccessItemAction action = entitlement.ToItemRevokeAction();
+                    db.AccessCaseItems.Add(AccessCaseItem.Create(
+                        entity.Id,
+                        entitlement.Key,
+                        action,
+                        clock.UtcNow,
+                        isPrivileged: entitlement.IsPrivileged,
+                        isMandatory: true,
+                        accessEntitlementId: entitlement.Id,
+                        entitlementNameEnSnapshot: entitlement.NameEn,
+                        entitlementNameArSnapshot: entitlement.NameAr));
+                    added++;
+                }
+
+                if (added > 0) return added;
+            }
+        }
+
+        foreach ((string key, AccessItemAction action, bool privileged) in LeaverDefaults)
+        {
+            db.AccessCaseItems.Add(AccessCaseItem.Create(
+                entity.Id, key, action, clock.UtcNow, isPrivileged: privileged, isMandatory: true));
+        }
+
+        return LeaverDefaults.Length;
+    }
+
+    private async Task MaterializeClientItemsAsync(
+        AccessCase entity,
+        AccessCaseType type,
+        IReadOnlyList<AccessCaseItemCreateSpec> selected,
+        CancellationToken ct)
+    {
+        List<Guid> entitlementIds = selected
+            .Where(x => x.AccessEntitlementId is Guid id && id != Guid.Empty)
+            .Select(x => x.AccessEntitlementId!.Value)
+            .Distinct()
+            .ToList();
+        Dictionary<Guid, AccessEntitlement> catalog = entitlementIds.Count == 0
+            ? []
+            : await db.AccessEntitlements.AsNoTracking()
+                .Where(x => entitlementIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id, ct);
+
+        foreach (AccessCaseItemCreateSpec spec in selected)
+        {
+            ValidateItemActionForType(type, spec.Action);
+
+            if (spec.AccessEntitlementId is Guid entitlementId && entitlementId != Guid.Empty)
+            {
+                if (!catalog.TryGetValue(entitlementId, out AccessEntitlement? entitlement))
+                    throw new InvalidOperationException("Access entitlement not found.");
+                if (!entitlement.IsActive)
+                    throw new InvalidOperationException($"Access entitlement '{entitlement.Key}' is inactive.");
+
+                AccessItemAction action = ResolveAction(type, spec.Action, entitlement);
+                db.AccessCaseItems.Add(AccessCaseItem.Create(
+                    entity.Id,
+                    entitlement.Key,
+                    action,
+                    clock.UtcNow,
+                    isPrivileged: entitlement.IsPrivileged,
+                    isMandatory: type == AccessCaseType.Leaver,
+                    notes: spec.Notes,
+                    accessEntitlementId: entitlement.Id,
+                    entitlementNameEnSnapshot: entitlement.NameEn,
+                    entitlementNameArSnapshot: entitlement.NameAr));
+                continue;
+            }
+
+            if (string.IsNullOrWhiteSpace(spec.CustomName))
+                throw new InvalidOperationException("Custom access requires a name when no catalog entitlement is selected.");
+
+            string customName = spec.CustomName.Trim();
+            string customKey = "CUSTOM:" + customName.ToUpperInvariant();
+            AccessItemAction customAction = ResolveCustomAction(type, spec.Action);
+            db.AccessCaseItems.Add(AccessCaseItem.Create(
+                entity.Id,
+                customKey,
+                customAction,
+                clock.UtcNow,
+                isMandatory: type == AccessCaseType.Leaver,
+                notes: spec.Notes,
+                entitlementNameEnSnapshot: customName,
+                entitlementNameArSnapshot: customName,
+                isCustom: true));
+            await businessAudit.AppendAsync(AccessAudit.Field(
+                entity.Id, entity.CaseNumber, "CustomAccessRequested", null, customName), ct);
+        }
+    }
+
+    private static void ValidateItemActionForType(AccessCaseType type, AccessItemAction action)
+    {
+        switch (type)
+        {
+            case AccessCaseType.Joiner:
+            case AccessCaseType.AccessRequest:
+                if (action != AccessItemAction.Grant)
+                    throw new InvalidOperationException($"{type} cases only support Grant actions.");
+                break;
+            case AccessCaseType.Mover:
+                if (action is not (AccessItemAction.Grant or AccessItemAction.Remove or AccessItemAction.Disable))
+                    throw new InvalidOperationException("Mover cases support Grant, Remove, or Disable actions.");
+                break;
+            case AccessCaseType.Leaver:
+                if (action is not (AccessItemAction.Remove or AccessItemAction.Disable or AccessItemAction.Reassign))
+                    throw new InvalidOperationException("Leaver cases support Remove, Disable, or Reassign actions.");
+                break;
+        }
+    }
+
+    private static AccessItemAction ResolveAction(
+        AccessCaseType type,
+        AccessItemAction requested,
+        AccessEntitlement entitlement)
+    {
+        if (type is AccessCaseType.Joiner or AccessCaseType.AccessRequest)
+            return AccessItemAction.Grant;
+        if (type == AccessCaseType.Leaver)
+            return entitlement.ToItemRevokeAction();
+        if (type == AccessCaseType.Mover
+            && requested is AccessItemAction.Remove or AccessItemAction.Disable)
+        {
+            // Prefer catalog default when client sends Remove as a generic revoke intent
+            if (requested == AccessItemAction.Remove)
+                return entitlement.ToItemRevokeAction();
+            return requested;
+        }
+
+        return requested;
+    }
+
+    private static AccessItemAction ResolveCustomAction(AccessCaseType type, AccessItemAction requested)
+    {
+        if (type is AccessCaseType.Joiner or AccessCaseType.AccessRequest)
+            return AccessItemAction.Grant;
+        if (type == AccessCaseType.Leaver && requested is AccessItemAction.Grant)
+            return AccessItemAction.Remove;
+        return requested;
+    }
+
+    private async Task SnapshotCurrentAccessAsync(Guid caseId, Guid subjectUserId, CancellationToken ct)
+    {
+        IReadOnlyList<UserAccessEntitlementDto> current = await userAccess.GetCurrentAccessAsync(
+            subjectUserId, ct, activeOnly: true);
+        foreach (UserAccessEntitlementDto row in current)
+        {
+            db.ExistingAccessSnapshotItems.Add(ExistingAccessSnapshotItem.Create(
+                caseId,
+                row.EntitlementKey,
+                clock.UtcNow,
+                accessSummary: row.NameEn));
+        }
     }
 
     public async Task<AccessCaseDto> UpdateDraftAsync(
@@ -477,9 +679,16 @@ public sealed class AccessCaseService(
         await EnsureRouteActorAsync(entity.Id, AccessCategoryStage.Closer, actorUserId, ct);
         await EnsureMandatoryCompleteOrExceptionAsync(entity, ct);
         entity.RecordClosure(actorUserId, clock.UtcNow);
+        AccessCaseStatus from = entity.Status;
+        entity.TransitionTo(AccessCaseStatus.Closed, clock.UtcNow);
         await businessAudit.AppendAsync(AccessAudit.Field(
             entity.Id, entity.CaseNumber, "CaseClosed", null, actorUserId.ToString()), ct);
-        return await TransitionAsync(id, AccessCaseStatus.Closed, ct, actorUserId);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "Status", from.ToString(), nameof(AccessCaseStatus.Closed),
+            BusinessAuditAction.StatusChanged), ct);
+        await userAccess.ReconcileFromClosedCaseAsync(entity, ct);
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(id, ct))!;
     }
 
     public async Task<AccessCaseDto> CancelAsync(Guid id, Guid actorUserId, string? reason, bool hasPrivilegedOverride, CancellationToken ct)
@@ -763,5 +972,9 @@ public sealed class AccessCaseService(
     private static AccessCaseItemDto Map(AccessCaseItem x) =>
         new(x.Id, x.AccessCaseId, x.ConfigurationItemId, x.EntitlementKey, x.Action.ToString(),
             x.IsPrivileged, x.IsMandatory, x.Status.ToString(), x.FulfilledByUserId, x.FulfilledAtUtc,
-            x.Notes, x.CreatedAtUtc);
+            x.Notes, x.CreatedAtUtc,
+            x.AccessEntitlementId,
+            x.EntitlementNameEnSnapshot ?? x.EntitlementKey,
+            x.EntitlementNameArSnapshot ?? x.EntitlementNameEnSnapshot ?? x.EntitlementKey,
+            x.IsCustom);
 }
