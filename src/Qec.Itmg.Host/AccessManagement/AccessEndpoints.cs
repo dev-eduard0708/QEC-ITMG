@@ -16,6 +16,7 @@ public static class AccessEndpoints
     public const string AccessRequest = "access.request";
     public const string AccessApprove = "access.approve";
     public const string AccessFulfill = "access.fulfill";
+    public const string AccessConfigure = "access.configure";
     public const string AccessReview = "access.review";
     public const string AccessPrivilegedManage = "access.privileged.manage";
     public const string SodManage = "sod.manage";
@@ -23,17 +24,86 @@ public static class AccessEndpoints
     public static IEndpointRouteBuilder MapAccessEndpoints(this IEndpointRouteBuilder endpoints)
     {
         MapCases(endpoints);
+        MapCategories(endpoints);
         MapReviews(endpoints);
         MapAccounts(endpoints);
         MapSod(endpoints);
         return endpoints;
     }
 
+    private static void MapCategories(IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGet("/api/v1/access/categories", async (
+            bool? activeOnly, AccessCategoryService svc, CancellationToken ct) =>
+            Results.Ok(await svc.ListAsync(activeOnly ?? false, ct)))
+            .RequirePermission(AccessRequest);
+
+        endpoints.MapGet("/api/v1/access/categories/{id:guid}", async (
+            Guid id, AccessCategoryService svc, CancellationToken ct) =>
+        {
+            AccessCategoryDto? item = await svc.GetAsync(id, ct);
+            return item is null ? Results.NotFound() : Results.Ok(item);
+        }).RequirePermission(AccessRequest);
+
+        endpoints.MapPost("/api/v1/access/categories", async (
+            UpsertAccessCategoryRequest req, AccessCategoryService svc, CancellationToken ct) =>
+        {
+            try
+            {
+                AccessCategoryDto created = await svc.CreateAsync(
+                    req.Key, req.NameEn, req.NameAr, req.DescriptionEn, req.DescriptionAr,
+                    req.PreferSubjectEmployeeVerification ?? true, req.IsActive ?? true, ct);
+                return Results.Created($"/api/v1/access/categories/{created.Id}", created);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessConfigure);
+
+        endpoints.MapPut("/api/v1/access/categories/{id:guid}", async (
+            Guid id, UpsertAccessCategoryRequest req, AccessCategoryService svc, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await svc.UpdateAsync(
+                    id, req.NameEn, req.NameAr, req.DescriptionEn, req.DescriptionAr,
+                    req.IsActive ?? true, req.PreferSubjectEmployeeVerification ?? true, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessConfigure);
+
+        endpoints.MapPut("/api/v1/access/categories/{id:guid}/routing", async (
+            Guid id, ReplaceCategoryRoutingRequest req, AccessCategoryService svc, CancellationToken ct) =>
+        {
+            try
+            {
+                Dictionary<AccessCategoryStage, IReadOnlyList<Guid>> routing = new()
+                {
+                    [AccessCategoryStage.Requester] = req.RequesterUserIds ?? [],
+                    [AccessCategoryStage.Approver] = req.ApproverUserIds ?? [],
+                    [AccessCategoryStage.Fulfiller] = req.FulfillerUserIds ?? [],
+                    [AccessCategoryStage.Verifier] = req.VerifierUserIds ?? [],
+                    [AccessCategoryStage.Closer] = req.CloserUserIds ?? [],
+                };
+                return Results.Ok(await svc.ReplaceRoutingAsync(id, routing, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessConfigure);
+    }
+
     private static void MapCases(IEndpointRouteBuilder endpoints)
     {
         RouteGroupBuilder read = endpoints.MapGroup("/api/v1/access/cases").RequirePermission(AccessRequest);
-        read.MapGet(string.Empty, async (int? page, int? pageSize, string? search, string? type, string? status, AccessCaseService svc, CancellationToken ct) =>
-            Results.Ok(await svc.ListAsync(page ?? 1, pageSize ?? 25, search, ParseEnum<AccessCaseType>(type), ParseEnum<AccessCaseStatus>(status), ct)));
+        read.MapGet(string.Empty, async (
+            int? page, int? pageSize, string? search, string? type, string? status, string? queue,
+            ClaimsPrincipal principal, ICurrentUserService currentUser, AccessCaseService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            bool canSeeAll = session.Permissions.Contains(AccessConfigure)
+                || session.Permissions.Contains(AccessPrivilegedManage);
+            return Results.Ok(await svc.ListAsync(
+                page ?? 1, pageSize ?? 25, search, ParseEnum<AccessCaseType>(type), ParseEnum<AccessCaseStatus>(status), ct,
+                scopedUserId: session.Id, workQueue: queue, canSeeAll: canSeeAll));
+        });
         read.MapGet("/{id:guid}", async (Guid id, AccessCaseService svc, CancellationToken ct) =>
         {
             AccessCaseDto? item = await svc.GetAsync(id, ct);
@@ -69,7 +139,9 @@ public static class AccessEndpoints
             {
                 AccessCaseDto created = await svc.CreateAsync(
                     type, session.Id, req.Reason, req.SubjectUserId, req.SubjectName, req.SubjectEmail,
-                    req.DepartmentId, req.ManagerUserId, req.DesignatedApproverUserId, req.EffectiveAtUtc, ct);
+                    req.DepartmentId, req.ManagerUserId, req.DesignatedApproverUserId, req.EffectiveAtUtc, ct,
+                    accessCategoryId: req.AccessCategoryId,
+                    hasConfigureOverride: session.Permissions.Contains(AccessConfigure));
                 return Results.Created($"/api/v1/access/cases/{created.Id}", created);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
@@ -82,13 +154,14 @@ public static class AccessEndpoints
             {
                 return Results.Ok(await svc.UpdateDraftAsync(
                     id, req.Reason, req.SubjectUserId, req.SubjectName, req.SubjectEmail,
-                    req.DepartmentId, req.ManagerUserId, req.DesignatedApproverUserId, req.EffectiveAtUtc, ct));
+                    req.DepartmentId, req.ManagerUserId, req.DesignatedApproverUserId, req.EffectiveAtUtc, ct,
+                    accessCategoryId: req.AccessCategoryId));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessRequest);
 
-        MapCaseAction("/api/v1/access/cases/{id:guid}/submit", AccessRequest, async (id, _, svc, _, ct) =>
-            Results.Ok(await svc.SubmitAsync(id, ct)));
+        MapCaseAction("/api/v1/access/cases/{id:guid}/submit", AccessRequest, async (id, session, svc, _, ct) =>
+            Results.Ok(await svc.SubmitAsync(id, session.Id, ct)));
         MapCaseAction("/api/v1/access/cases/{id:guid}/start-approval", AccessApprove, async (id, _, svc, _, ct) =>
             Results.Ok(await svc.StartApprovalAsync(id, ct)));
 
@@ -122,14 +195,30 @@ public static class AccessEndpoints
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessApprove);
 
-        MapCaseAction("/api/v1/access/cases/{id:guid}/start-verification", AccessFulfill, async (id, _, svc, notifications, ct) =>
+        MapCaseAction("/api/v1/access/cases/{id:guid}/start-verification", AccessFulfill, async (id, session, svc, notifications, ct) =>
         {
-            AccessCaseDto updated = await svc.StartVerificationAsync(id, ct);
+            AccessCaseDto updated = await svc.StartVerificationAsync(id, session.Id, ct);
             await notifications.NotifyVerificationRequiredAsync(updated, ct);
             return Results.Ok(updated);
         });
-        MapCaseAction("/api/v1/access/cases/{id:guid}/close", AccessFulfill, async (id, _, svc, _, ct) =>
-            Results.Ok(await svc.CloseAsync(id, ct)));
+
+        endpoints.MapPost("/api/v1/access/cases/{id:guid}/verify", async (
+            Guid id, VerifyAccessCaseRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                if (string.Equals(req.Mode, "fallback", StringComparison.OrdinalIgnoreCase))
+                    return Results.Ok(await svc.VerifyFallbackAsync(id, session.Id, req.FallbackReason ?? req.Comment ?? "", ct));
+                return Results.Ok(await svc.VerifyEmployeeAsync(id, session.Id, req.EverythingWorks != false, req.Comment, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessRequest);
+
+        MapCaseAction("/api/v1/access/cases/{id:guid}/close", AccessFulfill, async (id, session, svc, _, ct) =>
+            Results.Ok(await svc.CloseAsync(id, session.Id, ct)));
 
         endpoints.MapPost("/api/v1/access/cases/{id:guid}/cancel", async (
             Guid id, OverrideReasonRequest? req, ClaimsPrincipal principal, ICurrentUserService currentUser,
@@ -449,11 +538,35 @@ public sealed class AccessNotificationService(INotificationService notifications
 
 public sealed record CreateAccessCaseRequest(
     string Type, string Reason, Guid? SubjectUserId, string? SubjectName, string? SubjectEmail,
-    Guid? DepartmentId, Guid? ManagerUserId, Guid? DesignatedApproverUserId, DateTimeOffset? EffectiveAtUtc);
+    Guid? DepartmentId, Guid? ManagerUserId, Guid? DesignatedApproverUserId, DateTimeOffset? EffectiveAtUtc,
+    Guid? AccessCategoryId = null);
 
 public sealed record UpdateAccessCaseRequest(
     string Reason, Guid? SubjectUserId, string? SubjectName, string? SubjectEmail,
-    Guid? DepartmentId, Guid? ManagerUserId, Guid? DesignatedApproverUserId, DateTimeOffset? EffectiveAtUtc);
+    Guid? DepartmentId, Guid? ManagerUserId, Guid? DesignatedApproverUserId, DateTimeOffset? EffectiveAtUtc,
+    Guid? AccessCategoryId = null);
+
+public sealed record UpsertAccessCategoryRequest(
+    string Key,
+    string NameEn,
+    string NameAr,
+    string? DescriptionEn,
+    string? DescriptionAr,
+    bool? IsActive,
+    bool? PreferSubjectEmployeeVerification);
+
+public sealed record ReplaceCategoryRoutingRequest(
+    Guid[]? RequesterUserIds,
+    Guid[]? ApproverUserIds,
+    Guid[]? FulfillerUserIds,
+    Guid[]? VerifierUserIds,
+    Guid[]? CloserUserIds);
+
+public sealed record VerifyAccessCaseRequest(
+    string? Mode,
+    bool? EverythingWorks,
+    string? Comment,
+    string? FallbackReason);
 
 public sealed record AddAccessItemRequest(
     string EntitlementKey, string Action, Guid? ConfigurationItemId, bool IsPrivileged, bool IsMandatory, string? Notes);

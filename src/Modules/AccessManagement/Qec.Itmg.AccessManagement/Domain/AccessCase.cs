@@ -93,11 +93,24 @@ public sealed class AccessCase
     public Guid? DesignatedApproverUserId { get; private set; }
     public Guid? LinkedTicketId { get; private set; }
     public Guid? VendorId { get; private set; }
+    public Guid? AccessCategoryId { get; private set; }
+    public string? AccessCategoryKeySnapshot { get; private set; }
+    public string? AccessCategoryNameSnapshot { get; private set; }
+    public bool PreferSubjectEmployeeVerificationSnapshot { get; private set; }
     public DateTimeOffset? EffectiveAtUtc { get; private set; }
     public string Reason { get; private set; } = null!;
     public bool ExistingAccessConfirmed { get; private set; }
     public DateTimeOffset? ExistingAccessConfirmedAtUtc { get; private set; }
     public Guid? ExistingAccessConfirmedByUserId { get; private set; }
+    public Guid? ApprovedByUserId { get; private set; }
+    public DateTimeOffset? ApprovedAtUtc { get; private set; }
+    public Guid? VerifiedByUserId { get; private set; }
+    public DateTimeOffset? VerifiedAtUtc { get; private set; }
+    public AccessVerificationMethod? VerificationMethod { get; private set; }
+    public AccessVerificationOutcome? VerificationOutcome { get; private set; }
+    public string? VerificationComment { get; private set; }
+    public string? FallbackReason { get; private set; }
+    public Guid? ClosedByUserId { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
     public DateTimeOffset? ClosedAtUtc { get; private set; }
@@ -115,7 +128,8 @@ public sealed class AccessCase
         Guid? departmentId = null,
         Guid? managerUserId = null,
         Guid? designatedApproverUserId = null,
-        DateTimeOffset? effectiveAtUtc = null)
+        DateTimeOffset? effectiveAtUtc = null,
+        Guid? accessCategoryId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(caseNumber);
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
@@ -135,6 +149,7 @@ public sealed class AccessCase
             DepartmentId = Norm(departmentId),
             ManagerUserId = Norm(managerUserId),
             DesignatedApproverUserId = Norm(designatedApproverUserId),
+            AccessCategoryId = Norm(accessCategoryId),
             EffectiveAtUtc = effectiveAtUtc,
             Reason = reason.Trim(),
             CreatedAtUtc = utcNow,
@@ -151,7 +166,8 @@ public sealed class AccessCase
         Guid? managerUserId,
         Guid? designatedApproverUserId,
         DateTimeOffset? effectiveAtUtc,
-        DateTimeOffset utcNow)
+        DateTimeOffset utcNow,
+        Guid? accessCategoryId = null)
     {
         EnsureDraft();
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
@@ -162,9 +178,72 @@ public sealed class AccessCase
         DepartmentId = Norm(departmentId);
         ManagerUserId = Norm(managerUserId);
         DesignatedApproverUserId = Norm(designatedApproverUserId);
+        if (accessCategoryId is not null)
+            AccessCategoryId = Norm(accessCategoryId);
         EffectiveAtUtc = effectiveAtUtc;
         UpdatedAtUtc = utcNow;
     }
+
+    public void SetCategorySnapshot(
+        Guid categoryId,
+        string key,
+        string name,
+        bool preferSubjectEmployeeVerification,
+        DateTimeOffset utcNow)
+    {
+        AccessCategoryId = categoryId;
+        AccessCategoryKeySnapshot = key.Trim();
+        AccessCategoryNameSnapshot = name.Trim();
+        PreferSubjectEmployeeVerificationSnapshot = preferSubjectEmployeeVerification;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void RecordApproval(Guid actorUserId, DateTimeOffset utcNow)
+    {
+        ApprovedByUserId = actorUserId;
+        ApprovedAtUtc = utcNow;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void RecordVerification(
+        Guid actorUserId,
+        AccessVerificationMethod method,
+        AccessVerificationOutcome outcome,
+        DateTimeOffset utcNow,
+        string? comment = null,
+        string? fallbackReason = null)
+    {
+        VerifiedByUserId = actorUserId;
+        VerifiedAtUtc = utcNow;
+        VerificationMethod = method;
+        VerificationOutcome = outcome;
+        VerificationComment = Norm(comment);
+        FallbackReason = Norm(fallbackReason);
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void ClearVerification(DateTimeOffset utcNow)
+    {
+        VerifiedByUserId = null;
+        VerifiedAtUtc = null;
+        VerificationMethod = null;
+        VerificationOutcome = null;
+        VerificationComment = null;
+        FallbackReason = null;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void RecordClosure(Guid actorUserId, DateTimeOffset utcNow)
+    {
+        ClosedByUserId = actorUserId;
+        ClosedAtUtc = utcNow;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public bool IsReadyToClose =>
+        Status == AccessCaseStatus.Verification
+        && VerificationOutcome == AccessVerificationOutcome.Verified
+        && VerifiedAtUtc is not null;
 
     public void LinkTicket(Guid ticketId, DateTimeOffset utcNow)
     {

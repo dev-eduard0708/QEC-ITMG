@@ -19,6 +19,17 @@ public static class DevelopmentLoginPrincipalFactory
     public const string EmployeeDisplayName = "Local Employee";
     public const string EmployeeExternalId = "dev:employee";
 
+    public static readonly HashSet<string> DemoPersonaKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "finance-manager",
+        "hr-manager",
+        "it-manager",
+        "it-admin1",
+        "it-admin2",
+        "finance-employee",
+        "facilities",
+    };
+
     public static ClaimsPrincipal Create(User user)
     {
         ArgumentNullException.ThrowIfNull(user);

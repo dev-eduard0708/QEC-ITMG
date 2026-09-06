@@ -13,6 +13,8 @@ public interface IDevelopmentQuickLoginService
     Task<User> EnsureAdministratorAsync(CancellationToken cancellationToken = default);
 
     Task<User> EnsureEmployeeAsync(CancellationToken cancellationToken = default);
+
+    Task<User?> FindDemoPersonaAsync(string key, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -38,6 +40,18 @@ public sealed class DevelopmentQuickLoginService(
             DevelopmentLoginPrincipalFactory.EmployeeExternalId,
             IdentitySeedCatalog.EmployeeRoleName,
             cancellationToken);
+
+    public async Task<User?> FindDemoPersonaAsync(string key, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return null;
+        string normalized = key.Trim().ToLowerInvariant();
+        if (!DevelopmentLoginPrincipalFactory.DemoPersonaKeys.Contains(normalized)) return null;
+
+        string externalId = $"dev:demo:{normalized}";
+        return await db.Users.FirstOrDefaultAsync(
+            candidate => candidate.DirectoryObjectId == externalId && candidate.Status == UserStatus.Active,
+            cancellationToken);
+    }
 
     private async Task<User> EnsureUserWithRoleAsync(
         string upn,

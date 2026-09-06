@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import type { ColumnDef } from '@tanstack/react-table'
 import { ApiError, accessApi, evidenceApi, type AccessReviewCampaign } from '@/api/client'
+import { AccessNavTabs } from '@/features/it/access-nav'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { DataTable } from '@/components/shared/data-table'
@@ -96,6 +97,7 @@ export function AccessReviewsPage() {
           </Button>
         }
       />
+      <AccessNavTabs />
       <p className="text-sm text-muted-foreground">
         {t('access.reviewsCounts', {
           overdue: listQuery.data?.overdueCount ?? 0,

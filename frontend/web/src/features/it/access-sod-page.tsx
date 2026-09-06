@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { AccessNavTabs } from '@/features/it/access-nav'
 
 export function AccessSodPage() {
   const { t } = useTranslation()
@@ -73,6 +74,7 @@ export function AccessSodPage() {
           </Button>
         }
       />
+      <AccessNavTabs />
       <DataTable
         columns={columns}
         data={listQuery.data?.items ?? []}

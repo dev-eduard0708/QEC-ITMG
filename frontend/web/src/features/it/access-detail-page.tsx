@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ApiError, accessApi, type AccessEvidenceProjection } from '@/api/client'
+import { ApiError, accessApi, type AccessCaseRouteParticipant, type AccessEvidenceProjection } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -16,15 +17,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { AccessNavTabs } from '@/features/it/access-nav'
+import { useAccessUsers } from '@/features/it/access-users'
+
+type StageKey = 'Requester' | 'Approver' | 'Fulfiller' | 'Verifier' | 'Closer'
+
+function participantsFor(
+  routes: AccessCaseRouteParticipant[] | null | undefined,
+  stage: StageKey,
+): AccessCaseRouteParticipant[] {
+  return (routes ?? []).filter((item) => item.stage === stage)
+}
+
+function formatWhen(value: string | null | undefined): string {
+  if (!value) return '—'
+  return new Date(value).toLocaleString()
+}
 
 export function AccessDetailPage() {
   const { id = '' } = useParams()
   const { t } = useTranslation()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
+  const { nameFor } = useAccessUsers()
   const qc = useQueryClient()
   const [entitlement, setEntitlement] = useState('')
   const [action, setAction] = useState('Grant')
   const [existingKey, setExistingKey] = useState('')
+  const [problemComment, setProblemComment] = useState('')
+  const [fallbackReason, setFallbackReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [evidence, setEvidence] = useState<AccessEvidenceProjection | null>(null)
 
@@ -59,8 +79,119 @@ export function AccessDetailPage() {
   })
 
   const accessCase = caseQuery.data
+  const routes = accessCase?.routeParticipants
+
+  const workflowStages = useMemo(() => {
+    if (!accessCase) return []
+    const status = accessCase.status
+    const requesters = participantsFor(routes, 'Requester')
+    const approvers = participantsFor(routes, 'Approver')
+    const fulfillers = participantsFor(routes, 'Fulfiller')
+    const verifiers = participantsFor(routes, 'Verifier')
+    const fallbackVerifiers = verifiers.filter((item) => !item.isSubjectEmployeeDerived)
+    const subjectVerifiers = verifiers.filter((item) => item.isSubjectEmployeeDerived)
+    const closers = participantsFor(routes, 'Closer')
+
+    const requesterDone = !['Draft'].includes(status)
+    const approvalDone = Boolean(accessCase.approvedAtUtc) || ['Fulfillment', 'Verification', 'Closed'].includes(status)
+    const fulfillmentDone = ['Verification', 'Closed'].includes(status) || Boolean(accessCase.isReadyToClose)
+    const verificationDone = Boolean(accessCase.isReadyToClose) || status === 'Closed'
+    const closedDone = status === 'Closed'
+
+    return [
+      {
+        key: 'requester',
+        title: t('access.workflow.requester'),
+        names: requesters.length
+          ? requesters.map((item) => nameFor(item.userId))
+          : [nameFor(accessCase.requesterUserId)],
+        state: requesterDone
+          ? t('access.workflow.submitted')
+          : status === 'Draft'
+            ? t('access.workflow.draft')
+            : t('access.workflow.waiting'),
+        done: requesterDone,
+        meta: null as string | null,
+      },
+      {
+        key: 'approver',
+        title: t('access.workflow.approver'),
+        names: approvers.length ? approvers.map((item) => nameFor(item.userId)) : ['—'],
+        state: approvalDone
+          ? t('access.workflow.approved')
+          : status === 'Approval'
+            ? t('access.workflow.inProgress')
+            : t('access.workflow.waiting'),
+        done: approvalDone,
+        meta: accessCase.approvedAtUtc
+          ? `${nameFor(accessCase.approvedByUserId)} · ${formatWhen(accessCase.approvedAtUtc)}`
+          : null,
+      },
+      {
+        key: 'fulfiller',
+        title: t('access.workflow.fulfiller'),
+        names: fulfillers.length ? fulfillers.map((item) => nameFor(item.userId)) : ['—'],
+        state: fulfillmentDone
+          ? t('access.workflow.sentForVerification')
+          : status === 'Fulfillment'
+            ? t('access.workflow.inProgress')
+            : t('access.workflow.waiting'),
+        done: fulfillmentDone,
+        meta: null,
+      },
+      {
+        key: 'verifier',
+        title: t('access.workflow.verifier'),
+        names: (subjectVerifiers.length ? subjectVerifiers : verifiers).map((item) => nameFor(item.userId)),
+        state: verificationDone
+          ? t('access.workflow.verified')
+          : status === 'Verification'
+            ? t('access.workflow.waiting')
+            : t('access.workflow.pending'),
+        done: verificationDone,
+        meta: accessCase.verifiedAtUtc
+          ? `${nameFor(accessCase.verifiedByUserId)} · ${formatWhen(accessCase.verifiedAtUtc)}${
+              accessCase.verificationMethod ? ` · ${accessCase.verificationMethod}` : ''
+            }`
+          : null,
+      },
+      {
+        key: 'fallback',
+        title: t('access.workflow.fallbackVerifier'),
+        names: fallbackVerifiers.length ? fallbackVerifiers.map((item) => nameFor(item.userId)) : ['—'],
+        state: accessCase.verificationMethod === 'Fallback' ? t('access.workflow.verified') : t('access.workflow.optional'),
+        done: accessCase.verificationMethod === 'Fallback',
+        meta: accessCase.fallbackReason ?? null,
+      },
+      {
+        key: 'closer',
+        title: t('access.workflow.closer'),
+        names: closers.length ? closers.map((item) => nameFor(item.userId)) : ['—'],
+        state: closedDone
+          ? t('access.status.closed')
+          : accessCase.isReadyToClose
+            ? t('access.status.readyToClose')
+            : t('access.workflow.pending'),
+        done: closedDone,
+        meta: closedDone
+          ? `${nameFor(accessCase.closedByUserId)} · ${formatWhen(accessCase.closedAtUtc)}`
+          : null,
+      },
+    ]
+  }, [accessCase, nameFor, routes, t])
+
   if (caseQuery.isLoading) return <p className="text-sm text-muted-foreground">{t('access.loading')}</p>
   if (!accessCase) return <p className="text-sm text-destructive">{t('access.notFound')}</p>
+
+  const isSubject = Boolean(user?.id && accessCase.subjectUserId === user.id)
+  const canVerifyEmployee =
+    accessCase.status === 'Verification' && isSubject && accessCase.type !== 'Leaver' && !accessCase.isReadyToClose
+  const canFallbackVerify =
+    accessCase.status === 'Verification' &&
+    !accessCase.isReadyToClose &&
+    can('access.request') &&
+    !isSubject
+  const showClose = Boolean(accessCase.isReadyToClose) && accessCase.status !== 'Closed' && can('access.fulfill')
 
   return (
     <div className="space-y-6">
@@ -73,9 +204,18 @@ export function AccessDetailPage() {
           </Button>
         }
       />
+      <AccessNavTabs />
+
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline">{accessCase.type}</Badge>
         <Badge variant="secondary">{accessCase.status}</Badge>
+        {accessCase.accessCategoryNameSnapshot ? (
+          <Badge variant="outline">{accessCase.accessCategoryNameSnapshot}</Badge>
+        ) : null}
+        {accessCase.isReadyToClose ? (
+          <Badge variant="success">{t('access.status.readyToClose')}</Badge>
+        ) : null}
+        {accessCase.status === 'Closed' ? <Badge variant="success">{t('access.status.closed')}</Badge> : null}
         {accessCase.existingAccessConfirmed ? (
           <Badge variant="success">{t('access.existingConfirmed')}</Badge>
         ) : null}
@@ -83,15 +223,29 @@ export function AccessDetailPage() {
       <p className="text-sm">{accessCase.reason}</p>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('access.workflow.title')}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {workflowStages.map((stage) => (
+            <div key={stage.key} className="rounded-md border p-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium">{stage.title}</p>
+                <span aria-hidden>{stage.done ? '✓' : stage.state === t('access.workflow.inProgress') ? '●' : '○'}</span>
+              </div>
+              <p className="mt-1 text-muted-foreground">{stage.names.join(' / ') || '—'}</p>
+              <p className="mt-1 text-xs">{stage.state}</p>
+              {stage.meta ? <p className="mt-1 text-xs text-muted-foreground">{stage.meta}</p> : null}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
       <div className="flex flex-wrap gap-2">
         {accessCase.status === 'Draft' && can('access.request') ? (
           <Button type="button" onClick={() => run.mutate(() => accessApi.submit(id))}>
-            {t('access.actions.submit')}
-          </Button>
-        ) : null}
-        {accessCase.status === 'Submitted' && can('access.approve') ? (
-          <Button type="button" onClick={() => run.mutate(() => accessApi.startApproval(id))}>
-            {t('access.actions.startApproval')}
+            {t('access.actions.submitForApproval')}
           </Button>
         ) : null}
         {accessCase.status === 'Approval' && can('access.approve') ? (
@@ -106,12 +260,12 @@ export function AccessDetailPage() {
         ) : null}
         {accessCase.status === 'Fulfillment' && can('access.fulfill') ? (
           <Button type="button" onClick={() => run.mutate(() => accessApi.startVerification(id))}>
-            {t('access.actions.startVerification')}
+            {t('access.actions.sendForVerification')}
           </Button>
         ) : null}
-        {accessCase.status === 'Verification' && can('access.fulfill') ? (
+        {showClose ? (
           <Button type="button" onClick={() => run.mutate(() => accessApi.close(id))}>
-            {t('access.actions.close')}
+            {t('access.actions.closeCase')}
           </Button>
         ) : null}
         {accessCase.status === 'Closed' ? (
@@ -128,6 +282,113 @@ export function AccessDetailPage() {
           </Button>
         ) : null}
       </div>
+
+      {accessCase.status === 'Verification' && !accessCase.isReadyToClose ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('access.verification.title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {canVerifyEmployee ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    run.mutate(() => accessApi.verify(id, { mode: 'employee', everythingWorks: true }))
+                  }
+                >
+                  {t('access.verification.everythingWorks')}
+                </Button>
+                <div className="flex min-w-[240px] flex-1 flex-wrap items-end gap-2">
+                  <div className="min-w-[180px] flex-1 space-y-1">
+                    <Label htmlFor="problem-comment">{t('access.verification.problemComment')}</Label>
+                    <Input
+                      id="problem-comment"
+                      value={problemComment}
+                      onChange={(e) => setProblemComment(e.target.value)}
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={!problemComment.trim()}
+                    onClick={() =>
+                      run.mutate(() =>
+                        accessApi.verify(id, {
+                          mode: 'employee',
+                          everythingWorks: false,
+                          comment: problemComment,
+                        }),
+                      )
+                    }
+                  >
+                    {t('access.verification.haveProblem')}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+
+            {canFallbackVerify ? (
+              <div className="flex flex-wrap items-end gap-2 border-t pt-4">
+                <div className="min-w-[220px] flex-1 space-y-1">
+                  <Label htmlFor="fallback-reason">{t('access.verification.fallbackReason')}</Label>
+                  <Input
+                    id="fallback-reason"
+                    value={fallbackReason}
+                    onChange={(e) => setFallbackReason(e.target.value)}
+                    placeholder={t('access.verification.fallbackPlaceholder')}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={!fallbackReason.trim()}
+                  onClick={() =>
+                    run.mutate(() =>
+                      accessApi.verify(id, { mode: 'fallback', fallbackReason }),
+                    )
+                  }
+                >
+                  {t('access.verification.verifyOnBehalf')}
+                </Button>
+              </div>
+            ) : null}
+
+            {!canVerifyEmployee && !canFallbackVerify ? (
+              <p className="text-sm text-muted-foreground">{t('access.verification.waiting')}</p>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {(accessCase.approvedAtUtc || accessCase.verifiedAtUtc || accessCase.closedAtUtc) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('access.lifecycle.title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {accessCase.approvedAtUtc ? (
+              <p>
+                {t('access.lifecycle.approvedBy')}: {nameFor(accessCase.approvedByUserId)} ·{' '}
+                {formatWhen(accessCase.approvedAtUtc)}
+              </p>
+            ) : null}
+            {accessCase.verifiedAtUtc ? (
+              <p>
+                {t('access.lifecycle.verifiedBy')}: {nameFor(accessCase.verifiedByUserId)} ·{' '}
+                {formatWhen(accessCase.verifiedAtUtc)}
+                {accessCase.verificationMethod ? ` · ${accessCase.verificationMethod}` : ''}
+              </p>
+            ) : null}
+            {accessCase.closedAtUtc ? (
+              <p>
+                {t('access.lifecycle.closedBy')}: {nameFor(accessCase.closedByUserId)} ·{' '}
+                {formatWhen(accessCase.closedAtUtc)}
+              </p>
+            ) : null}
+          </CardContent>
+        </Card>
+      )}
 
       {accessCase.type === 'Mover' ? (
         <section className="space-y-3">

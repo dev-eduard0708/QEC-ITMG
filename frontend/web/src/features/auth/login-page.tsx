@@ -14,6 +14,18 @@ import { cn } from '@/lib/utils'
 
 type QuickLoginKind = 'admin' | 'employee'
 
+const DEMO_PERSONAS = [
+  'finance-manager',
+  'hr-manager',
+  'it-manager',
+  'it-admin1',
+  'it-admin2',
+  'finance-employee',
+  'facilities',
+] as const
+
+type DemoPersonaKey = (typeof DEMO_PERSONAS)[number]
+
 function sanitizeLocalReturnUrl(candidate: string | null | undefined): string {
   // Default "/" lets RootWorkspaceRedirect send Employees to /employee and IT users to /it.
   if (!candidate || !candidate.trim()) return '/'
@@ -58,6 +70,7 @@ export function LoginPage() {
   const language: AppLanguage = isAppLanguage(i18n.language) ? i18n.language : 'en'
 
   const [busyKind, setBusyKind] = useState<QuickLoginKind | null>(null)
+  const [busyPersona, setBusyPersona] = useState<DemoPersonaKey | null>(null)
   const [quickLoginError, setQuickLoginError] = useState<string | null>(null)
   const [googleBusy, setGoogleBusy] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
@@ -86,7 +99,7 @@ export function LoginPage() {
   }
 
   async function quickLogin(kind: QuickLoginKind) {
-    if (busyKind) return
+    if (busyKind || busyPersona) return
     setQuickLoginError(null)
     setBusyKind(kind)
     try {
@@ -101,6 +114,25 @@ export function LoginPage() {
       )
     } finally {
       setBusyKind(null)
+    }
+  }
+
+  async function personaLogin(key: DemoPersonaKey) {
+    if (busyKind || busyPersona) return
+    setQuickLoginError(null)
+    setBusyPersona(key)
+    try {
+      await apiFetch(`/auth/dev-login/persona/${key}`, { method: 'POST' })
+      await refresh()
+      navigate('/it/access', { replace: true })
+    } catch (caught) {
+      setQuickLoginError(
+        caught instanceof ApiError && caught.message
+          ? caught.message
+          : t('login.quickLogin.error'),
+      )
+    } finally {
+      setBusyPersona(null)
     }
   }
 
@@ -361,7 +393,7 @@ export function LoginPage() {
                       variant="outline"
                       size="sm"
                       className="h-9 w-full"
-                      disabled={busyKind !== null}
+                      disabled={busyKind !== null || busyPersona !== null}
                       onClick={() => void quickLogin('admin')}
                     >
                       {busyKind === 'admin' ? t('login.quickLogin.busy') : t('login.quickLogin.admin')}
@@ -371,13 +403,37 @@ export function LoginPage() {
                       variant="outline"
                       size="sm"
                       className="h-9 w-full"
-                      disabled={busyKind !== null}
+                      disabled={busyKind !== null || busyPersona !== null}
                       onClick={() => void quickLogin('employee')}
                     >
                       {busyKind === 'employee'
                         ? t('login.quickLogin.busy')
                         : t('login.quickLogin.employee')}
                     </Button>
+                    <Separator />
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-foreground">{t('login.dev.personas')}</p>
+                        <Badge variant="outline">{t('login.dev.personasNote')}</Badge>
+                      </div>
+                      <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                        {DEMO_PERSONAS.map((key) => (
+                          <Button
+                            key={key}
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 justify-start"
+                            disabled={busyKind !== null || busyPersona !== null}
+                            onClick={() => void personaLogin(key)}
+                          >
+                            {busyPersona === key
+                              ? t('login.quickLogin.busy')
+                              : t(`login.persona.${key}`)}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
                     {quickLoginError ? (
                       <p className="text-xs text-destructive" role="alert">
                         {quickLoginError}

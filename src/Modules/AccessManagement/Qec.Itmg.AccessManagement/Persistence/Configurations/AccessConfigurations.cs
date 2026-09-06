@@ -16,13 +16,67 @@ internal sealed class AccessCaseConfiguration : IEntityTypeConfiguration<AccessC
         builder.Property(x => x.SubjectName).HasMaxLength(256);
         builder.Property(x => x.SubjectEmail).HasMaxLength(256);
         builder.Property(x => x.Reason).IsRequired().HasMaxLength(2000);
+        builder.Property(x => x.AccessCategoryKeySnapshot).HasMaxLength(64);
+        builder.Property(x => x.AccessCategoryNameSnapshot).HasMaxLength(256);
+        builder.Property(x => x.VerificationMethod).HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.VerificationOutcome).HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.VerificationComment).HasMaxLength(2000);
+        builder.Property(x => x.FallbackReason).HasMaxLength(2000);
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
+        builder.Ignore(x => x.IsReadyToClose);
         builder.HasIndex(x => x.CaseNumber).IsUnique().HasDatabaseName("IX_AccessCase_CaseNumber");
         builder.HasIndex(x => new { x.Status, x.Type }).HasDatabaseName("IX_AccessCase_Status_Type");
         builder.HasIndex(x => x.RequesterUserId).HasDatabaseName("IX_AccessCase_RequesterUserId");
         builder.HasIndex(x => x.SubjectUserId).HasDatabaseName("IX_AccessCase_SubjectUserId");
         builder.HasIndex(x => x.EffectiveAtUtc).HasDatabaseName("IX_AccessCase_EffectiveAtUtc");
         builder.HasIndex(x => x.VendorId).HasDatabaseName("IX_AccessCase_VendorId");
+        builder.HasIndex(x => x.AccessCategoryId).HasDatabaseName("IX_AccessCase_AccessCategoryId");
+    }
+}
+
+internal sealed class AccessCategoryConfiguration : IEntityTypeConfiguration<AccessCategory>
+{
+    public void Configure(EntityTypeBuilder<AccessCategory> builder)
+    {
+        builder.ToTable("AccessCategory");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Key).IsRequired().HasMaxLength(64);
+        builder.Property(x => x.NameEn).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.NameAr).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.DescriptionEn).HasMaxLength(2000);
+        builder.Property(x => x.DescriptionAr).HasMaxLength(2000);
+        builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
+        builder.HasIndex(x => x.Key).IsUnique().HasDatabaseName("IX_AccessCategory_Key");
+        builder.HasIndex(x => x.IsActive).HasDatabaseName("IX_AccessCategory_IsActive");
+    }
+}
+
+internal sealed class AccessCategoryParticipantConfiguration : IEntityTypeConfiguration<AccessCategoryParticipant>
+{
+    public void Configure(EntityTypeBuilder<AccessCategoryParticipant> builder)
+    {
+        builder.ToTable("AccessCategoryParticipant");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Stage).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.HasIndex(x => new { x.AccessCategoryId, x.Stage, x.UserId })
+            .IsUnique()
+            .HasDatabaseName("IX_AccessCategoryParticipant_Category_Stage_User");
+        builder.HasOne<AccessCategory>().WithMany().HasForeignKey(x => x.AccessCategoryId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AccessCaseRouteParticipantConfiguration : IEntityTypeConfiguration<AccessCaseRouteParticipant>
+{
+    public void Configure(EntityTypeBuilder<AccessCaseRouteParticipant> builder)
+    {
+        builder.ToTable("AccessCaseRouteParticipant");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Stage).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.HasIndex(x => new { x.AccessCaseId, x.Stage, x.UserId })
+            .IsUnique()
+            .HasDatabaseName("IX_AccessCaseRouteParticipant_Case_Stage_User");
+        builder.HasIndex(x => new { x.UserId, x.Stage }).HasDatabaseName("IX_AccessCaseRouteParticipant_User_Stage");
+        builder.HasOne<AccessCase>().WithMany().HasForeignKey(x => x.AccessCaseId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 

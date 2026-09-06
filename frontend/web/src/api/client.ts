@@ -1266,6 +1266,12 @@ export const opsApi = {
   }) => apiFetch<ScheduledJob>('/api/v1/ops/jobs', { method: 'POST', body: JSON.stringify(payload) }),
 }
 
+export type AccessCaseRouteParticipant = {
+  userId: string
+  stage: string
+  isSubjectEmployeeDerived: boolean
+}
+
 export type AccessCase = {
   id: string
   caseNumber: string
@@ -1290,7 +1296,45 @@ export type AccessCase = {
   rowVersion: string
   itemCount: number
   pendingMandatoryCount: number
+  accessCategoryId?: string | null
+  accessCategoryKeySnapshot?: string | null
+  accessCategoryNameSnapshot?: string | null
+  preferSubjectEmployeeVerificationSnapshot?: boolean
+  approvedByUserId?: string | null
+  approvedAtUtc?: string | null
+  verifiedByUserId?: string | null
+  verifiedAtUtc?: string | null
+  verificationMethod?: string | null
+  verificationOutcome?: string | null
+  verificationComment?: string | null
+  fallbackReason?: string | null
+  closedByUserId?: string | null
+  isReadyToClose?: boolean
+  routeParticipants?: AccessCaseRouteParticipant[] | null
 }
+
+export type AccessCategory = {
+  id: string
+  key: string
+  nameEn: string
+  nameAr: string
+  descriptionEn: string | null
+  descriptionAr: string | null
+  isActive: boolean
+  preferSubjectEmployeeVerification: boolean
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  participantsByStage: Record<string, string[]>
+}
+
+export type AccessWorkQueue =
+  | 'my-requests'
+  | 'for-approval'
+  | 'for-fulfillment'
+  | 'for-verification'
+  | 'for-closure'
+  | 'all'
 
 export type AccessCaseItem = {
   id: string
@@ -1393,8 +1437,14 @@ export type AccessEvidenceProjection = {
 }
 
 export const accessApi = {
-  listCases: (params?: { page?: number; pageSize?: number; search?: string; type?: string; status?: string }) =>
-    apiFetch<OpsPaged<AccessCase>>(`/api/v1/access/cases${opsQuery(params)}`),
+  listCases: (params?: {
+    page?: number
+    pageSize?: number
+    search?: string
+    type?: string
+    status?: string
+    queue?: AccessWorkQueue | string
+  }) => apiFetch<OpsPaged<AccessCase>>(`/api/v1/access/cases${opsQuery(params)}`),
   getCase: (id: string) => apiFetch<AccessCase>(`/api/v1/access/cases/${id}`),
   createCase: (payload: {
     type: string
@@ -1404,8 +1454,59 @@ export const accessApi = {
     subjectEmail?: string | null
     designatedApproverUserId?: string | null
     effectiveAtUtc?: string | null
+    accessCategoryId?: string | null
   }) =>
     apiFetch<AccessCase>('/api/v1/access/cases', { method: 'POST', body: JSON.stringify(payload) }),
+  listCategories: (params?: { activeOnly?: boolean }) =>
+    apiFetch<AccessCategory[]>(
+      `/api/v1/access/categories${opsQuery({
+        activeOnly: params?.activeOnly === undefined ? undefined : String(params.activeOnly),
+      })}`,
+    ),
+  getCategory: (id: string) => apiFetch<AccessCategory>(`/api/v1/access/categories/${id}`),
+  createCategory: (payload: {
+    key: string
+    nameEn: string
+    nameAr: string
+    descriptionEn?: string | null
+    descriptionAr?: string | null
+    isActive?: boolean | null
+    preferSubjectEmployeeVerification?: boolean | null
+  }) =>
+    apiFetch<AccessCategory>('/api/v1/access/categories', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateCategory: (
+    id: string,
+    payload: {
+      key?: string
+      nameEn: string
+      nameAr: string
+      descriptionEn?: string | null
+      descriptionAr?: string | null
+      isActive?: boolean | null
+      preferSubjectEmployeeVerification?: boolean | null
+    },
+  ) =>
+    apiFetch<AccessCategory>(`/api/v1/access/categories/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  replaceCategoryRouting: (
+    id: string,
+    payload: {
+      requesterUserIds: string[]
+      approverUserIds: string[]
+      fulfillerUserIds: string[]
+      verifierUserIds: string[]
+      closerUserIds: string[]
+    },
+  ) =>
+    apiFetch<AccessCategory>(`/api/v1/access/categories/${id}/routing`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
   submit: (id: string) => apiFetch<AccessCase>(`/api/v1/access/cases/${id}/submit`, { method: 'POST' }),
   startApproval: (id: string) =>
     apiFetch<AccessCase>(`/api/v1/access/cases/${id}/start-approval`, { method: 'POST' }),
@@ -1417,6 +1518,19 @@ export const accessApi = {
     }),
   startVerification: (id: string) =>
     apiFetch<AccessCase>(`/api/v1/access/cases/${id}/start-verification`, { method: 'POST' }),
+  verify: (
+    id: string,
+    payload: {
+      mode?: string | null
+      everythingWorks?: boolean | null
+      comment?: string | null
+      fallbackReason?: string | null
+    },
+  ) =>
+    apiFetch<AccessCase>(`/api/v1/access/cases/${id}/verify`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   close: (id: string) => apiFetch<AccessCase>(`/api/v1/access/cases/${id}/close`, { method: 'POST' }),
   cancel: (id: string, reason?: string) =>
     apiFetch<AccessCase>(`/api/v1/access/cases/${id}/cancel`, {

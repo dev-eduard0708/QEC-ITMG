@@ -70,6 +70,7 @@ try
     builder.Services.AddIdentityAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddIdentitySeed(builder.Configuration);
     builder.Services.AddCmdbSeed();
+    builder.Services.AddDevelopmentAccessDemoSeed();
     builder.Services.AddServiceDeskSeed();
     builder.Services.AddScoped<ISharedDbTransaction, SharedSqlTransaction>();
     builder.Services.AddScoped<TicketNotificationService>();
@@ -146,6 +147,7 @@ try
     await app.RunIdentitySeedAsync();
     await app.RunCmdbSeedAsync();
     await app.RunServiceDeskSeedAsync();
+    await app.RunDevelopmentAccessDemoSeedAsync();
 
     if (enableHangfire)
     {

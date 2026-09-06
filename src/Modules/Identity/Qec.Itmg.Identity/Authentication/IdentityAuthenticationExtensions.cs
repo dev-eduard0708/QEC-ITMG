@@ -309,6 +309,33 @@ public static class IdentityAuthenticationExtensions
             });
         });
 
+        endpoints.MapPost("/auth/dev-login/persona/{key}", async (
+            string key,
+            HttpContext httpContext,
+            IDevelopmentQuickLoginService quickLogin,
+            CancellationToken cancellationToken) =>
+        {
+            User? user = await quickLogin.FindDemoPersonaAsync(key, cancellationToken);
+            if (user is null)
+            {
+                return Results.NotFound(new
+                {
+                    error = "Demo persona not found. Ensure Development seed has run.",
+                    key,
+                });
+            }
+
+            ClaimsPrincipal principal = DevelopmentLoginPrincipalFactory.Create(user);
+            await httpContext.SignInAsync(CookieScheme, principal);
+            return Results.Ok(new
+            {
+                signedIn = true,
+                authMethod = DevelopmentLoginPrincipalFactory.AuthMethodDevelopment,
+                upn = user.Upn,
+                persona = key,
+            });
+        });
+
         return endpoints;
     }
 }

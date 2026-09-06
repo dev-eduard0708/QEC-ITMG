@@ -58,6 +58,7 @@ public static class IdentitySeedCatalog
         ("access.request", "Create and view access cases (JML / access requests)"),
         ("access.approve", "Approve or reject access cases"),
         ("access.fulfill", "Fulfill and verify access case checklist items"),
+        ("access.configure", "Configure access categories and routing participants"),
         ("access.review", "Manage access review campaigns and decisions"),
         ("access.privileged.manage", "Manage privileged and service account metadata"),
         ("sod.manage", "Manage segregation of duties rules and exceptions"),

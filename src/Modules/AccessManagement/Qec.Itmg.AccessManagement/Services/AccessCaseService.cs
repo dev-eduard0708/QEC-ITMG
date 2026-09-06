@@ -15,7 +15,27 @@ public sealed record AccessCaseDto(
     DateTimeOffset? EffectiveAtUtc, string Reason, bool ExistingAccessConfirmed,
     DateTimeOffset? ExistingAccessConfirmedAtUtc, Guid? ExistingAccessConfirmedByUserId,
     DateTimeOffset CreatedAtUtc, DateTimeOffset UpdatedAtUtc, DateTimeOffset? ClosedAtUtc,
-    string RowVersion, int ItemCount, int PendingMandatoryCount);
+    string RowVersion, int ItemCount, int PendingMandatoryCount,
+    Guid? AccessCategoryId = null,
+    string? AccessCategoryKeySnapshot = null,
+    string? AccessCategoryNameSnapshot = null,
+    bool PreferSubjectEmployeeVerificationSnapshot = false,
+    Guid? ApprovedByUserId = null,
+    DateTimeOffset? ApprovedAtUtc = null,
+    Guid? VerifiedByUserId = null,
+    DateTimeOffset? VerifiedAtUtc = null,
+    string? VerificationMethod = null,
+    string? VerificationOutcome = null,
+    string? VerificationComment = null,
+    string? FallbackReason = null,
+    Guid? ClosedByUserId = null,
+    bool IsReadyToClose = false,
+    IReadOnlyList<AccessCaseRouteParticipantDto>? RouteParticipants = null);
+
+public sealed record AccessCaseRouteParticipantDto(
+    Guid UserId,
+    string Stage,
+    bool IsSubjectEmployeeDerived);
 
 public sealed record AccessCaseListResult(IReadOnlyList<AccessCaseDto> Items, int TotalCount, int Page, int PageSize);
 
@@ -83,7 +103,10 @@ public sealed class AccessCaseService(
     ];
 
     public async Task<AccessCaseListResult> ListAsync(
-        int page, int pageSize, string? search, AccessCaseType? type, AccessCaseStatus? status, CancellationToken ct)
+        int page, int pageSize, string? search, AccessCaseType? type, AccessCaseStatus? status, CancellationToken ct,
+        Guid? scopedUserId = null,
+        string? workQueue = null,
+        bool canSeeAll = false)
     {
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -98,12 +121,46 @@ public sealed class AccessCaseService(
                 || (x.SubjectEmail != null && x.SubjectEmail.Contains(term)));
         }
 
+        string queue = (workQueue ?? "all").Trim().ToLowerInvariant();
+        if (!canSeeAll || queue is not ("all" or ""))
+        {
+            if (scopedUserId is null || scopedUserId == Guid.Empty)
+                throw new InvalidOperationException("User scope is required.");
+            Guid uid = scopedUserId.Value;
+            q = queue switch
+            {
+                "my-requests" or "mine" => q.Where(x => x.RequesterUserId == uid),
+                "for-approval" or "approval" => q.Where(x => x.Status == AccessCaseStatus.Approval
+                    && db.AccessCaseRouteParticipants.Any(p =>
+                        p.AccessCaseId == x.Id && p.Stage == AccessCategoryStage.Approver && p.UserId == uid)),
+                "for-fulfillment" or "fulfillment" => q.Where(x => x.Status == AccessCaseStatus.Fulfillment
+                    && db.AccessCaseRouteParticipants.Any(p =>
+                        p.AccessCaseId == x.Id && p.Stage == AccessCategoryStage.Fulfiller && p.UserId == uid)),
+                "for-verification" or "verification" => q.Where(x => x.Status == AccessCaseStatus.Verification
+                    && x.VerifiedAtUtc == null
+                    && db.AccessCaseRouteParticipants.Any(p =>
+                        p.AccessCaseId == x.Id && p.Stage == AccessCategoryStage.Verifier && p.UserId == uid)),
+                "for-closure" or "closure" => q.Where(x => x.Status == AccessCaseStatus.Verification
+                    && x.VerificationOutcome == AccessVerificationOutcome.Verified
+                    && db.AccessCaseRouteParticipants.Any(p =>
+                        p.AccessCaseId == x.Id && p.Stage == AccessCategoryStage.Closer && p.UserId == uid)),
+                "all" when canSeeAll => q,
+                _ => canSeeAll
+                    ? q
+                    : q.Where(x => x.RequesterUserId == uid
+                        || x.SubjectUserId == uid
+                        || db.AccessCaseRouteParticipants.Any(p => p.AccessCaseId == x.Id && p.UserId == uid)),
+            };
+        }
+
         int total = await q.CountAsync(ct);
         List<AccessCase> items = await q.OrderByDescending(x => x.UpdatedAtUtc)
             .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         Dictionary<Guid, int> counts = await CountItemsAsync(items.Select(x => x.Id).ToList(), ct);
         Dictionary<Guid, int> pendingMandatory = await CountPendingMandatoryAsync(items.Select(x => x.Id).ToList(), ct);
-        return new(items.Select(x => Map(x, counts.GetValueOrDefault(x.Id), pendingMandatory.GetValueOrDefault(x.Id))).ToList(),
+        Dictionary<Guid, List<AccessCaseRouteParticipantDto>> routes = await LoadRoutesAsync(items.Select(x => x.Id).ToList(), ct);
+        return new(items.Select(x => Map(x, counts.GetValueOrDefault(x.Id), pendingMandatory.GetValueOrDefault(x.Id),
+            routes.GetValueOrDefault(x.Id))).ToList(),
             total, page, pageSize);
     }
 
@@ -114,7 +171,8 @@ public sealed class AccessCaseService(
         int count = await db.AccessCaseItems.CountAsync(x => x.AccessCaseId == id, ct);
         int pending = await db.AccessCaseItems.CountAsync(
             x => x.AccessCaseId == id && x.IsMandatory && x.Status == AccessItemStatus.Pending, ct);
-        return Map(item, count, pending);
+        Dictionary<Guid, List<AccessCaseRouteParticipantDto>> routes = await LoadRoutesAsync([id], ct);
+        return Map(item, count, pending, routes.GetValueOrDefault(id));
     }
 
     public async Task<IReadOnlyList<AccessCaseDto>> ListByVendorAsync(Guid vendorId, CancellationToken ct)
@@ -150,16 +208,38 @@ public sealed class AccessCaseService(
         AccessCaseType type, Guid requesterUserId, string reason,
         Guid? subjectUserId, string? subjectName, string? subjectEmail,
         Guid? departmentId, Guid? managerUserId, Guid? designatedApproverUserId,
-        DateTimeOffset? effectiveAtUtc, CancellationToken ct)
+        DateTimeOffset? effectiveAtUtc, CancellationToken ct,
+        Guid? accessCategoryId = null,
+        bool hasConfigureOverride = false)
     {
         AccessCaseDto? created = null;
         await sharedDbTransaction.ExecuteAsync(async innerCt =>
         {
+            if (accessCategoryId is Guid catId)
+            {
+                AccessCategory category = await db.AccessCategories.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == catId, innerCt)
+                    ?? throw new InvalidOperationException("Access category not found.");
+                if (!category.IsActive)
+                    throw new InvalidOperationException("Access category is inactive.");
+                bool allowedRequester = await db.AccessCategoryParticipants.AnyAsync(
+                    x => x.AccessCategoryId == catId
+                        && x.Stage == AccessCategoryStage.Requester
+                        && x.UserId == requesterUserId, innerCt);
+                if (!allowedRequester)
+                {
+                    if (!hasConfigureOverride)
+                        throw new InvalidOperationException("You are not allowed to request this access category.");
+                    await businessAudit.AppendAsync(AccessAudit.Field(
+                        catId, category.Key, "RequesterOverride", null, requesterUserId.ToString()), innerCt);
+                }
+            }
+
             string number = await numbers.NextAsync(SequenceKey, Prefix, innerCt);
             AccessCase entity = AccessCase.Create(
                 number, type, requesterUserId, reason, clock.UtcNow,
                 subjectUserId, subjectName, subjectEmail, departmentId, managerUserId,
-                designatedApproverUserId, effectiveAtUtc);
+                designatedApproverUserId, effectiveAtUtc, accessCategoryId);
             db.AccessCases.Add(entity);
 
             if (type == AccessCaseType.Leaver)
@@ -183,19 +263,92 @@ public sealed class AccessCaseService(
     public async Task<AccessCaseDto> UpdateDraftAsync(
         Guid id, string reason, Guid? subjectUserId, string? subjectName, string? subjectEmail,
         Guid? departmentId, Guid? managerUserId, Guid? designatedApproverUserId,
-        DateTimeOffset? effectiveAtUtc, CancellationToken ct)
+        DateTimeOffset? effectiveAtUtc, CancellationToken ct,
+        Guid? accessCategoryId = null)
     {
         AccessCase entity = await db.AccessCases.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new InvalidOperationException("Access case not found.");
         entity.UpdateDraft(reason, subjectUserId, subjectName, subjectEmail, departmentId, managerUserId,
-            designatedApproverUserId, effectiveAtUtc, clock.UtcNow);
+            designatedApproverUserId, effectiveAtUtc, clock.UtcNow, accessCategoryId);
         await businessAudit.AppendAsync(AccessAudit.Field(entity.Id, entity.CaseNumber, "Reason", null, reason), ct);
         await db.SaveChangesAsync(ct);
         return (await GetAsync(id, ct))!;
     }
 
-    public async Task<AccessCaseDto> SubmitAsync(Guid id, CancellationToken ct) =>
-        await TransitionAsync(id, AccessCaseStatus.Submitted, ct);
+    public async Task<AccessCaseDto> SubmitAsync(Guid id, Guid actorUserId, CancellationToken ct)
+    {
+        AccessCase entity = await LoadTrackedAsync(id, ct);
+        if (entity.Status != AccessCaseStatus.Draft)
+            throw new InvalidOperationException("Only draft cases can be submitted.");
+        if (entity.AccessCategoryId is null)
+            throw new InvalidOperationException("Access category is required before submission.");
+
+        AccessCategory category = await db.AccessCategories.AsNoTracking()
+            .FirstAsync(x => x.Id == entity.AccessCategoryId, ct);
+        if (!category.IsActive)
+            throw new InvalidOperationException("Access category is inactive.");
+
+        bool allowedRequester = await db.AccessCategoryParticipants.AnyAsync(
+            x => x.AccessCategoryId == category.Id
+                && x.Stage == AccessCategoryStage.Requester
+                && x.UserId == actorUserId, ct);
+        if (!allowedRequester && actorUserId != entity.RequesterUserId)
+            throw new InvalidOperationException("Only the requester can submit this case.");
+        if (!allowedRequester)
+            throw new InvalidOperationException("You are not allowed to request this access category.");
+
+        // Snapshot routing for durability
+        List<AccessCaseRouteParticipant> old = await db.AccessCaseRouteParticipants
+            .Where(x => x.AccessCaseId == entity.Id).ToListAsync(ct);
+        db.AccessCaseRouteParticipants.RemoveRange(old);
+
+        List<AccessCategoryParticipant> configured = await db.AccessCategoryParticipants
+            .Where(x => x.AccessCategoryId == category.Id).ToListAsync(ct);
+        foreach (AccessCategoryParticipant part in configured)
+        {
+            db.AccessCaseRouteParticipants.Add(AccessCaseRouteParticipant.Create(
+                entity.Id, part.Stage, part.UserId, clock.UtcNow));
+        }
+
+        // Preferred subject employee verifier (not for Leaver)
+        if (category.PreferSubjectEmployeeVerification
+            && entity.Type != AccessCaseType.Leaver
+            && entity.SubjectUserId is Guid subjectId)
+        {
+            bool already = configured.Any(x =>
+                x.Stage == AccessCategoryStage.Verifier && x.UserId == subjectId);
+            if (!already)
+            {
+                db.AccessCaseRouteParticipants.Add(AccessCaseRouteParticipant.Create(
+                    entity.Id, AccessCategoryStage.Verifier, subjectId, clock.UtcNow,
+                    isSubjectEmployeeDerived: true));
+            }
+            else
+            {
+                // Mark existing verifier row as subject-derived if it matches subject
+                // (already snapshotted as configured; add derived flag via extra row not allowed by unique)
+            }
+        }
+
+        entity.SetCategorySnapshot(
+            category.Id, category.Key, category.NameEn, category.PreferSubjectEmployeeVerification, clock.UtcNow);
+
+        AccessCaseStatus from = entity.Status;
+        entity.TransitionTo(AccessCaseStatus.Submitted, clock.UtcNow);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "CaseSubmitted", from.ToString(), nameof(AccessCaseStatus.Submitted),
+            BusinessAuditAction.StatusChanged), ct);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "RoutingSnapshotted", null, category.Key), ct);
+
+        entity.TransitionTo(AccessCaseStatus.Approval, clock.UtcNow);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "Status", nameof(AccessCaseStatus.Submitted), nameof(AccessCaseStatus.Approval),
+            BusinessAuditAction.StatusChanged), ct);
+
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(id, ct))!;
+    }
 
     public async Task<AccessCaseDto> StartApprovalAsync(Guid id, CancellationToken ct) =>
         await TransitionAsync(id, AccessCaseStatus.Approval, ct);
@@ -207,13 +360,16 @@ public sealed class AccessCaseService(
             throw new InvalidOperationException("Case is not awaiting approval.");
         if (actorUserId == entity.RequesterUserId)
             throw new InvalidOperationException("Requester cannot approve their own access case.");
-        if (entity.DesignatedApproverUserId is Guid designated && designated != actorUserId)
-            throw new InvalidOperationException("Only the designated approver can approve this case.");
+        await EnsureRouteActorAsync(entity.Id, AccessCategoryStage.Approver, actorUserId, ct,
+            legacyDesignatedApprover: entity.DesignatedApproverUserId);
 
         await EnsureSodClearOrExceptionAsync(entity, ct);
         if (entity.Type == AccessCaseType.Mover && !entity.ExistingAccessConfirmed)
             throw new InvalidOperationException("Mover cases require existing-access confirmation before fulfillment.");
 
+        entity.RecordApproval(actorUserId, clock.UtcNow);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "CaseApproved", null, actorUserId.ToString()), ct);
         return await TransitionAsync(id, AccessCaseStatus.Fulfillment, ct, actorUserId);
     }
 
@@ -222,27 +378,108 @@ public sealed class AccessCaseService(
         AccessCase entity = await LoadTrackedAsync(id, ct);
         if (actorUserId == entity.RequesterUserId)
             throw new InvalidOperationException("Requester cannot reject their own access case.");
+        await EnsureRouteActorAsync(entity.Id, AccessCategoryStage.Approver, actorUserId, ct,
+            legacyDesignatedApprover: entity.DesignatedApproverUserId);
         AccessCaseStatus from = entity.Status;
         entity.TransitionTo(AccessCaseStatus.Rejected, clock.UtcNow);
         await businessAudit.AppendAsync(AccessAudit.Field(
-            entity.Id, entity.CaseNumber, "Status", from.ToString(), nameof(AccessCaseStatus.Rejected),
+            entity.Id, entity.CaseNumber, "CaseRejected", from.ToString(), nameof(AccessCaseStatus.Rejected),
             BusinessAuditAction.StatusChanged, reason), ct);
         await db.SaveChangesAsync(ct);
         return (await GetAsync(id, ct))!;
     }
 
-    public async Task<AccessCaseDto> StartVerificationAsync(Guid id, CancellationToken ct)
+    public async Task<AccessCaseDto> StartVerificationAsync(Guid id, Guid actorUserId, CancellationToken ct)
     {
         AccessCase entity = await LoadTrackedAsync(id, ct);
+        await EnsureRouteActorAsync(entity.Id, AccessCategoryStage.Fulfiller, actorUserId, ct);
         await EnsureMandatoryCompleteOrExceptionAsync(entity, ct);
-        return await TransitionAsync(id, AccessCaseStatus.Verification, ct);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "SentForVerification", null, actorUserId.ToString()), ct);
+        return await TransitionAsync(id, AccessCaseStatus.Verification, ct, actorUserId);
     }
 
-    public async Task<AccessCaseDto> CloseAsync(Guid id, CancellationToken ct)
+    public async Task<AccessCaseDto> VerifyEmployeeAsync(Guid id, Guid actorUserId, bool everythingWorks, string? comment, CancellationToken ct)
     {
         AccessCase entity = await LoadTrackedAsync(id, ct);
+        if (entity.Status != AccessCaseStatus.Verification)
+            throw new InvalidOperationException("Case is not awaiting verification.");
+        if (entity.SubjectUserId != actorUserId)
+            throw new InvalidOperationException("Only the subject employee can complete employee verification.");
+        if (entity.Type == AccessCaseType.Leaver)
+            throw new InvalidOperationException("Leaver cases do not use subject employee verification.");
+
+        if (!everythingWorks)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(comment);
+            entity.ClearVerification(clock.UtcNow);
+            entity.RecordVerification(
+                actorUserId, AccessVerificationMethod.Employee, AccessVerificationOutcome.Problem,
+                clock.UtcNow, comment);
+            entity.TransitionTo(AccessCaseStatus.Fulfillment, clock.UtcNow);
+            await businessAudit.AppendAsync(AccessAudit.Field(
+                entity.Id, entity.CaseNumber, "VerificationFailed", nameof(AccessCaseStatus.Verification),
+                nameof(AccessCaseStatus.Fulfillment), BusinessAuditAction.StatusChanged, comment), ct);
+            await db.SaveChangesAsync(ct);
+            return (await GetAsync(id, ct))!;
+        }
+
+        entity.RecordVerification(
+            actorUserId, AccessVerificationMethod.Employee, AccessVerificationOutcome.Verified, clock.UtcNow);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "EmployeeVerified", null, actorUserId.ToString()), ct);
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(id, ct))!;
+    }
+
+    public async Task<AccessCaseDto> VerifyFallbackAsync(Guid id, Guid actorUserId, string fallbackReason, CancellationToken ct)
+    {
+        AccessCase entity = await LoadTrackedAsync(id, ct);
+        if (entity.Status != AccessCaseStatus.Verification)
+            throw new InvalidOperationException("Case is not awaiting verification.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(fallbackReason);
+        await EnsureRouteActorAsync(entity.Id, AccessCategoryStage.Verifier, actorUserId, ct,
+            allowSubjectDerivedOnly: false);
+
+        // Fallback verifiers are configured Verifier participants who are NOT the subject-derived-only path
+        bool isConfiguredFallback = await db.AccessCaseRouteParticipants.AnyAsync(
+            x => x.AccessCaseId == id
+                && x.Stage == AccessCategoryStage.Verifier
+                && x.UserId == actorUserId
+                && !x.IsSubjectEmployeeDerived, ct);
+        if (!isConfiguredFallback && entity.AccessCategoryId is not null)
+        {
+            // Legacy / missing snapshot: allow if category still has this verifier
+            isConfiguredFallback = await db.AccessCategoryParticipants.AnyAsync(
+                x => x.AccessCategoryId == entity.AccessCategoryId
+                    && x.Stage == AccessCategoryStage.Verifier
+                    && x.UserId == actorUserId, ct);
+        }
+
+        if (!isConfiguredFallback)
+            throw new InvalidOperationException("You are not an authorized fallback verifier for this case.");
+
+        entity.RecordVerification(
+            actorUserId, AccessVerificationMethod.Fallback, AccessVerificationOutcome.Verified,
+            clock.UtcNow, fallbackReason: fallbackReason);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "FallbackVerified", null, actorUserId.ToString(),
+            BusinessAuditAction.Updated, fallbackReason), ct);
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(id, ct))!;
+    }
+
+    public async Task<AccessCaseDto> CloseAsync(Guid id, Guid actorUserId, CancellationToken ct)
+    {
+        AccessCase entity = await LoadTrackedAsync(id, ct);
+        if (!entity.IsReadyToClose)
+            throw new InvalidOperationException("Case must be successfully verified before closure.");
+        await EnsureRouteActorAsync(entity.Id, AccessCategoryStage.Closer, actorUserId, ct);
         await EnsureMandatoryCompleteOrExceptionAsync(entity, ct);
-        return await TransitionAsync(id, AccessCaseStatus.Closed, ct);
+        entity.RecordClosure(actorUserId, clock.UtcNow);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "CaseClosed", null, actorUserId.ToString()), ct);
+        return await TransitionAsync(id, AccessCaseStatus.Closed, ct, actorUserId);
     }
 
     public async Task<AccessCaseDto> CancelAsync(Guid id, Guid actorUserId, string? reason, bool hasPrivilegedOverride, CancellationToken ct)
@@ -316,11 +553,15 @@ public sealed class AccessCaseService(
 
     public async Task<AccessCaseItemDto> CompleteItemAsync(Guid caseId, Guid itemId, Guid userId, string? notes, CancellationToken ct)
     {
+        AccessCase entity = await LoadTrackedAsync(caseId, ct);
+        if (entity.Status != AccessCaseStatus.Fulfillment)
+            throw new InvalidOperationException("Items can only be fulfilled while the case is in fulfillment.");
+        await EnsureRouteActorAsync(caseId, AccessCategoryStage.Fulfiller, userId, ct);
         AccessCaseItem item = await db.AccessCaseItems.FirstOrDefaultAsync(x => x.Id == itemId && x.AccessCaseId == caseId, ct)
             ?? throw new InvalidOperationException("Access case item not found.");
         item.MarkCompleted(userId, clock.UtcNow, notes);
         await businessAudit.AppendAsync(AccessAudit.Field(
-            caseId, null, "ItemCompleted", item.EntitlementKey, nameof(AccessItemStatus.Completed)), ct);
+            caseId, entity.CaseNumber, "AccessItemFulfilled", item.EntitlementKey, nameof(AccessItemStatus.Completed)), ct);
         await db.SaveChangesAsync(ct);
         return Map(item);
     }
@@ -456,13 +697,68 @@ public sealed class AccessCaseService(
             .ToDictionaryAsync(x => x.Key, x => x.Count, ct);
     }
 
-    private static AccessCaseDto Map(AccessCase x, int itemCount, int pendingMandatory) =>
+    private async Task EnsureRouteActorAsync(
+        Guid caseId,
+        AccessCategoryStage stage,
+        Guid actorUserId,
+        CancellationToken ct,
+        Guid? legacyDesignatedApprover = null,
+        bool allowSubjectDerivedOnly = true)
+    {
+        IQueryable<AccessCaseRouteParticipant> q = db.AccessCaseRouteParticipants.AsNoTracking()
+            .Where(x => x.AccessCaseId == caseId && x.Stage == stage && x.UserId == actorUserId);
+        if (!allowSubjectDerivedOnly && stage == AccessCategoryStage.Verifier)
+            q = q.Where(x => !x.IsSubjectEmployeeDerived);
+
+        bool allowed = await q.AnyAsync(ct);
+        if (allowed) return;
+
+        // Legacy cases without routing snapshot
+        bool hasSnapshot = await db.AccessCaseRouteParticipants.AsNoTracking()
+            .AnyAsync(x => x.AccessCaseId == caseId, ct);
+        if (!hasSnapshot)
+        {
+            if (stage == AccessCategoryStage.Approver
+                && legacyDesignatedApprover is Guid designated
+                && designated == actorUserId)
+                return;
+            if (stage is AccessCategoryStage.Fulfiller or AccessCategoryStage.Closer or AccessCategoryStage.Verifier)
+                return; // legacy path relies on permission only
+        }
+
+        throw new InvalidOperationException($"You are not an authorized {stage.ToString().ToLowerInvariant()} for this case.");
+    }
+
+    private async Task<Dictionary<Guid, List<AccessCaseRouteParticipantDto>>> LoadRoutesAsync(
+        List<Guid> caseIds, CancellationToken ct)
+    {
+        if (caseIds.Count == 0) return [];
+        List<AccessCaseRouteParticipant> rows = await db.AccessCaseRouteParticipants.AsNoTracking()
+            .Where(x => caseIds.Contains(x.AccessCaseId)).ToListAsync(ct);
+        return rows.GroupBy(x => x.AccessCaseId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => new AccessCaseRouteParticipantDto(x.UserId, x.Stage.ToString(), x.IsSubjectEmployeeDerived)).ToList());
+    }
+
+    private static AccessCaseDto Map(
+        AccessCase x,
+        int itemCount,
+        int pendingMandatory,
+        IReadOnlyList<AccessCaseRouteParticipantDto>? routes = null) =>
         new(x.Id, x.CaseNumber, x.Type.ToString(), x.Status.ToString(), x.RequesterUserId,
             x.SubjectUserId, x.SubjectName, x.SubjectEmail, x.DepartmentId, x.ManagerUserId,
             x.DesignatedApproverUserId, x.LinkedTicketId, x.VendorId, x.EffectiveAtUtc, x.Reason,
             x.ExistingAccessConfirmed, x.ExistingAccessConfirmedAtUtc, x.ExistingAccessConfirmedByUserId,
             x.CreatedAtUtc, x.UpdatedAtUtc, x.ClosedAtUtc, Convert.ToBase64String(x.RowVersion),
-            itemCount, pendingMandatory);
+            itemCount, pendingMandatory,
+            x.AccessCategoryId, x.AccessCategoryKeySnapshot, x.AccessCategoryNameSnapshot,
+            x.PreferSubjectEmployeeVerificationSnapshot,
+            x.ApprovedByUserId, x.ApprovedAtUtc,
+            x.VerifiedByUserId, x.VerifiedAtUtc,
+            x.VerificationMethod?.ToString(), x.VerificationOutcome?.ToString(),
+            x.VerificationComment, x.FallbackReason, x.ClosedByUserId,
+            x.IsReadyToClose, routes);
 
     private static AccessCaseItemDto Map(AccessCaseItem x) =>
         new(x.Id, x.AccessCaseId, x.ConfigurationItemId, x.EntitlementKey, x.Action.ToString(),

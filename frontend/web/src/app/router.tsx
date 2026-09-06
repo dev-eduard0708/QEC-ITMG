@@ -59,6 +59,8 @@ import { OperationsPage } from '@/features/it/operations-page'
 import { AccessPage } from '@/features/it/access-page'
 import { AccessNewPage } from '@/features/it/access-new-page'
 import { AccessDetailPage } from '@/features/it/access-detail-page'
+import { AccessCategoriesPage } from '@/features/it/access-categories-page'
+import { AccessCategoryDetailPage } from '@/features/it/access-category-detail-page'
 import { AccessReviewsPage } from '@/features/it/access-reviews-page'
 import { AccessAccountsPage } from '@/features/it/access-accounts-page'
 import { AccessSodPage } from '@/features/it/access-sod-page'
@@ -141,6 +143,10 @@ export function AppRouter() {
           </Route>
           <Route element={<RequirePermission permission="ops.read" />}>
             <Route path="it/operations" element={<OperationsPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="access.configure" />}>
+            <Route path="it/access/configuration" element={<AccessCategoriesPage />} />
+            <Route path="it/access/configuration/:id" element={<AccessCategoryDetailPage />} />
           </Route>
           <Route element={<RequirePermission permission="access.review" />}>
             <Route path="it/access/reviews" element={<AccessReviewsPage />} />
