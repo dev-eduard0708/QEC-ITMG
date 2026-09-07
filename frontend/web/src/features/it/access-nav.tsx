@@ -23,7 +23,7 @@ export function AccessNavTabs({ className }: { className?: string }) {
       match: (path) =>
         path === '/it/access' ||
         path === '/it/access/new' ||
-        (/^\/it\/access\/[^/]+$/.test(path) &&
+        (/^\/it\/access\/[^/]+(\/edit)?$/.test(path) &&
           !['reviews', 'accounts', 'sod', 'configuration', 'new'].includes(path.split('/')[3] ?? '')),
       visible: can('access.request'),
     },

@@ -12,6 +12,8 @@ public sealed class AccessManagementDbContext(DbContextOptions<AccessManagementD
     public DbSet<AccessCaseItem> AccessCaseItems => Set<AccessCaseItem>();
     public DbSet<ExistingAccessSnapshotItem> ExistingAccessSnapshotItems => Set<ExistingAccessSnapshotItem>();
     public DbSet<AccessCaseException> AccessCaseExceptions => Set<AccessCaseException>();
+    public DbSet<AccessCaseRevision> AccessCaseRevisions => Set<AccessCaseRevision>();
+    public DbSet<AccessCaseRevisionItem> AccessCaseRevisionItems => Set<AccessCaseRevisionItem>();
     public DbSet<AccessCategory> AccessCategories => Set<AccessCategory>();
     public DbSet<AccessCategoryParticipant> AccessCategoryParticipants => Set<AccessCategoryParticipant>();
     public DbSet<AccessCaseRouteParticipant> AccessCaseRouteParticipants => Set<AccessCaseRouteParticipant>();

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown } from 'lucide-react'
+import { AlertCircle, ChevronDown } from 'lucide-react'
 import {
   ApiError,
   accessApi,
@@ -10,7 +10,6 @@ import {
   type AccessCaseRouteParticipant,
   type AccessEvidenceProjection,
 } from '@/api/client'
-import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -82,7 +81,6 @@ export function AccessDetailPage() {
   const { id = '' } = useParams()
   const { t, i18n } = useTranslation()
   const language = isAppLanguage(i18n.language) ? i18n.language : 'en'
-  const { can, user } = useAuth()
   const { nameFor } = useAccessUsers()
   const qc = useQueryClient()
   const [entitlement, setEntitlement] = useState('')
@@ -91,9 +89,11 @@ export function AccessDetailPage() {
   const [problemComment, setProblemComment] = useState('')
   const [fallbackReason, setFallbackReason] = useState('')
   const [rejectReason, setRejectReason] = useState('')
+  const [reworkReason, setReworkReason] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [evidence, setEvidence] = useState<AccessEvidenceProjection | null>(null)
   const [rejectOpen, setRejectOpen] = useState(false)
+  const [reworkOpen, setReworkOpen] = useState(false)
   const [problemOpen, setProblemOpen] = useState(false)
   const [fallbackOpen, setFallbackOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
@@ -112,6 +112,11 @@ export function AccessDetailPage() {
     queryKey: ['access', 'case', id, 'existing'],
     queryFn: () => accessApi.listExistingAccess(id),
     enabled: !!id && caseQuery.data?.type === 'Mover',
+  })
+  const revisionsQuery = useQuery({
+    queryKey: ['access', 'case', id, 'revisions'],
+    queryFn: () => accessApi.listRevisions(id),
+    enabled: !!id,
   })
   const currentAccessQuery = useQuery({
     queryKey: ['access', 'users', caseQuery.data?.subjectUserId, 'current-access'],
@@ -139,6 +144,7 @@ export function AccessDetailPage() {
   const accessCase = caseQuery.data
   const routes = accessCase?.routeParticipants
   const items = itemsQuery.data ?? []
+  const actions = accessCase?.actions
 
   const groupedItems = useMemo(() => {
     const list = itemsQuery.data ?? []
@@ -169,7 +175,6 @@ export function AccessDetailPage() {
     return <p className="text-sm text-destructive">{t('access.notFound')}</p>
   }
 
-  const isSubject = Boolean(user?.id && accessCase.subjectUserId === user.id)
   const approvers = participantsFor(routes, 'Approver')
   const fulfillers = participantsFor(routes, 'Fulfiller')
   const verifiers = participantsFor(routes, 'Verifier')
@@ -178,24 +183,21 @@ export function AccessDetailPage() {
   const closers = participantsFor(routes, 'Closer')
   const requesters = participantsFor(routes, 'Requester')
 
-  const isRouteApprover =
-    approvers.length === 0 ||
-    Boolean(user?.id && approvers.some((item) => item.userId === user.id))
-  const showApproveReject =
-    accessCase.status === 'Approval' && can('access.approve') && isRouteApprover
-  const canVerifyEmployee =
-    accessCase.status === 'Verification' &&
-    isSubject &&
-    accessCase.type !== 'Leaver' &&
-    !accessCase.isReadyToClose
-  const canFallbackVerify =
-    accessCase.status === 'Verification' && !accessCase.isReadyToClose && !isSubject
-  const showClose =
-    can('access.fulfill') &&
-    accessCase.status === 'Verification' &&
-    Boolean(accessCase.isReadyToClose)
-  const showFulfill =
-    accessCase.status === 'Fulfillment' && can('access.fulfill')
+  const showApproveReject = Boolean(
+    actions?.canApprove || actions?.canReject || actions?.canSendForRework,
+  )
+  const canVerifyEmployee = Boolean(actions?.canVerifyAsEmployee)
+  const canFallbackVerify = Boolean(actions?.canVerifyAsFallback)
+  const showClose = Boolean(actions?.canClose)
+  const showFulfill = Boolean(actions?.canFulfill)
+  const canEditRequest = Boolean(actions?.canEditRequest)
+  const canSubmit = Boolean(actions?.canSubmit)
+  const canResubmit = Boolean(actions?.canResubmit)
+  const isDraft = accessCase.status === 'Draft'
+  const isRework = accessCase.status === 'Rework'
+  const isRejected = accessCase.status === 'Rejected'
+  const scopeEditable = isDraft || isRework
+  const scopeLocked = !scopeEditable && !['Closed', 'Rejected', 'Cancelled'].includes(accessCase.status)
   const categoryLabel =
     accessCase.accessCategoryDisplayName ?? accessCase.accessCategoryNameSnapshot ?? null
 
@@ -207,6 +209,7 @@ export function AccessDetailPage() {
 
   const currentOwner = (() => {
     if (accessCase.status === 'Approval') return namesJoined(approvers, nameFor)
+    if (accessCase.status === 'Rework') return nameFor(accessCase.requesterUserId)
     if (accessCase.status === 'Fulfillment') return namesJoined(fulfillers, nameFor)
     if (accessCase.status === 'Verification' && accessCase.isReadyToClose) {
       return namesJoined(closers, nameFor)
@@ -292,8 +295,61 @@ export function AccessDetailPage() {
         </CardContent>
       </Card>
 
+      {actions?.isRoutedApproverMissingPermission ? (
+        <div
+          role="alert"
+          className="flex gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p>{t('access.warnings.approverMissingPermission')}</p>
+        </div>
+      ) : null}
+
+      {isRejected ? (
+        <AccessCurrentActionCard
+          title={t('access.actionCard.rejectedTitle')}
+          description={
+            accessCase.rejectionReason?.trim() ||
+            t('access.actionCard.rejectedDesc')
+          }
+        >
+          <p className="text-sm text-muted-foreground">
+            {t('access.rejectedBy', {
+              name: nameFor(accessCase.rejectedByUserId),
+              when: formatWhen(accessCase.rejectedAtUtc),
+            })}
+          </p>
+        </AccessCurrentActionCard>
+      ) : null}
+
+      {isRework && canEditRequest ? (
+        <AccessCurrentActionCard
+          title={t('access.actionCard.reworkTitle')}
+          description={accessCase.reworkReason?.trim() || t('access.actionCard.reworkDesc')}
+          actions={
+            <>
+              <Button asChild variant="secondary">
+                <Link to={`/it/access/${id}/edit`}>{t('access.actions.editRequest')}</Link>
+              </Button>
+              {canResubmit ? (
+                <Button type="button" onClick={() => run.mutate(() => accessApi.resubmit(id))}>
+                  {t('access.actions.resubmit')}
+                </Button>
+              ) : null}
+            </>
+          }
+        >
+          <p className="text-sm text-muted-foreground">
+            {t('access.returnedBy', {
+              name: nameFor(accessCase.returnedForReworkByUserId),
+              when: formatWhen(accessCase.returnedForReworkAtUtc),
+            })}
+          </p>
+        </AccessCurrentActionCard>
+      ) : null}
+
       {/* Current action card */}
-      {accessCase.status === 'Draft' && can('access.request') ? (
+      {isDraft && canSubmit ? (
         <AccessCurrentActionCard
           title={t('access.actionCard.draftTitle')}
           description={t('access.draftNotYetSent')}
@@ -311,12 +367,21 @@ export function AccessDetailPage() {
           description={t('access.actionCard.approvalDesc')}
           actions={
             <>
-              <Button type="button" variant="secondary" onClick={() => setRejectOpen(true)}>
-                {t('access.actions.reject')}
-              </Button>
-              <Button type="button" onClick={() => run.mutate(() => accessApi.approve(id))}>
-                {t('access.actions.approve')}
-              </Button>
+              {actions?.canReject ? (
+                <Button type="button" variant="secondary" onClick={() => setRejectOpen(true)}>
+                  {t('access.actions.rejectRequest')}
+                </Button>
+              ) : null}
+              {actions?.canSendForRework ? (
+                <Button type="button" variant="secondary" onClick={() => setReworkOpen(true)}>
+                  {t('access.actions.sendForRework')}
+                </Button>
+              ) : null}
+              {actions?.canApprove ? (
+                <Button type="button" onClick={() => run.mutate(() => accessApi.approve(id))}>
+                  {t('access.actions.approveRequest')}
+                </Button>
+              ) : null}
             </>
           }
         >
@@ -347,6 +412,7 @@ export function AccessDetailPage() {
             total: items.length,
           })}
         >
+          <p className="mb-3 text-sm text-muted-foreground">{t('access.fulfill.lateAccessHelper')}</p>
           <Progress value={progressValue} className="mb-3" />
           <div className="space-y-3">
             {groupedItems.map((group) => (
@@ -378,11 +444,11 @@ export function AccessDetailPage() {
               <p className="text-sm text-muted-foreground">
                 {t('access.tasksRemaining', { count: pendingItems.length })}
               </p>
-            ) : (
+            ) : actions?.canSendForVerification ? (
               <Button type="button" onClick={() => run.mutate(() => accessApi.startVerification(id))}>
                 {t('access.actions.sendForVerification')}
               </Button>
-            )}
+            ) : null}
           </div>
         </AccessCurrentActionCard>
       ) : null}
@@ -487,6 +553,9 @@ export function AccessDetailPage() {
       {!showFulfill && accessCase.status !== 'Closed' ? (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold tracking-tight">{t('access.requestedAccess')}</h2>
+          {scopeLocked ? (
+            <p className="text-sm text-muted-foreground">{t('access.scope.lockedExceptDraftRework')}</p>
+          ) : null}
           {groupedItems.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('access.itemsEmpty')}</p>
           ) : (
@@ -515,20 +584,26 @@ export function AccessDetailPage() {
         </section>
       ) : null}
 
-      {/* Advanced / technical */}
+      {/* Advanced (draft edit) / Additional details (read-only after submit) */}
       <div className="rounded-lg border">
         <button
           type="button"
           className="flex w-full items-center justify-between gap-2 px-4 py-3 text-start text-sm font-medium"
           onClick={() => setAdvancedOpen((v) => !v)}
         >
-          {t('access.advanced.title')}
+          {scopeEditable && canEditRequest
+            ? t('access.advanced.title')
+            : t('access.additionalDetails.title')}
           <ChevronDown
             className={cn('h-4 w-4 text-muted-foreground transition-transform', advancedOpen && 'rotate-180')}
           />
         </button>
         {advancedOpen ? (
           <div className="space-y-6 border-t px-4 py-4">
+            {scopeEditable && canEditRequest ? (
+              <p className="text-sm text-muted-foreground">{t('access.advanced.catalogHelper')}</p>
+            ) : null}
+
             {accessCase.subjectUserId ? (
               <section className="space-y-2">
                 <h3 className="text-sm font-medium">{t('access.currentAccess')}</h3>
@@ -573,7 +648,7 @@ export function AccessDetailPage() {
                     </li>
                   ))}
                 </ul>
-                {can('access.request') && accessCase.status !== 'Closed' ? (
+                {isDraft && canEditRequest ? (
                   <div className="flex flex-wrap gap-2">
                     <Input
                       className="max-w-xs"
@@ -608,8 +683,7 @@ export function AccessDetailPage() {
               </section>
             ) : null}
 
-            {can('access.request') &&
-            !['Closed', 'Rejected', 'Cancelled'].includes(accessCase.status) ? (
+            {scopeEditable && canEditRequest ? (
               <section className="space-y-3">
                 <h3 className="text-sm font-medium">{t('access.advanced.manualItem')}</h3>
                 <div className="flex flex-wrap items-end gap-2">
@@ -692,6 +766,55 @@ export function AccessDetailPage() {
                 ) : null}
               </section>
             )}
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-medium">{t('access.revisions.title')}</h3>
+              {revisionsQuery.isLoading ? (
+                <p className="text-sm text-muted-foreground">{t('access.loading')}</p>
+              ) : (revisionsQuery.data ?? []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('access.revisions.empty')}</p>
+              ) : (
+                <ul className="space-y-3">
+                  {(revisionsQuery.data ?? []).map((rev) => (
+                    <li key={rev.id} className="rounded-md border p-3 text-sm">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">
+                          {t('access.revisions.revision', { n: rev.revisionNumber })}
+                        </span>
+                        <Badge variant="outline">{rev.decision}</Badge>
+                        <span className="text-xs text-muted-foreground">
+                          {t('access.revisions.submittedBy', {
+                            name: nameFor(rev.submittedByUserId),
+                            when: formatWhen(rev.submittedAtUtc),
+                          })}
+                        </span>
+                      </div>
+                      {rev.decisionReason ? (
+                        <p className="mt-1 text-muted-foreground">{rev.decisionReason}</p>
+                      ) : null}
+                      {rev.decidedByUserId ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {t('access.revisions.decidedBy', {
+                            name: nameFor(rev.decidedByUserId),
+                            when: formatWhen(rev.decidedAtUtc),
+                          })}
+                        </p>
+                      ) : null}
+                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {rev.items.map((item) => (
+                          <li key={item.id}>
+                            {language === 'ar'
+                              ? item.nameArSnapshot || item.nameEnSnapshot || item.entitlementKeySnapshot
+                              : item.nameEnSnapshot || item.nameArSnapshot || item.entitlementKeySnapshot}{' '}
+                            · {item.action}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
         ) : null}
       </div>
@@ -700,7 +823,7 @@ export function AccessDetailPage() {
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{t('access.actions.reject')}</DialogTitle>
+            <DialogTitle>{t('access.actions.rejectRequest')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="reject-reason">{t('access.rejectReason')}</Label>
@@ -717,13 +840,47 @@ export function AccessDetailPage() {
             </Button>
             <Button
               type="button"
+              disabled={!rejectReason.trim()}
               onClick={() => {
-                run.mutate(() => accessApi.reject(id, rejectReason.trim() || undefined))
+                run.mutate(() => accessApi.reject(id, rejectReason.trim()))
                 setRejectOpen(false)
                 setRejectReason('')
               }}
             >
-              {t('access.actions.reject')}
+              {t('access.actions.rejectRequest')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={reworkOpen} onOpenChange={setReworkOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('access.actions.sendForRework')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rework-reason">{t('access.reworkReason')}</Label>
+            <Textarea
+              id="rework-reason"
+              value={reworkReason}
+              onChange={(e) => setReworkReason(e.target.value)}
+              placeholder={t('access.reworkReasonPlaceholder')}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setReworkOpen(false)}>
+              {t('access.cancel')}
+            </Button>
+            <Button
+              type="button"
+              disabled={!reworkReason.trim()}
+              onClick={() => {
+                run.mutate(() => accessApi.returnForRework(id, reworkReason.trim()))
+                setReworkOpen(false)
+                setReworkReason('')
+              }}
+            >
+              {t('access.actions.sendForRework')}
             </Button>
           </DialogFooter>
         </DialogContent>

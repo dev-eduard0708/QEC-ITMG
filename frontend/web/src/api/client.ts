@@ -1312,6 +1312,27 @@ export type AccessCase = {
   closedByUserId?: string | null
   isReadyToClose?: boolean
   routeParticipants?: AccessCaseRouteParticipant[] | null
+  returnedForReworkByUserId?: string | null
+  returnedForReworkAtUtc?: string | null
+  reworkReason?: string | null
+  rejectedByUserId?: string | null
+  rejectedAtUtc?: string | null
+  rejectionReason?: string | null
+  currentScopeRevisionNumber?: number
+  actions?: {
+    canSubmit: boolean
+    canResubmit: boolean
+    canEditRequest: boolean
+    canApprove: boolean
+    canReject: boolean
+    canSendForRework: boolean
+    canFulfill: boolean
+    canSendForVerification: boolean
+    canVerifyAsEmployee: boolean
+    canVerifyAsFallback: boolean
+    canClose: boolean
+    isRoutedApproverMissingPermission: boolean
+  } | null
 }
 
 export type AccessCategory = {
@@ -1354,6 +1375,33 @@ export type AccessCaseItem = {
   nameEn?: string | null
   nameAr?: string | null
   isCustom?: boolean
+}
+
+export type AccessCaseRevisionItem = {
+  id: string
+  revisionId: string
+  accessEntitlementId: string | null
+  entitlementKeySnapshot: string
+  nameEnSnapshot: string | null
+  nameArSnapshot: string | null
+  customName: string | null
+  action: string
+  notes: string | null
+  isPrivileged: boolean
+  isCustom: boolean
+}
+
+export type AccessCaseRevision = {
+  id: string
+  accessCaseId: string
+  revisionNumber: number
+  submittedByUserId: string
+  submittedAtUtc: string
+  decision: string
+  decidedByUserId: string | null
+  decidedAtUtc: string | null
+  decisionReason: string | null
+  items: AccessCaseRevisionItem[]
 }
 
 export type AccessEntitlement = {
@@ -1643,6 +1691,23 @@ export const accessApi = {
       method: 'POST',
       body: JSON.stringify({ reason }),
     }),
+  returnForRework: (id: string, reason: string) =>
+    apiFetch<AccessCase>(`/api/v1/access/cases/${id}/return-for-rework`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+  resubmit: (id: string) =>
+    apiFetch<AccessCase>(`/api/v1/access/cases/${id}/resubmit`, { method: 'POST' }),
+  updateScope: (
+    id: string,
+    payload: { reason?: string | null; items?: AccessCaseItemCreate[] | null },
+  ) =>
+    apiFetch<AccessCase>(`/api/v1/access/cases/${id}/scope`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  listRevisions: (id: string) =>
+    apiFetch<AccessCaseRevision[]>(`/api/v1/access/cases/${id}/revisions`),
   startVerification: (id: string) =>
     apiFetch<AccessCase>(`/api/v1/access/cases/${id}/start-verification`, { method: 'POST' }),
   verify: (

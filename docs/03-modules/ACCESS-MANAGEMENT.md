@@ -33,11 +33,32 @@ Global reusable `AccessEntitlement` records (bilingual names, `DefaultRevokeActi
 3. **Create** a case with Category + Type + Subject + items:
    - **Save as Draft** (`submitForApproval: false`) → status remains Draft; category name snapshot/display is filled for drafts.
    - **Create & Submit for Approval** (`submitForApproval: true`) → routing is **snapshotted** onto the case → status becomes **Approval** (waiting for approval); approvers are notified.
-4. **Approver** (route snapshot + `access.approve`) → Fulfillment; fulfillers notified.
-5. **Fulfiller** completes items and **Send for verification** → Verification; subject/fallback verifiers notified.
-6. **Verify**: subject employee (preferred) or authenticated fallback verifier (server enforces route; no `access.request` required on verify endpoints).
-7. **Closer** (route snapshot + `access.fulfill`) closes when verified / ready-to-close → Closed; requester/subject notified; stage notifications resolved.
-8. Historical in-progress cases keep their original snapshot if an admin later changes the category.
+4. **Approver** (route snapshot + `access.approve`) chooses one of:
+   - **Approve** → Fulfillment; fulfillers notified. Empty approver route does **not** open approval to everyone with the permission.
+   - **Send for Rework** (reason required) → status **Rework**; requester notified; current scope revision marked Rework. Routing snapshot stays stable.
+   - **Reject** (reason required) → terminal **Rejected** (not Closed). Rejection reason is stored on the case.
+5. **Rework**: requester may edit **reason + requested items only** (category / type / subject / routing remain locked). **Resubmit** creates the next Pending scope revision and returns to Approval; approvers are notified again.
+6. **Fulfiller** completes **exact** requested items and **Send for verification** → Verification; subject/fallback verifiers notified. Fulfillers cannot add/expand scope; late access requires a **new case**.
+7. **Verify**: subject employee (preferred) or authenticated fallback verifier (server enforces route; no `access.request` required on verify endpoints).
+8. **Closer** (route snapshot + `access.fulfill`) closes when verified / ready-to-close → **Closed** (successful completion only); requester/subject notified; stage notifications resolved.
+9. Historical in-progress cases keep their original snapshot if an admin later changes the category.
+
+### Approval decisions & scope revisions
+
+| Decision | Next status | Notes |
+| --- | --- | --- |
+| Approve | Fulfillment | Marks current revision Approved |
+| Send for Rework | Rework | Marks current revision Rework; requester edits then resubmits |
+| Reject | Rejected | Terminal; marks current revision Rejected. **Rejected ≠ Closed** |
+
+Each submit/resubmit snapshots items into `AccessCaseRevision` / `AccessCaseRevisionItem`. `CurrentScopeRevisionNumber` tracks the active Pending revision.
+
+### Scope freeze & server capabilities
+
+- **Draft or Rework**: requested items (and rework reason) may be edited (requester / `access.request` / configure as applicable).
+- **After submit** (Approval and beyond, except Rework): requested scope is **locked**. Case detail returns an `actions` capability block (`canApprove`, `canSendForRework`, `canEditRequest`, `canResubmit`, …) resolved from session permissions + snapshotted route — the UI must treat it as authoritative.
+- Reject and Send for Rework require a non-empty reason.
+- **Closed** is only for the successful Verification → Close path.
 
 ### Work queues & notifications
 

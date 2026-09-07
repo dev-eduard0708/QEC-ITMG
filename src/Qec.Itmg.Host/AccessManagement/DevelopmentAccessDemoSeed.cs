@@ -33,7 +33,7 @@ public sealed class DevelopmentAccessDemoSeedRunner(
         ("finance-manager", "demo.finance.manager@qec.local", "Demo Finance Manager", ["access.request", "admin.users"]),
         ("hr-manager", "demo.hr.manager@qec.local", "Demo HR Manager", ["access.request", "admin.users"]),
         ("it-manager", "demo.it.manager@qec.local", "Demo IT Manager", ["access.request", "access.approve", "access.configure", "access.fulfill", "admin.users"]),
-        ("it-admin1", "demo.it.admin1@qec.local", "Demo IT Admin 1", ["access.request", "access.fulfill", "access.configure", "access.approve", "admin.users"]),
+        ("it-admin1", "demo.it.admin1@qec.local", "Demo IT Admin 1", ["access.request", "access.fulfill", "access.configure", "admin.users"]),
         ("it-admin2", "demo.it.admin2@qec.local", "Demo IT Admin 2", ["access.fulfill"]),
         ("finance-employee", "demo.finance.employee@qec.local", "Demo Finance Employee", ["access.request"]),
         ("facilities", "demo.facilities@qec.local", "Demo Facilities Officer", ["access.request", "access.approve", "access.fulfill", "admin.users"]),
@@ -153,13 +153,25 @@ public sealed class DevelopmentAccessDemoSeedRunner(
 
     private async Task EnsureRolePermissionsAsync(Role role, IEnumerable<Permission> permissions, CancellationToken ct)
     {
-        HashSet<Guid> existing = (await identityDb.RolePermissions
+        List<Permission> desired = permissions.ToList();
+        HashSet<Guid> desiredIds = desired.Select(p => p.Id).ToHashSet();
+        List<RolePermission> existingRows = await identityDb.RolePermissions
             .Where(x => x.RoleId == role.Id)
-            .Select(x => x.PermissionId)
-            .ToListAsync(ct)).ToHashSet();
-        foreach (Permission permission in permissions)
+            .ToListAsync(ct);
+
+        foreach (RolePermission row in existingRows)
         {
-            if (existing.Contains(permission.Id)) continue;
+            if (!desiredIds.Contains(row.PermissionId))
+                identityDb.RolePermissions.Remove(row);
+        }
+
+        HashSet<Guid> remaining = existingRows
+            .Where(x => desiredIds.Contains(x.PermissionId))
+            .Select(x => x.PermissionId)
+            .ToHashSet();
+        foreach (Permission permission in desired)
+        {
+            if (remaining.Contains(permission.Id)) continue;
             identityDb.RolePermissions.Add(RolePermission.Create(role.Id, permission.Id));
         }
     }

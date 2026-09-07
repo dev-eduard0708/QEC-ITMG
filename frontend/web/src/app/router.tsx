@@ -62,6 +62,7 @@ import { OperationsPage } from '@/features/it/operations-page'
 import { AccessPage } from '@/features/it/access-page'
 import { AccessNewPage } from '@/features/it/access-new-page'
 import { AccessDetailPage } from '@/features/it/access-detail-page'
+import { AccessEditPage } from '@/features/it/access-edit-page'
 import { AccessCategoriesPage } from '@/features/it/access-categories-page'
 import { AccessCategoryDetailPage } from '@/features/it/access-category-detail-page'
 import { AccessReviewsPage } from '@/features/it/access-reviews-page'
@@ -176,6 +177,7 @@ export function AppRouter() {
             }
           >
             <Route path="it/access" element={<AccessPage />} />
+            <Route path="it/access/:id/edit" element={<AccessEditPage />} />
             <Route path="it/access/:id" element={<AccessDetailPage />} />
           </Route>
           <Route element={<RequirePermission permission="access.request" />}>

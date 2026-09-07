@@ -176,10 +176,15 @@ public static class AccessEndpoints
                 page ?? 1, pageSize ?? 25, search, ParseEnum<AccessCaseType>(type), ParseEnum<AccessCaseStatus>(status), ct,
                 scopedUserId: session.Id, workQueue: queue, canSeeAll: canSeeAll));
         });
-        read.MapGet("/{id:guid}", async (Guid id, AccessCaseService svc, CancellationToken ct) =>
+        read.MapGet("/{id:guid}", async (
+            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, CancellationToken ct) =>
         {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
             AccessCaseDto? item = await svc.GetAsync(id, ct);
-            return item is null ? Results.NotFound() : Results.Ok(item);
+            if (item is null) return Results.NotFound();
+            return Results.Ok(await WithResolvedActionsAsync(item, session, svc, ct));
         });
         read.MapGet("/{id:guid}/items", async (Guid id, AccessCaseService svc, CancellationToken ct) =>
             Results.Ok(await svc.ListItemsAsync(id, ct)));
@@ -238,20 +243,25 @@ public static class AccessEndpoints
                 if (submitForApproval || string.Equals(created.Status, nameof(AccessCaseStatus.Approval), StringComparison.OrdinalIgnoreCase))
                     await NotifyApproversForCaseAsync(created, svc, notifications, ct);
 
-                return Results.Created($"/api/v1/access/cases/{created.Id}", created);
+                AccessCaseDto enriched = await WithResolvedActionsAsync(created, session, svc, ct);
+                return Results.Created($"/api/v1/access/cases/{enriched.Id}", enriched);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessRequest);
 
         endpoints.MapPut("/api/v1/access/cases/{id:guid}", async (
-            Guid id, UpdateAccessCaseRequest req, AccessCaseService svc, CancellationToken ct) =>
+            Guid id, UpdateAccessCaseRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, CancellationToken ct) =>
         {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
             try
             {
-                return Results.Ok(await svc.UpdateDraftAsync(
+                AccessCaseDto updated = await svc.UpdateDraftAsync(
                     id, req.Reason, req.SubjectUserId, req.SubjectName, req.SubjectEmail,
                     req.DepartmentId, req.ManagerUserId, req.DesignatedApproverUserId, req.EffectiveAtUtc, ct,
-                    accessCategoryId: req.AccessCategoryId));
+                    accessCategoryId: req.AccessCategoryId);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessRequest);
@@ -266,13 +276,13 @@ public static class AccessEndpoints
             {
                 AccessCaseDto updated = await svc.SubmitAsync(id, session.Id, ct);
                 await NotifyApproversForCaseAsync(updated, svc, notifications, ct);
-                return Results.Ok(updated);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessRequest);
 
-        MapCaseAction("/api/v1/access/cases/{id:guid}/start-approval", AccessApprove, async (id, _, svc, _, ct) =>
-            Results.Ok(await svc.StartApprovalAsync(id, ct)));
+        MapCaseAction("/api/v1/access/cases/{id:guid}/start-approval", AccessApprove, async (id, session, svc, _, ct) =>
+            Results.Ok(await WithResolvedActionsAsync(await svc.StartApprovalAsync(id, ct), session, svc, ct)));
 
         endpoints.MapPost("/api/v1/access/cases/{id:guid}/approve", async (
             Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
@@ -295,7 +305,7 @@ public static class AccessEndpoints
                     updated.Id, updated.CaseNumber, category, typeLabel, subject, updated.RequesterUserId, ct);
                 await notifications.ResolveStageNotificationsAsync(
                     updated.Id, approverIds, [AccessNotificationService.TypeApprovalRequested], ct);
-                return Results.Ok(updated);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessApprove);
@@ -314,13 +324,96 @@ public static class AccessEndpoints
                 string typeLabel = AccessNotificationService.TypeLabel(updated);
                 string subject = AccessNotificationService.SubjectLabel(updated);
                 await notifications.NotifyRequesterRejectedAsync(
-                    updated.Id, updated.CaseNumber, category, typeLabel, subject, updated.RequesterUserId, ct);
+                    updated.Id, updated.CaseNumber, category, typeLabel, subject,
+                    updated.RequesterUserId, updated.RejectionReason, ct);
                 await notifications.ResolveStageNotificationsAsync(
                     updated.Id, approverIds, [AccessNotificationService.TypeApprovalRequested], ct);
-                return Results.Ok(updated);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessApprove);
+
+        endpoints.MapPost("/api/v1/access/cases/{id:guid}/return-for-rework", async (
+            Guid id, OverrideReasonRequest? req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, AccessNotificationService notifications, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                IReadOnlyList<Guid> approverIds = await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Approver, ct);
+                AccessCaseDto updated = await svc.ReturnForReworkAsync(id, session.Id, req?.Reason ?? string.Empty, ct);
+                string category = AccessNotificationService.CategoryLabel(updated);
+                string typeLabel = AccessNotificationService.TypeLabel(updated);
+                string subject = AccessNotificationService.SubjectLabel(updated);
+                await notifications.NotifyRequesterReworkAsync(
+                    updated.Id, updated.CaseNumber, category, typeLabel, subject,
+                    updated.RequesterUserId, updated.ReworkReason, ct);
+                await notifications.ResolveStageNotificationsAsync(
+                    updated.Id, approverIds, [AccessNotificationService.TypeApprovalRequested], ct);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessApprove);
+
+        endpoints.MapPost("/api/v1/access/cases/{id:guid}/resubmit", async (
+            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, AccessNotificationService notifications, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                AccessCaseDto updated = await svc.ResubmitAsync(id, session.Id, ct);
+                await NotifyApproversForCaseAsync(updated, svc, notifications, ct);
+                await notifications.ResolveStageNotificationsAsync(
+                    updated.Id,
+                    [updated.RequesterUserId],
+                    [AccessNotificationService.TypeReworkRequested],
+                    ct);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessRequest);
+
+        endpoints.MapPut("/api/v1/access/cases/{id:guid}/scope", async (
+            Guid id, UpdateAccessRequestScopeRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                List<AccessCaseItemCreateSpec> specs = [];
+                foreach (CreateAccessCaseItemRequest item in req.Items ?? [])
+                {
+                    if (!Enum.TryParse(item.Action, true, out AccessItemAction action))
+                        return Validation("A valid item action is required.");
+                    specs.Add(new AccessCaseItemCreateSpec(
+                        item.AccessEntitlementId,
+                        item.CustomName,
+                        action,
+                        item.Notes,
+                        item.IsSelected != false));
+                }
+
+                AccessCaseDto updated = await svc.UpdateRequestScopeAsync(id, req.Reason, specs, session.Id, ct);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessRequest);
+
+        endpoints.MapGet("/api/v1/access/cases/{id:guid}/revisions", async (
+            Guid id, AccessCaseService svc, CancellationToken ct) =>
+        {
+            try
+            {
+                return Results.Ok(await svc.ListRevisionsAsync(id, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequireAnyPermission(
+            AccessRequest, AccessApprove, AccessFulfill, AccessConfigure,
+            AccessReview, AccessPrivilegedManage, SodManage);
 
         endpoints.MapPost("/api/v1/access/cases/{id:guid}/start-verification", async (
             Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
@@ -343,7 +436,7 @@ public static class AccessEndpoints
                     updated.SubjectUserId, fallbacks, isLeaver, ct);
                 await notifications.ResolveStageNotificationsAsync(
                     updated.Id, fulfillerIds, [AccessNotificationService.TypeFulfillmentReady], ct);
-                return Results.Ok(updated);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessFulfill);
@@ -364,7 +457,7 @@ public static class AccessEndpoints
                     await notifications.ResolveStageNotificationsAsync(
                         updated.Id, verifierIds.Concat(updated.SubjectUserId is Guid s ? [s] : []),
                         [AccessNotificationService.TypeVerificationRequired], ct);
-                    return Results.Ok(updated);
+                    return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
                 }
 
                 AccessCaseDto verified = await svc.VerifyEmployeeAsync(id, session.Id, req.EverythingWorks != false, req.Comment, ct);
@@ -387,7 +480,7 @@ public static class AccessEndpoints
                 await notifications.ResolveStageNotificationsAsync(
                     verified.Id, verifierIds.Concat(verified.SubjectUserId is Guid sub ? [sub] : []),
                     [AccessNotificationService.TypeVerificationRequired], ct);
-                return Results.Ok(verified);
+                return Results.Ok(await WithResolvedActionsAsync(verified, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequireAuthorization();
@@ -429,7 +522,7 @@ public static class AccessEndpoints
                         AccessNotificationService.TypeReadyToClose,
                     ],
                     ct);
-                return Results.Ok(updated);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessFulfill);
@@ -443,7 +536,8 @@ public static class AccessEndpoints
             bool canOverride = session.Permissions.Contains(AccessPrivilegedManage);
             try
             {
-                return Results.Ok(await svc.CancelAsync(id, session.Id, req?.Reason, canOverride, ct));
+                AccessCaseDto updated = await svc.CancelAsync(id, session.Id, req?.Reason, canOverride, ct);
+                return Results.Ok(await WithResolvedActionsAsync(updated, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessRequest);
@@ -456,7 +550,10 @@ public static class AccessEndpoints
             try
             {
                 await svc.ConfirmExistingAccessAsync(id, session.Id, ct);
-                return Results.Ok(await svc.GetAsync(id, ct));
+                AccessCaseDto? item = await svc.GetAsync(id, ct);
+                return item is null
+                    ? Results.NotFound()
+                    : Results.Ok(await WithResolvedActionsAsync(item, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessRequest);
@@ -517,12 +614,18 @@ public static class AccessEndpoints
         }).RequirePermission(AccessRequest);
 
         endpoints.MapPost("/api/v1/access/cases/{id:guid}/link-ticket", async (
-            Guid id, LinkTicketRequest req, AccessCaseService svc, CancellationToken ct) =>
+            Guid id, LinkTicketRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, CancellationToken ct) =>
         {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
             try
             {
                 await svc.LinkTicketAsync(id, req.TicketId, ct);
-                return Results.Ok(await svc.GetAsync(id, ct));
+                AccessCaseDto? item = await svc.GetAsync(id, ct);
+                return item is null
+                    ? Results.NotFound()
+                    : Results.Ok(await WithResolvedActionsAsync(item, session, svc, ct));
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessRequest);
@@ -542,6 +645,23 @@ public static class AccessEndpoints
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
             }).RequirePermission(permission);
         }
+    }
+
+    private static async Task<AccessCaseDto> WithResolvedActionsAsync(
+        AccessCaseDto accessCase,
+        CurrentUserDto session,
+        AccessCaseService svc,
+        CancellationToken ct)
+    {
+        AccessCaseActionsDto actions = await svc.ResolveActionsAsync(
+            accessCase,
+            session.Id,
+            session.Permissions.Contains(AccessRequest),
+            session.Permissions.Contains(AccessApprove),
+            session.Permissions.Contains(AccessFulfill),
+            ct,
+            hasAccessConfigure: session.Permissions.Contains(AccessConfigure));
+        return accessCase with { Actions = actions };
     }
 
     private static async Task NotifyApproversForCaseAsync(
@@ -746,6 +866,7 @@ public sealed class AccessNotificationService(IUserNotificationPublisher notific
     public const string TypeApprovalRequested = "access.approval_requested";
     public const string TypeApproved = "access.approved";
     public const string TypeRejected = "access.rejected";
+    public const string TypeReworkRequested = "access.rework_requested";
     public const string TypeFulfillmentReady = "access.fulfillment_ready";
     public const string TypeVerificationRequired = "access.verification_required";
     public const string TypeVerificationProblem = "access.verification_problem";
@@ -827,17 +948,46 @@ public sealed class AccessNotificationService(IUserNotificationPublisher notific
         string typeLabel,
         string subjectLabel,
         Guid requesterId,
-        CancellationToken ct) =>
-        notifications.PublishAsync(
+        string? reason,
+        CancellationToken ct)
+    {
+        string detail = string.IsNullOrWhiteSpace(reason) ? string.Empty : $" {reason.Trim()}";
+        return notifications.PublishAsync(
             requesterId,
             TypeRejected,
             "Warning",
             $"{caseNumber} rejected",
-            $"Your {typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel} was rejected.",
+            $"Your {typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel} was rejected.{detail}",
             ResourceType,
             caseId,
             CaseUrl(caseId),
             ct);
+    }
+
+    public Task NotifyRequesterReworkAsync(
+        Guid caseId,
+        string caseNumber,
+        string categoryName,
+        string typeLabel,
+        string subjectLabel,
+        Guid requesterId,
+        string? reason,
+        CancellationToken ct)
+    {
+        string detail = string.IsNullOrWhiteSpace(reason)
+            ? "Please update the request and resubmit."
+            : reason.Trim();
+        return notifications.PublishAsync(
+            requesterId,
+            TypeReworkRequested,
+            "Warning",
+            $"Changes requested: {caseNumber}",
+            $"Your {typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel} was returned for rework. {detail}",
+            ResourceType,
+            caseId,
+            CaseUrl(caseId),
+            ct);
+    }
 
     public async Task NotifyVerificationToSubjectOrFallbacksAsync(
         Guid caseId,
@@ -1029,6 +1179,10 @@ public sealed record UpdateAccessCaseRequest(
     string Reason, Guid? SubjectUserId, string? SubjectName, string? SubjectEmail,
     Guid? DepartmentId, Guid? ManagerUserId, Guid? DesignatedApproverUserId, DateTimeOffset? EffectiveAtUtc,
     Guid? AccessCategoryId = null);
+
+public sealed record UpdateAccessRequestScopeRequest(
+    string? Reason,
+    IReadOnlyList<CreateAccessCaseItemRequest>? Items);
 
 public sealed record UpsertAccessCategoryRequest(
     string Key,

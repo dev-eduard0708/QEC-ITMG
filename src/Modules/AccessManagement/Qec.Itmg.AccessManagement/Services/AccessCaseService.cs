@@ -8,6 +8,20 @@ using Qec.Itmg.Contracts.Numbering;
 
 namespace Qec.Itmg.AccessManagement.Services;
 
+public sealed record AccessCaseActionsDto(
+    bool CanSubmit,
+    bool CanResubmit,
+    bool CanEditRequest,
+    bool CanApprove,
+    bool CanReject,
+    bool CanSendForRework,
+    bool CanFulfill,
+    bool CanSendForVerification,
+    bool CanVerifyAsEmployee,
+    bool CanVerifyAsFallback,
+    bool CanClose,
+    bool IsRoutedApproverMissingPermission);
+
 public sealed record AccessCaseDto(
     Guid Id, string CaseNumber, string Type, string Status, Guid RequesterUserId,
     Guid? SubjectUserId, string? SubjectName, string? SubjectEmail, Guid? DepartmentId,
@@ -31,7 +45,15 @@ public sealed record AccessCaseDto(
     Guid? ClosedByUserId = null,
     bool IsReadyToClose = false,
     IReadOnlyList<AccessCaseRouteParticipantDto>? RouteParticipants = null,
-    string? AccessCategoryDisplayName = null);
+    string? AccessCategoryDisplayName = null,
+    AccessCaseActionsDto? Actions = null,
+    Guid? ReturnedForReworkByUserId = null,
+    DateTimeOffset? ReturnedForReworkAtUtc = null,
+    string? ReworkReason = null,
+    Guid? RejectedByUserId = null,
+    DateTimeOffset? RejectedAtUtc = null,
+    string? RejectionReason = null,
+    int CurrentScopeRevisionNumber = 0);
 
 public sealed record AccessCaseRouteParticipantDto(
     Guid UserId,
@@ -55,6 +77,31 @@ public sealed record AccessCaseItemCreateSpec(
     AccessItemAction Action,
     string? Notes,
     bool IsSelected = true);
+
+public sealed record AccessCaseRevisionItemDto(
+    Guid Id,
+    Guid RevisionId,
+    Guid? AccessEntitlementId,
+    string EntitlementKeySnapshot,
+    string? NameEnSnapshot,
+    string? NameArSnapshot,
+    string? CustomName,
+    string Action,
+    string? Notes,
+    bool IsPrivileged,
+    bool IsCustom);
+
+public sealed record AccessCaseRevisionDto(
+    Guid Id,
+    Guid AccessCaseId,
+    int RevisionNumber,
+    Guid SubmittedByUserId,
+    DateTimeOffset SubmittedAtUtc,
+    string Decision,
+    Guid? DecidedByUserId,
+    DateTimeOffset? DecidedAtUtc,
+    string? DecisionReason,
+    IReadOnlyList<AccessCaseRevisionItemDto> Items);
 
 public sealed record ExistingAccessItemDto(
     Guid Id, Guid AccessCaseId, Guid? ConfigurationItemId, string EntitlementKey,
@@ -190,6 +237,94 @@ public sealed class AccessCaseService(
         return Map(item, count, pending, routes.GetValueOrDefault(id), categoryNames);
     }
 
+    public Task<AccessCaseActionsDto> ResolveActionsAsync(
+        AccessCaseDto accessCase,
+        Guid actorUserId,
+        bool hasAccessRequest,
+        bool hasAccessApprove,
+        bool hasAccessFulfill,
+        CancellationToken ct,
+        bool hasAccessConfigure = false)
+    {
+        _ = ct;
+        bool isDraft = StatusEquals(accessCase.Status, AccessCaseStatus.Draft);
+        bool isRework = StatusEquals(accessCase.Status, AccessCaseStatus.Rework);
+        bool isApproval = StatusEquals(accessCase.Status, AccessCaseStatus.Approval);
+        bool isFulfillment = StatusEquals(accessCase.Status, AccessCaseStatus.Fulfillment);
+        bool isVerification = StatusEquals(accessCase.Status, AccessCaseStatus.Verification);
+        bool isRequester = accessCase.RequesterUserId == actorUserId;
+        bool isSubject = accessCase.SubjectUserId == actorUserId;
+        bool isLeaver = string.Equals(accessCase.Type, nameof(AccessCaseType.Leaver), StringComparison.OrdinalIgnoreCase);
+
+        bool isSnapshottedApprover = (accessCase.RouteParticipants ?? [])
+            .Any(r => StageEquals(r.Stage, AccessCategoryStage.Approver) && r.UserId == actorUserId);
+        bool isRoutedApprover = IsRouted(accessCase, AccessCategoryStage.Approver, actorUserId);
+        bool isRoutedFulfiller = IsRouted(accessCase, AccessCategoryStage.Fulfiller, actorUserId);
+        bool isRoutedCloser = IsRouted(accessCase, AccessCategoryStage.Closer, actorUserId);
+        bool isRoutedFallbackVerifier = (accessCase.RouteParticipants ?? [])
+            .Any(r => StageEquals(r.Stage, AccessCategoryStage.Verifier)
+                && !r.IsSubjectEmployeeDerived
+                && r.UserId == actorUserId);
+
+        bool canApprove = isApproval && hasAccessApprove && isRoutedApprover && !isRequester;
+        bool canReject = canApprove;
+        bool canSendForRework = canApprove;
+        bool canFulfill = isFulfillment && hasAccessFulfill && isRoutedFulfiller;
+        bool canSendForVerification = canFulfill;
+        bool canVerifyAsEmployee = isVerification && !accessCase.IsReadyToClose && isSubject && !isLeaver;
+        bool canVerifyAsFallback = isVerification && !accessCase.IsReadyToClose && isRoutedFallbackVerifier;
+        bool canClose = isVerification && accessCase.IsReadyToClose && hasAccessFulfill && isRoutedCloser;
+        bool canSubmit = isDraft && (hasAccessRequest || isRequester);
+        bool canResubmit = isRework && (hasAccessRequest || isRequester);
+        bool canEditRequest = (isDraft || isRework) && (hasAccessRequest || isRequester || hasAccessConfigure);
+        bool isRoutedApproverMissingPermission = isApproval && isSnapshottedApprover && !hasAccessApprove;
+
+        return Task.FromResult(new AccessCaseActionsDto(
+            canSubmit,
+            canResubmit,
+            canEditRequest,
+            canApprove,
+            canReject,
+            canSendForRework,
+            canFulfill,
+            canSendForVerification,
+            canVerifyAsEmployee,
+            canVerifyAsFallback,
+            canClose,
+            isRoutedApproverMissingPermission));
+    }
+
+    private static bool IsRouted(AccessCaseDto accessCase, AccessCategoryStage stage, Guid userId)
+    {
+        IReadOnlyList<AccessCaseRouteParticipantDto> routes =
+            accessCase.RouteParticipants ?? Array.Empty<AccessCaseRouteParticipantDto>();
+        AccessCaseRouteParticipantDto[] stageRoutes = routes
+            .Where(r => StageEquals(r.Stage, stage))
+            .ToArray();
+
+        if (stageRoutes.Length > 0)
+            return stageRoutes.Any(r => r.UserId == userId);
+
+        // Empty stage with other route rows → invalid config (do not open to everyone).
+        if (routes.Count > 0)
+            return false;
+
+        // Legacy cases with zero total route participants.
+        if (stage == AccessCategoryStage.Approver)
+            return accessCase.DesignatedApproverUserId == userId;
+
+        // Legacy fulfillment/verification/closure relied on permission only.
+        return stage is AccessCategoryStage.Fulfiller
+            or AccessCategoryStage.Closer
+            or AccessCategoryStage.Verifier;
+    }
+
+    private static bool StatusEquals(string status, AccessCaseStatus expected) =>
+        string.Equals(status, expected.ToString(), StringComparison.OrdinalIgnoreCase);
+
+    private static bool StageEquals(string stage, AccessCategoryStage expected) =>
+        string.Equals(stage, expected.ToString(), StringComparison.OrdinalIgnoreCase);
+
     public async Task<IReadOnlyList<Guid>> GetRouteUserIdsAsync(
         Guid caseId, AccessCategoryStage stage, CancellationToken ct)
     {
@@ -275,7 +410,13 @@ public sealed class AccessCaseService(
                 entity, type, accessCategoryId, items, innerCt);
 
             if (type == AccessCaseType.Mover && subjectUserId is Guid moverSubject && moverSubject != Guid.Empty)
+            {
                 await SnapshotCurrentAccessAsync(entity.Id, moverSubject, innerCt);
+                int snapshotCount = await db.ExistingAccessSnapshotItems.CountAsync(
+                    x => x.AccessCaseId == entity.Id, innerCt);
+                if (snapshotCount > 0)
+                    entity.ConfirmExistingAccess(requesterUserId, clock.UtcNow);
+            }
 
             await businessAudit.AppendAsync(AccessAudit.Created(entity.Id, entity.CaseNumber), innerCt);
             await db.SaveChangesAsync(innerCt);
@@ -601,7 +742,44 @@ public sealed class AccessCaseService(
             entity.Id, entity.CaseNumber, "Status", nameof(AccessCaseStatus.Submitted), nameof(AccessCaseStatus.Approval),
             BusinessAuditAction.StatusChanged), ct);
 
+        await CreatePendingRevisionSnapshotAsync(entity, actorUserId, revisionNumber: 1, ct);
+
         await db.SaveChangesAsync(ct);
+    }
+
+    private async Task CreatePendingRevisionSnapshotAsync(
+        AccessCase entity,
+        Guid submittedByUserId,
+        int revisionNumber,
+        CancellationToken ct)
+    {
+        AccessCaseRevision revision = AccessCaseRevision.CreatePending(
+            entity.Id, revisionNumber, submittedByUserId, clock.UtcNow);
+        db.AccessCaseRevisions.Add(revision);
+
+        List<AccessCaseItem> items = await db.AccessCaseItems
+            .Where(x => x.AccessCaseId == entity.Id)
+            .OrderBy(x => x.CreatedAtUtc)
+            .ToListAsync(ct);
+        foreach (AccessCaseItem item in items)
+            db.AccessCaseRevisionItems.Add(AccessCaseRevisionItem.CreateFromCaseItem(revision.Id, item));
+
+        entity.SetCurrentScopeRevisionNumber(revisionNumber, clock.UtcNow);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "ScopeRevisionCreated", null, revisionNumber.ToString()), ct);
+    }
+
+    private async Task<AccessCaseRevision> RequireCurrentPendingRevisionAsync(AccessCase entity, CancellationToken ct)
+    {
+        AccessCaseRevision? revision = await db.AccessCaseRevisions
+            .FirstOrDefaultAsync(
+                x => x.AccessCaseId == entity.Id
+                    && x.RevisionNumber == entity.CurrentScopeRevisionNumber
+                    && x.Decision == AccessCaseRevisionDecision.Pending,
+                ct);
+        if (revision is null)
+            throw new InvalidOperationException("No pending scope revision found for this case.");
+        return revision;
     }
 
     private async Task ValidateItemsForSubmitAsync(AccessCase entity, CancellationToken ct)
@@ -649,24 +827,191 @@ public sealed class AccessCaseService(
         if (entity.Type == AccessCaseType.Mover && !entity.ExistingAccessConfirmed)
             throw new InvalidOperationException("Mover cases require existing-access confirmation before fulfillment.");
 
+        if (entity.CurrentScopeRevisionNumber > 0)
+        {
+            AccessCaseRevision revision = await RequireCurrentPendingRevisionAsync(entity, ct);
+            revision.RecordDecision(AccessCaseRevisionDecision.Approved, actorUserId, clock.UtcNow);
+        }
+
         entity.RecordApproval(actorUserId, clock.UtcNow);
         await businessAudit.AppendAsync(AccessAudit.Field(
             entity.Id, entity.CaseNumber, "CaseApproved", null, actorUserId.ToString()), ct);
         return await TransitionAsync(id, AccessCaseStatus.Fulfillment, ct, actorUserId);
     }
 
-    public async Task<AccessCaseDto> RejectAsync(Guid id, Guid actorUserId, string? reason, CancellationToken ct)
+    public async Task<AccessCaseDto> ReturnForReworkAsync(Guid id, Guid actorUserId, string reason, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        AccessCase entity = await LoadTrackedAsync(id, ct);
+        if (entity.Status != AccessCaseStatus.Approval)
+            throw new InvalidOperationException("Case is not awaiting approval.");
+        if (actorUserId == entity.RequesterUserId)
+            throw new InvalidOperationException("Requester cannot send their own access case for rework.");
+        await EnsureRouteActorAsync(entity.Id, AccessCategoryStage.Approver, actorUserId, ct,
+            legacyDesignatedApprover: entity.DesignatedApproverUserId);
+
+        string trimmed = reason.Trim();
+        if (entity.CurrentScopeRevisionNumber > 0)
+        {
+            AccessCaseRevision revision = await RequireCurrentPendingRevisionAsync(entity, ct);
+            revision.RecordDecision(AccessCaseRevisionDecision.Rework, actorUserId, clock.UtcNow, trimmed);
+        }
+
+        entity.RecordRework(actorUserId, trimmed, clock.UtcNow);
+        AccessCaseStatus from = entity.Status;
+        entity.TransitionTo(AccessCaseStatus.Rework, clock.UtcNow);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "CaseReturnedForRework", from.ToString(), nameof(AccessCaseStatus.Rework),
+            BusinessAuditAction.StatusChanged, trimmed), ct);
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(id, ct))!;
+    }
+
+    public async Task<AccessCaseDto> ResubmitAsync(Guid id, Guid actorUserId, CancellationToken ct)
     {
         AccessCase entity = await LoadTrackedAsync(id, ct);
+        if (entity.Status != AccessCaseStatus.Rework)
+            throw new InvalidOperationException("Only cases in Rework can be resubmitted.");
+        if (actorUserId != entity.RequesterUserId)
+        {
+            bool allowedRequester = entity.AccessCategoryId is Guid categoryId
+                && await db.AccessCategoryParticipants.AnyAsync(
+                    x => x.AccessCategoryId == categoryId
+                        && x.Stage == AccessCategoryStage.Requester
+                        && x.UserId == actorUserId, ct);
+            if (!allowedRequester)
+                throw new InvalidOperationException("Only the requester can resubmit this case.");
+        }
+
+        await ValidateItemsForSubmitAsync(entity, ct);
+
+        int nextRevision = entity.CurrentScopeRevisionNumber <= 0
+            ? 1
+            : entity.CurrentScopeRevisionNumber + 1;
+        await CreatePendingRevisionSnapshotAsync(entity, actorUserId, nextRevision, ct);
+
+        entity.ClearReworkOnResubmit(clock.UtcNow);
+        AccessCaseStatus from = entity.Status;
+        entity.TransitionTo(AccessCaseStatus.Approval, clock.UtcNow);
+        await businessAudit.AppendAsync(AccessAudit.Field(
+            entity.Id, entity.CaseNumber, "CaseResubmitted", from.ToString(), nameof(AccessCaseStatus.Approval),
+            BusinessAuditAction.StatusChanged), ct);
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(id, ct))!;
+    }
+
+    public async Task<AccessCaseDto> UpdateRequestScopeAsync(
+        Guid id,
+        string? reason,
+        IReadOnlyList<AccessCaseItemCreateSpec> items,
+        Guid actorUserId,
+        CancellationToken ct)
+    {
+        AccessCase entity = await LoadTrackedAsync(id, ct);
+        if (entity.Status is not (AccessCaseStatus.Draft or AccessCaseStatus.Rework))
+            throw new InvalidOperationException(
+                "Requested access can only be changed while the request is Draft or in Rework.");
+
+        if (!string.IsNullOrWhiteSpace(reason))
+        {
+            if (entity.Status == AccessCaseStatus.Draft)
+            {
+                entity.UpdateDraft(
+                    reason,
+                    entity.SubjectUserId,
+                    entity.SubjectName,
+                    entity.SubjectEmail,
+                    entity.DepartmentId,
+                    entity.ManagerUserId,
+                    entity.DesignatedApproverUserId,
+                    entity.EffectiveAtUtc,
+                    clock.UtcNow,
+                    entity.AccessCategoryId);
+            }
+            else
+            {
+                entity.UpdateReasonWhileEditable(reason, clock.UtcNow);
+            }
+        }
+
+        List<AccessCaseItem> existing = await db.AccessCaseItems
+            .Where(x => x.AccessCaseId == id).ToListAsync(ct);
+        db.AccessCaseItems.RemoveRange(existing);
+
+        List<AccessCaseItemCreateSpec> selected = items.Where(x => x.IsSelected).ToList();
+        if (selected.Count > 0)
+            await MaterializeClientItemsAsync(entity, entity.Type, selected, ct);
+
+        if (entity.Status == AccessCaseStatus.Rework)
+        {
+            await businessAudit.AppendAsync(AccessAudit.Field(
+                entity.Id, entity.CaseNumber, "RequestEditedAfterRework", null, actorUserId.ToString()), ct);
+        }
+        else
+        {
+            await businessAudit.AppendAsync(AccessAudit.Field(
+                entity.Id, entity.CaseNumber, "RequestScopeUpdated", null, actorUserId.ToString()), ct);
+        }
+
+        await db.SaveChangesAsync(ct);
+        return (await GetAsync(id, ct))!;
+    }
+
+    public async Task<IReadOnlyList<AccessCaseRevisionDto>> ListRevisionsAsync(Guid caseId, CancellationToken ct)
+    {
+        List<AccessCaseRevision> revisions = await db.AccessCaseRevisions.AsNoTracking()
+            .Where(x => x.AccessCaseId == caseId)
+            .OrderBy(x => x.RevisionNumber)
+            .ToListAsync(ct);
+        if (revisions.Count == 0) return [];
+
+        List<Guid> revisionIds = revisions.Select(x => x.Id).ToList();
+        List<AccessCaseRevisionItem> items = await db.AccessCaseRevisionItems.AsNoTracking()
+            .Where(x => revisionIds.Contains(x.RevisionId))
+            .ToListAsync(ct);
+        Dictionary<Guid, List<AccessCaseRevisionItemDto>> byRevision = items
+            .GroupBy(x => x.RevisionId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(MapRevisionItem).ToList());
+
+        return revisions.Select(r => new AccessCaseRevisionDto(
+            r.Id,
+            r.AccessCaseId,
+            r.RevisionNumber,
+            r.SubmittedByUserId,
+            r.SubmittedAtUtc,
+            r.Decision.ToString(),
+            r.DecidedByUserId,
+            r.DecidedAtUtc,
+            r.DecisionReason,
+            byRevision.GetValueOrDefault(r.Id) ?? [])).ToList();
+    }
+
+    public async Task<AccessCaseDto> RejectAsync(Guid id, Guid actorUserId, string? reason, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        AccessCase entity = await LoadTrackedAsync(id, ct);
+        if (entity.Status != AccessCaseStatus.Approval)
+            throw new InvalidOperationException("Case is not awaiting approval.");
         if (actorUserId == entity.RequesterUserId)
             throw new InvalidOperationException("Requester cannot reject their own access case.");
         await EnsureRouteActorAsync(entity.Id, AccessCategoryStage.Approver, actorUserId, ct,
             legacyDesignatedApprover: entity.DesignatedApproverUserId);
+
+        string trimmed = reason.Trim();
+        if (entity.CurrentScopeRevisionNumber > 0)
+        {
+            AccessCaseRevision revision = await RequireCurrentPendingRevisionAsync(entity, ct);
+            revision.RecordDecision(AccessCaseRevisionDecision.Rejected, actorUserId, clock.UtcNow, trimmed);
+        }
+
+        entity.RecordRejection(actorUserId, trimmed, clock.UtcNow);
         AccessCaseStatus from = entity.Status;
         entity.TransitionTo(AccessCaseStatus.Rejected, clock.UtcNow);
         await businessAudit.AppendAsync(AccessAudit.Field(
             entity.Id, entity.CaseNumber, "CaseRejected", from.ToString(), nameof(AccessCaseStatus.Rejected),
-            BusinessAuditAction.StatusChanged, reason), ct);
+            BusinessAuditAction.StatusChanged, trimmed), ct);
         await db.SaveChangesAsync(ct);
         return (await GetAsync(id, ct))!;
     }
@@ -808,6 +1153,8 @@ public sealed class AccessCaseService(
     public async Task ConfirmExistingAccessAsync(Guid id, Guid userId, CancellationToken ct)
     {
         AccessCase entity = await LoadTrackedAsync(id, ct);
+        if (entity.Status != AccessCaseStatus.Draft)
+            throw new InvalidOperationException("Requested access can only be changed while the case is in Draft.");
         int snapshotCount = await db.ExistingAccessSnapshotItems.CountAsync(x => x.AccessCaseId == id, ct);
         if (snapshotCount == 0)
             throw new InvalidOperationException("Capture at least one existing-access item before confirmation.");
@@ -829,13 +1176,20 @@ public sealed class AccessCaseService(
         bool isPrivileged, bool isMandatory, string? notes, CancellationToken ct)
     {
         AccessCase entity = await LoadTrackedAsync(caseId, ct);
-        if (entity.Status is AccessCaseStatus.Closed or AccessCaseStatus.Rejected or AccessCaseStatus.Cancelled)
-            throw new InvalidOperationException("Cannot add items to a terminal case.");
+        EnsureEditableScope(entity);
         AccessCaseItem item = AccessCaseItem.Create(
             caseId, entitlementKey, action, clock.UtcNow, configurationItemId, isPrivileged, isMandatory, notes);
         db.AccessCaseItems.Add(item);
-        await businessAudit.AppendAsync(AccessAudit.Field(
-            entity.Id, entity.CaseNumber, "ItemAdded", null, entitlementKey), ct);
+        if (entity.Status == AccessCaseStatus.Rework)
+        {
+            await businessAudit.AppendAsync(AccessAudit.Field(
+                entity.Id, entity.CaseNumber, "RequestEditedAfterRework", null, entitlementKey), ct);
+        }
+        else
+        {
+            await businessAudit.AppendAsync(AccessAudit.Field(
+                entity.Id, entity.CaseNumber, "ItemAdded", null, entitlementKey), ct);
+        }
         await db.SaveChangesAsync(ct);
         return Map(item);
     }
@@ -867,6 +1221,7 @@ public sealed class AccessCaseService(
         Guid caseId, string entitlementKey, Guid? configurationItemId, string? accessSummary, CancellationToken ct)
     {
         AccessCase entity = await LoadTrackedAsync(caseId, ct);
+        EnsureEditableScope(entity);
         if (entity.Type != AccessCaseType.Mover)
             throw new InvalidOperationException("Existing access snapshots apply to Mover cases only.");
         ExistingAccessSnapshotItem item = ExistingAccessSnapshotItem.Create(
@@ -965,6 +1320,13 @@ public sealed class AccessCaseService(
     private async Task<AccessCase> LoadTrackedAsync(Guid id, CancellationToken ct) =>
         await db.AccessCases.FirstOrDefaultAsync(x => x.Id == id, ct)
         ?? throw new InvalidOperationException("Access case not found.");
+
+    private static void EnsureEditableScope(AccessCase entity)
+    {
+        if (entity.Status is not (AccessCaseStatus.Draft or AccessCaseStatus.Rework))
+            throw new InvalidOperationException(
+                "Requested access can only be changed while the request is Draft or in Rework.");
+    }
 
     private async Task<Dictionary<Guid, int>> CountItemsAsync(List<Guid> ids, CancellationToken ct)
     {
@@ -1077,7 +1439,15 @@ public sealed class AccessCaseService(
             x.VerifiedByUserId, x.VerifiedAtUtc,
             x.VerificationMethod?.ToString(), x.VerificationOutcome?.ToString(),
             x.VerificationComment, x.FallbackReason, x.ClosedByUserId,
-            x.IsReadyToClose, routes, displayName);
+            x.IsReadyToClose, routes, displayName,
+            Actions: null,
+            ReturnedForReworkByUserId: x.ReturnedForReworkByUserId,
+            ReturnedForReworkAtUtc: x.ReturnedForReworkAtUtc,
+            ReworkReason: x.ReworkReason,
+            RejectedByUserId: x.RejectedByUserId,
+            RejectedAtUtc: x.RejectedAtUtc,
+            RejectionReason: x.RejectionReason,
+            CurrentScopeRevisionNumber: x.CurrentScopeRevisionNumber);
     }
 
     private static AccessCaseItemDto Map(AccessCaseItem x) =>
@@ -1088,4 +1458,9 @@ public sealed class AccessCaseService(
             x.EntitlementNameEnSnapshot ?? x.EntitlementKey,
             x.EntitlementNameArSnapshot ?? x.EntitlementNameEnSnapshot ?? x.EntitlementKey,
             x.IsCustom);
+
+    private static AccessCaseRevisionItemDto MapRevisionItem(AccessCaseRevisionItem x) =>
+        new(x.Id, x.RevisionId, x.AccessEntitlementId, x.EntitlementKeySnapshot,
+            x.NameEnSnapshot, x.NameArSnapshot, x.CustomName, x.Action.ToString(),
+            x.Notes, x.IsPrivileged, x.IsCustom);
 }

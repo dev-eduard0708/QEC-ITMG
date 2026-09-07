@@ -22,6 +22,9 @@ internal sealed class AccessCaseConfiguration : IEntityTypeConfiguration<AccessC
         builder.Property(x => x.VerificationOutcome).HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.VerificationComment).HasMaxLength(2000);
         builder.Property(x => x.FallbackReason).HasMaxLength(2000);
+        builder.Property(x => x.ReworkReason).HasMaxLength(2000);
+        builder.Property(x => x.RejectionReason).HasMaxLength(2000);
+        builder.Property(x => x.CurrentScopeRevisionNumber).IsRequired();
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
         builder.Ignore(x => x.IsReadyToClose);
         builder.HasIndex(x => x.CaseNumber).IsUnique().HasDatabaseName("IX_AccessCase_CaseNumber");
@@ -183,6 +186,43 @@ internal sealed class AccessCaseExceptionConfiguration : IEntityTypeConfiguratio
         builder.Property(x => x.Reason).IsRequired().HasMaxLength(2000);
         builder.HasIndex(x => new { x.AccessCaseId, x.Type }).HasDatabaseName("IX_AccessCaseException_Case_Type");
         builder.HasOne<AccessCase>().WithMany().HasForeignKey(x => x.AccessCaseId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AccessCaseRevisionConfiguration : IEntityTypeConfiguration<AccessCaseRevision>
+{
+    public void Configure(EntityTypeBuilder<AccessCaseRevision> builder)
+    {
+        builder.ToTable("AccessCaseRevision");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Decision).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.DecisionReason).HasMaxLength(2000);
+        builder.HasIndex(x => new { x.AccessCaseId, x.RevisionNumber })
+            .IsUnique()
+            .HasDatabaseName("IX_AccessCaseRevision_Case_RevisionNumber");
+        builder.HasIndex(x => new { x.AccessCaseId, x.Decision })
+            .HasDatabaseName("IX_AccessCaseRevision_Case_Decision");
+        builder.HasOne<AccessCase>().WithMany().HasForeignKey(x => x.AccessCaseId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AccessCaseRevisionItemConfiguration : IEntityTypeConfiguration<AccessCaseRevisionItem>
+{
+    public void Configure(EntityTypeBuilder<AccessCaseRevisionItem> builder)
+    {
+        builder.ToTable("AccessCaseRevisionItem");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.EntitlementKeySnapshot).IsRequired().HasMaxLength(256);
+        builder.Property(x => x.NameEnSnapshot).HasMaxLength(256);
+        builder.Property(x => x.NameArSnapshot).HasMaxLength(256);
+        builder.Property(x => x.CustomName).HasMaxLength(256);
+        builder.Property(x => x.Action).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.Notes).HasMaxLength(2000);
+        builder.HasIndex(x => x.RevisionId).HasDatabaseName("IX_AccessCaseRevisionItem_RevisionId");
+        builder.HasOne<AccessCaseRevision>().WithMany().HasForeignKey(x => x.RevisionId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<AccessEntitlement>().WithMany().HasForeignKey(x => x.AccessEntitlementId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
 

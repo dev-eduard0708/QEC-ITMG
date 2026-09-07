@@ -3,6 +3,7 @@ import type { AccessCase } from '@/api/client'
 export type AccessFriendlyStatusKey =
   | 'draft'
   | 'waitingApproval'
+  | 'changesRequested'
   | 'inFulfillment'
   | 'waitingVerification'
   | 'readyToClose'
@@ -28,6 +29,13 @@ export function getAccessFriendlyStatus(
 
   if (status === 'Draft') {
     return { key: 'draft', labelKey: 'access.friendlyStatus.draft', tone: 'warning' }
+  }
+  if (status === 'Rework') {
+    return {
+      key: 'changesRequested',
+      labelKey: 'access.friendlyStatus.changesRequested',
+      tone: 'warning',
+    }
   }
   if (status === 'Rejected') {
     return { key: 'rejected', labelKey: 'access.friendlyStatus.rejected', tone: 'secondary' }
@@ -83,6 +91,7 @@ export function getAccessWorkflowSteps(
   const problem =
     status === 'Rejected' ||
     status === 'Cancelled' ||
+    status === 'Rework' ||
     accessCase.verificationOutcome === 'Problem'
 
   const order: WorkflowStepId[] = [
@@ -95,7 +104,7 @@ export function getAccessWorkflowSteps(
 
   let currentIndex = 0
   if (status === 'Draft') currentIndex = 0
-  else if (status === 'Submitted' || status === 'Approval') currentIndex = 1
+  else if (status === 'Submitted' || status === 'Approval' || status === 'Rework') currentIndex = 1
   else if (status === 'Fulfillment') currentIndex = 2
   else if (status === 'Verification' && !accessCase.isReadyToClose) currentIndex = 3
   else if (status === 'Verification' && accessCase.isReadyToClose) currentIndex = 4

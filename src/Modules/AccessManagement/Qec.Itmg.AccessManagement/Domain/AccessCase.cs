@@ -18,6 +18,15 @@ public enum AccessCaseStatus
     Closed = 5,
     Rejected = 6,
     Cancelled = 7,
+    Rework = 8,
+}
+
+public enum AccessCaseRevisionDecision
+{
+    Pending = 0,
+    Approved = 1,
+    Rework = 2,
+    Rejected = 3,
 }
 
 public enum AccessItemAction
@@ -111,6 +120,13 @@ public sealed class AccessCase
     public string? VerificationComment { get; private set; }
     public string? FallbackReason { get; private set; }
     public Guid? ClosedByUserId { get; private set; }
+    public Guid? ReturnedForReworkByUserId { get; private set; }
+    public DateTimeOffset? ReturnedForReworkAtUtc { get; private set; }
+    public string? ReworkReason { get; private set; }
+    public Guid? RejectedByUserId { get; private set; }
+    public DateTimeOffset? RejectedAtUtc { get; private set; }
+    public string? RejectionReason { get; private set; }
+    public int CurrentScopeRevisionNumber { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
     public DateTimeOffset? ClosedAtUtc { get; private set; }
@@ -202,6 +218,49 @@ public sealed class AccessCase
     {
         ApprovedByUserId = actorUserId;
         ApprovedAtUtc = utcNow;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void RecordRework(Guid actorUserId, string reason, DateTimeOffset utcNow)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        if (actorUserId == Guid.Empty) throw new ArgumentException("Actor is required.", nameof(actorUserId));
+        ReturnedForReworkByUserId = actorUserId;
+        ReturnedForReworkAtUtc = utcNow;
+        ReworkReason = reason.Trim();
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void ClearReworkOnResubmit(DateTimeOffset utcNow)
+    {
+        ReturnedForReworkByUserId = null;
+        ReturnedForReworkAtUtc = null;
+        ReworkReason = null;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void RecordRejection(Guid actorUserId, string reason, DateTimeOffset utcNow)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        if (actorUserId == Guid.Empty) throw new ArgumentException("Actor is required.", nameof(actorUserId));
+        RejectedByUserId = actorUserId;
+        RejectedAtUtc = utcNow;
+        RejectionReason = reason.Trim();
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void SetCurrentScopeRevisionNumber(int revisionNumber, DateTimeOffset utcNow)
+    {
+        if (revisionNumber < 1) throw new ArgumentOutOfRangeException(nameof(revisionNumber));
+        CurrentScopeRevisionNumber = revisionNumber;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void UpdateReasonWhileEditable(string reason, DateTimeOffset utcNow)
+    {
+        EnsureDraftOrRework();
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        Reason = reason.Trim();
         UpdatedAtUtc = utcNow;
     }
 
@@ -305,7 +364,10 @@ public sealed class AccessCase
             (AccessCaseStatus.Submitted, AccessCaseStatus.Cancelled) => true,
             (AccessCaseStatus.Approval, AccessCaseStatus.Fulfillment) => true,
             (AccessCaseStatus.Approval, AccessCaseStatus.Rejected) => true,
+            (AccessCaseStatus.Approval, AccessCaseStatus.Rework) => true,
             (AccessCaseStatus.Approval, AccessCaseStatus.Cancelled) => true,
+            (AccessCaseStatus.Rework, AccessCaseStatus.Approval) => true,
+            (AccessCaseStatus.Rework, AccessCaseStatus.Cancelled) => true,
             (AccessCaseStatus.Fulfillment, AccessCaseStatus.Verification) => true,
             (AccessCaseStatus.Fulfillment, AccessCaseStatus.Cancelled) =>
                 type != AccessCaseType.Leaver || hasCancelOverride,
@@ -319,6 +381,13 @@ public sealed class AccessCase
     {
         if (Status != AccessCaseStatus.Draft)
             throw new InvalidOperationException("Only draft cases can be edited.");
+    }
+
+    private void EnsureDraftOrRework()
+    {
+        if (Status is not (AccessCaseStatus.Draft or AccessCaseStatus.Rework))
+            throw new InvalidOperationException(
+                "Requested access can only be changed while the request is Draft or in Rework.");
     }
 
     private static Guid? Norm(Guid? v) => v is null || v == Guid.Empty ? null : v;
@@ -463,6 +532,100 @@ public sealed class AccessCaseException
             AuthorizedByUserId = authorizedByUserId,
             RelatedSodRuleId = relatedSodRuleId is null || relatedSodRuleId == Guid.Empty ? null : relatedSodRuleId,
             CreatedAtUtc = utcNow,
+        };
+    }
+}
+
+public sealed class AccessCaseRevision
+{
+    private AccessCaseRevision() { }
+
+    public Guid Id { get; private set; }
+    public Guid AccessCaseId { get; private set; }
+    public int RevisionNumber { get; private set; }
+    public Guid SubmittedByUserId { get; private set; }
+    public DateTimeOffset SubmittedAtUtc { get; private set; }
+    public AccessCaseRevisionDecision Decision { get; private set; }
+    public Guid? DecidedByUserId { get; private set; }
+    public DateTimeOffset? DecidedAtUtc { get; private set; }
+    public string? DecisionReason { get; private set; }
+
+    public static AccessCaseRevision CreatePending(
+        Guid accessCaseId,
+        int revisionNumber,
+        Guid submittedByUserId,
+        DateTimeOffset utcNow)
+    {
+        if (accessCaseId == Guid.Empty) throw new ArgumentException("Case is required.", nameof(accessCaseId));
+        if (revisionNumber < 1) throw new ArgumentOutOfRangeException(nameof(revisionNumber));
+        if (submittedByUserId == Guid.Empty) throw new ArgumentException("Submitter is required.", nameof(submittedByUserId));
+        return new AccessCaseRevision
+        {
+            Id = Guid.CreateVersion7(),
+            AccessCaseId = accessCaseId,
+            RevisionNumber = revisionNumber,
+            SubmittedByUserId = submittedByUserId,
+            SubmittedAtUtc = utcNow,
+            Decision = AccessCaseRevisionDecision.Pending,
+        };
+    }
+
+    public void RecordDecision(
+        AccessCaseRevisionDecision decision,
+        Guid decidedByUserId,
+        DateTimeOffset utcNow,
+        string? decisionReason = null)
+    {
+        if (Decision != AccessCaseRevisionDecision.Pending)
+            throw new InvalidOperationException("Revision decision is already recorded.");
+        if (decision is AccessCaseRevisionDecision.Pending)
+            throw new ArgumentOutOfRangeException(nameof(decision));
+        if (decidedByUserId == Guid.Empty) throw new ArgumentException("Decider is required.", nameof(decidedByUserId));
+        if (decision is AccessCaseRevisionDecision.Rework or AccessCaseRevisionDecision.Rejected)
+            ArgumentException.ThrowIfNullOrWhiteSpace(decisionReason);
+
+        Decision = decision;
+        DecidedByUserId = decidedByUserId;
+        DecidedAtUtc = utcNow;
+        DecisionReason = string.IsNullOrWhiteSpace(decisionReason) ? null : decisionReason.Trim();
+    }
+}
+
+public sealed class AccessCaseRevisionItem
+{
+    private AccessCaseRevisionItem() { }
+
+    public Guid Id { get; private set; }
+    public Guid RevisionId { get; private set; }
+    public Guid? AccessEntitlementId { get; private set; }
+    public string EntitlementKeySnapshot { get; private set; } = null!;
+    public string? NameEnSnapshot { get; private set; }
+    public string? NameArSnapshot { get; private set; }
+    public string? CustomName { get; private set; }
+    public AccessItemAction Action { get; private set; }
+    public string? Notes { get; private set; }
+    public bool IsPrivileged { get; private set; }
+    public bool IsCustom { get; private set; }
+
+    public static AccessCaseRevisionItem CreateFromCaseItem(Guid revisionId, AccessCaseItem item)
+    {
+        if (revisionId == Guid.Empty) throw new ArgumentException("Revision is required.", nameof(revisionId));
+        ArgumentNullException.ThrowIfNull(item);
+        return new AccessCaseRevisionItem
+        {
+            Id = Guid.CreateVersion7(),
+            RevisionId = revisionId,
+            AccessEntitlementId = item.AccessEntitlementId,
+            EntitlementKeySnapshot = item.EntitlementKey,
+            NameEnSnapshot = item.EntitlementNameEnSnapshot,
+            NameArSnapshot = item.EntitlementNameArSnapshot,
+            CustomName = item.IsCustom
+                ? (item.EntitlementNameEnSnapshot ?? item.EntitlementKey)
+                : null,
+            Action = item.Action,
+            Notes = item.Notes,
+            IsPrivileged = item.IsPrivileged,
+            IsCustom = item.IsCustom,
         };
     }
 }
