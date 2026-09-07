@@ -32,7 +32,7 @@ export function EmployeeSecurityPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <ActionCard
-          to="/employee/security/awareness"
+          to="/employee/awareness"
           icon={GraduationCap}
           title={t('employee.security.awareness.cardTitle')}
           description={t('employee.security.awareness.cardHint')}

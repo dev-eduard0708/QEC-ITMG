@@ -287,11 +287,19 @@ export function SecurityHomePage() {
       ) : null}
 
       {section === 'awareness' ? (
-        <AwarenessPanel
-          items={awarenessQuery.data ?? []}
-          canManage={can('sec.awareness.manage')}
-          onRefresh={() => refresh('awareness')}
-        />
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card px-4 py-3">
+            <p className="text-sm text-muted-foreground">{t('awarenessAdmin.openWorkspaceHint')}</p>
+            <Button asChild size="sm">
+              <Link to="/it/security/awareness">{t('nav.securityAwareness')}</Link>
+            </Button>
+          </div>
+          <AwarenessPanel
+            items={awarenessQuery.data ?? []}
+            canManage={can('sec.awareness.manage')}
+            onRefresh={() => refresh('awareness')}
+          />
+        </div>
       ) : null}
     </div>
   )

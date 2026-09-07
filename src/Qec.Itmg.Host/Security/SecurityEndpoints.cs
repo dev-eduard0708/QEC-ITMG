@@ -23,7 +23,9 @@ namespace Qec.Itmg.Host.Security;
 public static class SecurityEndpoints
 {
     public const string SecDashboard = "sec.dashboard";
+    public const string SecAwarenessRead = "sec.awareness.read";
     public const string SecAwarenessManage = "sec.awareness.manage";
+    public const string SecAwarenessReport = "sec.awareness.report";
     public const string VulnRead = "vuln.read";
     public const string VulnManage = "vuln.manage";
     public const string RiskManage = "risk.manage";
@@ -39,7 +41,9 @@ public static class SecurityEndpoints
         MapExceptions(endpoints);
         MapPentests(endpoints);
         MapAwareness(endpoints);
+        MapAwarenessV1(endpoints);
         MapMeSecurity(endpoints);
+        MapMeAwarenessV1(endpoints);
         return endpoints;
     }
 
@@ -331,7 +335,7 @@ public static class SecurityEndpoints
         endpoints.MapGet("/api/v1/security/awareness/modules", async (
             bool? includeInactive, SecurityAwarenessWorkflowService workflow, CancellationToken ct) =>
             Results.Ok(await workflow.ListModulesAsync(includeInactive == true, ct)))
-            .RequirePermission(SecDashboard);
+            .RequirePermission(SecAwarenessRead);
 
         endpoints.MapPost("/api/v1/security/awareness/modules/{id:guid}/activate", async (
             Guid id, SecurityAwarenessWorkflowService workflow, CancellationToken ct) =>
@@ -344,7 +348,7 @@ public static class SecurityEndpoints
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(SecAwarenessManage);
 
-        endpoints.MapPost("/api/v1/security/awareness/campaigns", async (
+        endpoints.MapPost("/api/v1/security/awareness/module-campaigns", async (
             CreateModuleCampaignRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
             SecurityAwarenessWorkflowService workflow, CancellationToken ct) =>
         {
@@ -450,6 +454,194 @@ public static class SecurityEndpoints
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(SecDashboard);
+    }
+
+    private static void MapAwarenessV1(IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGet("/api/v1/security/awareness/dashboard", async (
+            SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+            Results.Ok(await svc.GetDashboardAsync(ct)))
+            .RequirePermission(SecAwarenessRead);
+
+        endpoints.MapGet("/api/v1/security/awareness/campaigns", async (
+            string? status, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+            Results.Ok(await svc.ListCampaignsAsync(status, ct)))
+            .RequirePermission(SecAwarenessRead);
+
+        endpoints.MapPost("/api/v1/security/awareness/campaigns", async (
+            CreateAwarenessCampaignRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return Results.Unauthorized();
+            if (string.IsNullOrWhiteSpace(req.TitleEn)) return Validation("TitleEn is required.");
+            try
+            {
+                AwarenessCampaignDetailDto created = await svc.CreateDraftAsync(req, session.Id, ct);
+                return Results.Created($"/api/v1/security/awareness/campaigns/{created.Id}", created);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessManage);
+
+        endpoints.MapGet("/api/v1/security/awareness/campaigns/{id:guid}", async (
+            Guid id, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            AwarenessCampaignDetailDto? item = await svc.GetCampaignAsync(id, includeAnswerKeys: true, ct);
+            return item is null ? Results.NotFound() : Results.Ok(item);
+        }).RequirePermission(SecAwarenessRead);
+
+        endpoints.MapPut("/api/v1/security/awareness/campaigns/{id:guid}", async (
+            Guid id, UpdateAwarenessCampaignRequest req, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.UpdateDetailsAsync(id, req, ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or DbUpdateConcurrencyException)
+            { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessManage);
+
+        endpoints.MapPut("/api/v1/security/awareness/campaigns/{id:guid}/audience", async (
+            Guid id, SetAwarenessAudienceRequest req, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.SetAudienceAsync(id, req, ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessManage);
+
+        endpoints.MapPut("/api/v1/security/awareness/campaigns/{id:guid}/content", async (
+            Guid id, List<SetAwarenessContentBlockRequest> req, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.SetContentAsync(id, req ?? [], ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessManage);
+
+        endpoints.MapPut("/api/v1/security/awareness/campaigns/{id:guid}/quiz", async (
+            Guid id, List<SetAwarenessQuestionRequest> req, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.SetQuizAsync(id, req ?? [], ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessManage);
+
+        endpoints.MapPost("/api/v1/security/awareness/campaigns/{id:guid}/preview-audience", async (
+            Guid id, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.PreviewAudienceAsync(id, ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessManage);
+
+        endpoints.MapPost("/api/v1/security/awareness/campaigns/{id:guid}/launch", async (
+            Guid id, LaunchCampaignRequest? req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            SecurityAwarenessCampaignService svc, SecurityAwarenessNotificationService notifications,
+            CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return Results.Unauthorized();
+            try
+            {
+                (AwarenessCampaignDetailDto campaign, IReadOnlyList<AwarenessCompletionDto> created) =
+                    await svc.LaunchAsync(id, session.Id, req?.RowVersion, ct);
+                await notifications.NotifyAssignmentsAsync(created, ct);
+                return Results.Ok(new { campaign, assigned = created.Count, items = created });
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or DbUpdateConcurrencyException)
+            { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessManage);
+
+        endpoints.MapPost("/api/v1/security/awareness/campaigns/{id:guid}/close", async (
+            Guid id, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.CloseAsync(id, ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessManage);
+
+        endpoints.MapPost("/api/v1/security/awareness/campaigns/{id:guid}/archive", async (
+            Guid id, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.ArchiveAsync(id, ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessManage);
+
+        endpoints.MapGet("/api/v1/security/awareness/campaigns/{id:guid}/report", async (
+            Guid id, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            try { return Results.Ok(await svc.GetReportAsync(id, ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessReport);
+
+        endpoints.MapGet("/api/v1/security/awareness/campaigns/{id:guid}/export.csv", async (
+            Guid id, SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            try
+            {
+                string csv = await svc.ExportReportCsvAsync(id, ct);
+                return Results.File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv",
+                    $"awareness-campaign-{id:N}.csv");
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(SecAwarenessReport);
+    }
+
+    private static void MapMeAwarenessV1(IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGet("/api/v1/me/awareness", async (
+            string? filter, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            return Results.Ok(await svc.ListMyAssignmentsAsync(session.Id, filter, ct));
+        }).RequireAuthorization();
+
+        endpoints.MapGet("/api/v1/me/awareness/{assignmentId:guid}", async (
+            Guid assignmentId, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            EmployeeAwarenessV1DetailDto? detail = await svc.GetMyAssignmentAsync(session.Id, assignmentId, ct);
+            return detail is null ? Results.NotFound() : Results.Ok(detail);
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/me/awareness/{assignmentId:guid}/start", async (
+            Guid assignmentId, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try { return Results.Ok(await svc.StartAssignmentAsync(session.Id, assignmentId, ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/me/awareness/{assignmentId:guid}/quiz-attempts", async (
+            Guid assignmentId, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try { return Results.Ok(await svc.StartQuizAttemptAsync(session.Id, assignmentId, ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/me/awareness/{assignmentId:guid}/quiz-attempts/{attemptId:guid}/submit", async (
+            Guid assignmentId, Guid attemptId, SubmitAwarenessQuizV1Request req,
+            ClaimsPrincipal principal, ICurrentUserService currentUser,
+            SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                return Results.Ok(await svc.SubmitQuizAttemptAsync(session.Id, assignmentId, attemptId, req, ct));
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/me/awareness/{assignmentId:guid}/complete", async (
+            Guid assignmentId, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            SecurityAwarenessCampaignService svc, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try { return Results.Ok(await svc.CompleteWithoutQuizAsync(session.Id, assignmentId, ct)); }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequireAuthorization();
     }
 
     private static void MapMeSecurity(IEndpointRouteBuilder endpoints)
@@ -617,6 +809,7 @@ public static class SecurityEndpoints
     private sealed record CompleteAwarenessRequest(Guid? UserId, Guid? EvidenceId, string? Notes);
     private sealed record SubmitQuizRequest(List<QuizAnswer>? Answers);
     private sealed record QuizAnswer(Guid QuestionId, Guid OptionId);
+    private sealed record LaunchCampaignRequest(byte[]? RowVersion);
     private sealed record ReportSecurityConcernRequest(
         string CategoryKey,
         string Description,
@@ -652,7 +845,7 @@ public sealed class SecurityAwarenessNotificationService(
                 : campaign?.DueAtUtc is DateTimeOffset cd
                     ? $" Due by {cd:u}."
                     : string.Empty;
-            string actionUrl = $"/employee/security/awareness/{item.Id}";
+            string actionUrl = $"/employee/awareness/{item.Id}";
             string subject = $"QEC Security Awareness Required: {title}";
             string body =
                 $"Please complete your QEC security awareness assignment.\n\n" +
@@ -667,11 +860,12 @@ public sealed class SecurityAwarenessNotificationService(
 
     public async Task NotifyReminderAsync(AwarenessReminderCandidate candidate, CancellationToken ct)
     {
-        string actionUrl = $"/employee/security/awareness/{candidate.AssignmentId}";
+        string actionUrl = $"/employee/awareness/{candidate.AssignmentId}";
         string type = candidate.ReminderKind switch
         {
             SecurityAwarenessWorkflowService.ReminderOverdue => "awareness.overdue",
-            SecurityAwarenessWorkflowService.ReminderDue1 => "awareness.due_soon",
+            SecurityAwarenessWorkflowService.ReminderDue2 => "awareness.due_soon",
+            SecurityAwarenessWorkflowService.ReminderDue7 => "awareness.due_soon",
             _ => "awareness.due_soon",
         };
         string title = candidate.ReminderKind == SecurityAwarenessWorkflowService.ReminderOverdue

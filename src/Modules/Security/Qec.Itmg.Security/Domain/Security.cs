@@ -71,8 +71,9 @@ public enum PentestFindingStatus
 public enum AwarenessCampaignStatus
 {
     Draft = 0,
-    Open = 1, // Active for employees
+    Active = 1, // formerly Open — same stored ordinal for int maps; string rows migrated
     Closed = 2,
+    Archived = 3,
 }
 
 public enum AwarenessCompletionStatus
@@ -758,21 +759,37 @@ public sealed class AwarenessCampaign
     private AwarenessCampaign() { }
 
     public Guid Id { get; private set; }
-    public string Title { get; private set; } = null!;
-    public string? Description { get; private set; }
+    public string? Number { get; private set; }
+    public string TitleEn { get; private set; } = null!;
+    public string? TitleAr { get; private set; }
+    public string? DescriptionEn { get; private set; }
+    public string? DescriptionAr { get; private set; }
+    /// <summary>Legacy alias for TitleEn.</summary>
+    public string Title => TitleEn;
+    /// <summary>Legacy alias for DescriptionEn.</summary>
+    public string? Description => DescriptionEn;
     public Guid? ModuleId { get; private set; }
     public int? ModuleVersion { get; private set; }
     public int PassThresholdPercent { get; private set; }
     public DateTimeOffset StartsAtUtc { get; private set; }
     public DateTimeOffset? DueAtUtc { get; private set; }
+    public bool RequireQuiz { get; private set; }
+    public bool AllowRetry { get; private set; }
+    public int? MaxAttempts { get; private set; }
+    public bool RequireCompletion { get; private set; }
     public AwarenessCampaignStatus Status { get; private set; }
     public Guid OwnerUserId { get; private set; }
+    public Guid? CreatedByUserId { get; private set; }
+    public Guid? PublishedVersionId { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
+    public DateTimeOffset UpdatedAtUtc { get; private set; }
+    public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
     public static AwarenessCampaign Create(
         string title, Guid ownerUserId, DateTimeOffset startsAtUtc, DateTimeOffset utcNow,
         string? description = null, DateTimeOffset? dueAtUtc = null,
-        Guid? moduleId = null, int? moduleVersion = null, int passThresholdPercent = 80)
+        Guid? moduleId = null, int? moduleVersion = null, int passThresholdPercent = 80,
+        string? number = null, Guid? createdByUserId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(title);
         if (ownerUserId == Guid.Empty) throw new ArgumentException("Owner required.");
@@ -780,21 +797,152 @@ public sealed class AwarenessCampaign
         return new AwarenessCampaign
         {
             Id = Guid.CreateVersion7(),
-            Title = title.Trim(),
-            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+            Number = string.IsNullOrWhiteSpace(number) ? null : number.Trim(),
+            TitleEn = title.Trim(),
+            DescriptionEn = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             ModuleId = moduleId is null || moduleId == Guid.Empty ? null : moduleId,
             ModuleVersion = moduleVersion,
             PassThresholdPercent = passThresholdPercent,
             StartsAtUtc = startsAtUtc,
             DueAtUtc = dueAtUtc,
+            RequireQuiz = moduleId is not null,
+            AllowRetry = true,
+            MaxAttempts = null,
+            RequireCompletion = true,
             Status = AwarenessCampaignStatus.Draft,
             OwnerUserId = ownerUserId,
+            CreatedByUserId = createdByUserId is null || createdByUserId == Guid.Empty ? ownerUserId : createdByUserId,
             CreatedAtUtc = utcNow,
+            UpdatedAtUtc = utcNow,
         };
     }
 
-    public void Open() => Status = AwarenessCampaignStatus.Open;
-    public void Close() => Status = AwarenessCampaignStatus.Closed;
+    public static AwarenessCampaign CreateDraft(
+        string number,
+        string titleEn,
+        Guid ownerUserId,
+        Guid createdByUserId,
+        DateTimeOffset utcNow,
+        string? titleAr = null,
+        string? descriptionEn = null,
+        string? descriptionAr = null,
+        DateTimeOffset? startAtUtc = null,
+        DateTimeOffset? dueAtUtc = null,
+        bool requireQuiz = false,
+        int passingScorePercent = 80,
+        bool allowRetry = true,
+        int? maxAttempts = null,
+        bool requireCompletion = true)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(number);
+        ArgumentException.ThrowIfNullOrWhiteSpace(titleEn);
+        if (ownerUserId == Guid.Empty) throw new ArgumentException("Owner required.");
+        if (passingScorePercent is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(passingScorePercent));
+        if (maxAttempts is < 1) throw new ArgumentOutOfRangeException(nameof(maxAttempts));
+        return new AwarenessCampaign
+        {
+            Id = Guid.CreateVersion7(),
+            Number = number.Trim(),
+            TitleEn = titleEn.Trim(),
+            TitleAr = TrimOrNull(titleAr),
+            DescriptionEn = TrimOrNull(descriptionEn),
+            DescriptionAr = TrimOrNull(descriptionAr),
+            PassThresholdPercent = passingScorePercent,
+            StartsAtUtc = startAtUtc ?? utcNow,
+            DueAtUtc = dueAtUtc,
+            RequireQuiz = requireQuiz,
+            AllowRetry = allowRetry,
+            MaxAttempts = maxAttempts,
+            RequireCompletion = requireCompletion,
+            Status = AwarenessCampaignStatus.Draft,
+            OwnerUserId = ownerUserId,
+            CreatedByUserId = createdByUserId == Guid.Empty ? ownerUserId : createdByUserId,
+            CreatedAtUtc = utcNow,
+            UpdatedAtUtc = utcNow,
+        };
+    }
+
+    public void UpdateDraftDetails(
+        string titleEn,
+        string? titleAr,
+        string? descriptionEn,
+        string? descriptionAr,
+        DateTimeOffset? startAtUtc,
+        DateTimeOffset? dueAtUtc,
+        bool requireQuiz,
+        int passingScorePercent,
+        bool allowRetry,
+        int? maxAttempts,
+        bool requireCompletion,
+        DateTimeOffset utcNow)
+    {
+        EnsureDraft();
+        ArgumentException.ThrowIfNullOrWhiteSpace(titleEn);
+        if (passingScorePercent is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(passingScorePercent));
+        if (maxAttempts is < 1) throw new ArgumentOutOfRangeException(nameof(maxAttempts));
+        TitleEn = titleEn.Trim();
+        TitleAr = TrimOrNull(titleAr);
+        DescriptionEn = TrimOrNull(descriptionEn);
+        DescriptionAr = TrimOrNull(descriptionAr);
+        if (startAtUtc is not null) StartsAtUtc = startAtUtc.Value;
+        DueAtUtc = dueAtUtc;
+        RequireQuiz = requireQuiz;
+        PassThresholdPercent = passingScorePercent;
+        AllowRetry = allowRetry;
+        MaxAttempts = maxAttempts;
+        RequireCompletion = requireCompletion;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void SetPublishedVersion(Guid versionId, DateTimeOffset utcNow)
+    {
+        if (versionId == Guid.Empty) throw new ArgumentException("Version required.");
+        PublishedVersionId = versionId;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void Activate(DateTimeOffset utcNow)
+    {
+        if (Status == AwarenessCampaignStatus.Active) return;
+        if (Status != AwarenessCampaignStatus.Draft)
+            throw new InvalidOperationException("Only draft campaigns can be launched.");
+        Status = AwarenessCampaignStatus.Active;
+        UpdatedAtUtc = utcNow;
+    }
+
+    /// <summary>Legacy alias for <see cref="Activate"/>.</summary>
+    public void Open() => Activate(DateTimeOffset.UtcNow);
+
+    public void Close(DateTimeOffset utcNow)
+    {
+        if (Status is AwarenessCampaignStatus.Closed or AwarenessCampaignStatus.Archived) return;
+        if (Status != AwarenessCampaignStatus.Active)
+            throw new InvalidOperationException("Only active campaigns can be closed.");
+        Status = AwarenessCampaignStatus.Closed;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void Close() => Close(DateTimeOffset.UtcNow);
+
+    public void Archive(DateTimeOffset utcNow)
+    {
+        if (Status == AwarenessCampaignStatus.Archived) return;
+        if (Status is not (AwarenessCampaignStatus.Closed or AwarenessCampaignStatus.Active))
+            throw new InvalidOperationException("Only active or closed campaigns can be archived.");
+        Status = AwarenessCampaignStatus.Archived;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void Touch(DateTimeOffset utcNow) => UpdatedAtUtc = utcNow;
+
+    public void EnsureDraft()
+    {
+        if (Status != AwarenessCampaignStatus.Draft)
+            throw new InvalidOperationException("Campaign is not editable in the current status.");
+    }
+
+    private static string? TrimOrNull(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
 public sealed class AwarenessCompletion
@@ -803,17 +951,26 @@ public sealed class AwarenessCompletion
 
     public Guid Id { get; private set; }
     public Guid CampaignId { get; private set; }
+    public Guid? CampaignVersionId { get; private set; }
     public Guid UserId { get; private set; }
     public AwarenessCompletionStatus Status { get; private set; }
     public DateTimeOffset AssignedAtUtc { get; private set; }
     public DateTimeOffset? DueAtUtc { get; private set; }
     public DateTimeOffset? StartedAtUtc { get; private set; }
     public DateTimeOffset? CompletedAtUtc { get; private set; }
+    public DateTimeOffset? PassedAtUtc { get; private set; }
     public int? Score { get; private set; }
     public int AttemptCount { get; private set; }
     public int? ModuleVersion { get; private set; }
     public Guid? EvidenceId { get; private set; }
     public string? Notes { get; private set; }
+    public string? AssignmentSource { get; private set; }
+    public Guid? SourceDepartmentId { get; private set; }
+    public Guid? SourcePositionId { get; private set; }
+    public string? SnapshotDisplayName { get; private set; }
+    public string? SnapshotUpn { get; private set; }
+    public string? SnapshotDepartmentName { get; private set; }
+    public string? SnapshotPositionNames { get; private set; }
 
     public static AwarenessCompletion Assign(
         Guid campaignId, Guid userId, DateTimeOffset utcNow, DateTimeOffset? dueAtUtc = null, int? moduleVersion = null) =>
@@ -829,6 +986,43 @@ public sealed class AwarenessCompletion
             ModuleVersion = moduleVersion,
         };
 
+    public static AwarenessCompletion AssignSnapshot(
+        Guid campaignId,
+        Guid campaignVersionId,
+        Guid userId,
+        DateTimeOffset utcNow,
+        DateTimeOffset? dueAtUtc,
+        string assignmentSource,
+        string snapshotDisplayName,
+        string snapshotUpn,
+        Guid? sourceDepartmentId = null,
+        Guid? sourcePositionId = null,
+        string? snapshotDepartmentName = null,
+        string? snapshotPositionNames = null)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(assignmentSource);
+        ArgumentException.ThrowIfNullOrWhiteSpace(snapshotDisplayName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(snapshotUpn);
+        return new AwarenessCompletion
+        {
+            Id = Guid.CreateVersion7(),
+            CampaignId = campaignId,
+            CampaignVersionId = campaignVersionId,
+            UserId = userId,
+            Status = AwarenessCompletionStatus.Assigned,
+            AssignedAtUtc = utcNow,
+            DueAtUtc = dueAtUtc,
+            AttemptCount = 0,
+            AssignmentSource = assignmentSource.Trim(),
+            SourceDepartmentId = sourceDepartmentId == Guid.Empty ? null : sourceDepartmentId,
+            SourcePositionId = sourcePositionId == Guid.Empty ? null : sourcePositionId,
+            SnapshotDisplayName = snapshotDisplayName.Trim(),
+            SnapshotUpn = snapshotUpn.Trim(),
+            SnapshotDepartmentName = string.IsNullOrWhiteSpace(snapshotDepartmentName) ? null : snapshotDepartmentName.Trim(),
+            SnapshotPositionNames = string.IsNullOrWhiteSpace(snapshotPositionNames) ? null : snapshotPositionNames.Trim(),
+        };
+    }
+
     public void MarkStarted(DateTimeOffset utcNow)
     {
         if (StartedAtUtc is not null) return;
@@ -843,6 +1037,7 @@ public sealed class AwarenessCompletion
         {
             Status = AwarenessCompletionStatus.Completed;
             CompletedAtUtc = utcNow;
+            PassedAtUtc = utcNow;
         }
     }
 
@@ -850,6 +1045,7 @@ public sealed class AwarenessCompletion
     {
         Status = AwarenessCompletionStatus.Completed;
         CompletedAtUtc = utcNow;
+        PassedAtUtc ??= utcNow;
         EvidenceId = evidenceId == Guid.Empty ? null : evidenceId;
         Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
     }
@@ -867,10 +1063,12 @@ public sealed class AwarenessAttempt
 
     public Guid Id { get; private set; }
     public Guid AssignmentId { get; private set; }
+    public Guid? CampaignVersionId { get; private set; }
     public int AttemptNumber { get; private set; }
-    public int Score { get; private set; }
-    public bool Passed { get; private set; }
-    public DateTimeOffset SubmittedAtUtc { get; private set; }
+    public int? Score { get; private set; }
+    public bool? Passed { get; private set; }
+    public DateTimeOffset StartedAtUtc { get; private set; }
+    public DateTimeOffset? SubmittedAtUtc { get; private set; }
 
     public static AwarenessAttempt Create(
         Guid assignmentId, int attemptNumber, int score, bool passed, DateTimeOffset utcNow)
@@ -884,8 +1082,34 @@ public sealed class AwarenessAttempt
             AttemptNumber = attemptNumber,
             Score = score,
             Passed = passed,
+            StartedAtUtc = utcNow,
             SubmittedAtUtc = utcNow,
         };
+    }
+
+    public static AwarenessAttempt Start(
+        Guid assignmentId, Guid campaignVersionId, int attemptNumber, DateTimeOffset utcNow)
+    {
+        if (assignmentId == Guid.Empty) throw new ArgumentException("Assignment required.");
+        if (campaignVersionId == Guid.Empty) throw new ArgumentException("Version required.");
+        if (attemptNumber < 1) throw new ArgumentOutOfRangeException(nameof(attemptNumber));
+        return new AwarenessAttempt
+        {
+            Id = Guid.CreateVersion7(),
+            AssignmentId = assignmentId,
+            CampaignVersionId = campaignVersionId,
+            AttemptNumber = attemptNumber,
+            StartedAtUtc = utcNow,
+        };
+    }
+
+    public void Submit(int score, bool passed, DateTimeOffset utcNow)
+    {
+        if (SubmittedAtUtc is not null)
+            throw new InvalidOperationException("Attempt already submitted.");
+        Score = score;
+        Passed = passed;
+        SubmittedAtUtc = utcNow;
     }
 }
 

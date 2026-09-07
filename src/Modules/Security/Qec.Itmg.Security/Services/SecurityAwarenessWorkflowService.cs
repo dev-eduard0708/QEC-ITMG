@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Contracts.Identity;
+using Qec.Itmg.Contracts.Organization;
 using Qec.Itmg.Security.Domain;
 using Qec.Itmg.Security.Persistence;
 
@@ -36,12 +37,15 @@ public sealed class SecurityAwarenessWorkflowService(
     SecurityDbContext db,
     IClock clock,
     IBusinessAuditWriter businessAudit,
-    IActiveEmployeeLookup employees)
+    IActiveEmployeeLookup employees,
+    IHeadOfficeAudienceResolver headOfficeAudience)
 {
     public const string ReminderDue7 = "due_7";
-    public const string ReminderDue1 = "due_1";
+    public const string ReminderDue2 = "due_2";
     public const string ReminderOverdue = "overdue";
 
+    [Obsolete("Use ReminderDue2")]
+    public const string ReminderDue1 = ReminderDue2;
     public async Task EnsureStarterModulesAsync(CancellationToken ct)
     {
         foreach (var template in StarterTemplates())
@@ -126,15 +130,15 @@ public sealed class SecurityAwarenessWorkflowService(
             ?? throw new InvalidOperationException("Campaign not found.");
         if (campaign.Status == AwarenessCampaignStatus.Draft)
         {
-            campaign.Open();
-            await businessAudit.AppendAsync(Field(campaign.Id, campaign.Title, "AwarenessCampaignActivated", "Draft", "Open"), ct);
+            campaign.Activate(clock.UtcNow);
+            await businessAudit.AppendAsync(Field(campaign.Id, campaign.Title, "AwarenessCampaignActivated", "Draft", "Active"), ct);
         }
 
         HashSet<Guid> targets = [];
         if (allEmployees)
         {
-            foreach (ActiveEmployeeInfo emp in await employees.ListActiveAsync(ct))
-                targets.Add(emp.Id);
+            foreach (HeadOfficeAudienceMember emp in await headOfficeAudience.ListEligibleEmployeesAsync(ct))
+                targets.Add(emp.UserId);
         }
         else
         {
@@ -170,7 +174,7 @@ public sealed class SecurityAwarenessWorkflowService(
         AwarenessCampaign campaign = await db.AwarenessCampaigns.FirstOrDefaultAsync(x => x.Id == campaignId, ct)
             ?? throw new InvalidOperationException("Campaign not found.");
         campaign.Close();
-        await businessAudit.AppendAsync(Field(campaign.Id, campaign.Title, "AwarenessCampaignClosed", "Open", "Closed"), ct);
+        await businessAudit.AppendAsync(Field(campaign.Id, campaign.Title, "AwarenessCampaignClosed", "Active", "Closed"), ct);
         await db.SaveChangesAsync(ct);
     }
 
@@ -277,7 +281,7 @@ public sealed class SecurityAwarenessWorkflowService(
         }
 
         AwarenessCampaign campaign = await db.AwarenessCampaigns.FirstAsync(x => x.Id == assignment.CampaignId, ct);
-        if (campaign.Status != AwarenessCampaignStatus.Open)
+        if (campaign.Status != AwarenessCampaignStatus.Active)
             throw new InvalidOperationException("Campaign is not active.");
         if (campaign.ModuleId is null)
             throw new InvalidOperationException("Campaign has no module.");
@@ -374,7 +378,7 @@ public sealed class SecurityAwarenessWorkflowService(
             .Where(x => x.Status == AwarenessCompletionStatus.Assigned).ToListAsync(ct);
         HashSet<Guid> campaignIds = outstanding.Select(x => x.CampaignId).ToHashSet();
         Dictionary<Guid, AwarenessCampaign> campaigns = await db.AwarenessCampaigns.AsNoTracking()
-            .Where(x => campaignIds.Contains(x.Id) && x.Status == AwarenessCampaignStatus.Open)
+            .Where(x => campaignIds.Contains(x.Id) && x.Status == AwarenessCampaignStatus.Active)
             .ToDictionaryAsync(x => x.Id, ct);
         HashSet<(Guid, string)> sent = (await db.AwarenessReminderLogs.AsNoTracking()
             .Select(x => new { x.AssignmentId, x.ReminderKind }).ToListAsync(ct))
@@ -387,7 +391,7 @@ public sealed class SecurityAwarenessWorkflowService(
             DateTimeOffset? dueAt = a.DueAtUtc ?? campaign.DueAtUtc;
             if (dueAt is null) continue;
             double days = (dueAt.Value - now).TotalDays;
-            string? kind = days < 0 ? ReminderOverdue : days <= 1 ? ReminderDue1 : days <= 7 ? ReminderDue7 : null;
+            string? kind = days < 0 ? ReminderOverdue : days <= 2 ? ReminderDue2 : days <= 7 ? ReminderDue7 : null;
             if (kind is null || sent.Contains((a.Id, kind))) continue;
             due.Add(new AwarenessReminderCandidate(a.Id, a.UserId, a.CampaignId, campaign.Title, dueAt, kind));
         }

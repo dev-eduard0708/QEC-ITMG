@@ -518,7 +518,7 @@ public sealed class SecurityService(
     {
         AwarenessCampaign entity = await db.AwarenessCampaigns.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new InvalidOperationException("Campaign not found.");
-        entity.Open();
+        entity.Activate(clock.UtcNow);
         await db.SaveChangesAsync(ct);
         List<AwarenessCompletion> completions = await db.AwarenessCompletions.AsNoTracking()
             .Where(x => x.CampaignId == id).ToListAsync(ct);
@@ -577,7 +577,7 @@ public sealed class SecurityService(
         int pentestOpen = await db.PentestFindings.AsNoTracking().CountAsync(x => x.Status == PentestFindingStatus.Open, ct);
 
         List<AwarenessCampaign> openCampaigns = await db.AwarenessCampaigns.AsNoTracking()
-            .Where(x => x.Status == AwarenessCampaignStatus.Open).ToListAsync(ct);
+            .Where(x => x.Status == AwarenessCampaignStatus.Active).ToListAsync(ct);
         List<Guid> campaignIds = openCampaigns.Select(x => x.Id).ToList();
         List<AwarenessCompletion> completions = await db.AwarenessCompletions.AsNoTracking()
             .Where(x => campaignIds.Contains(x.CampaignId)).ToListAsync(ct);

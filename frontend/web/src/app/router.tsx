@@ -40,6 +40,8 @@ import { EvidenceDetailPage } from '@/features/it/evidence-detail-page'
 import { AuditsPage, AuditNewPage } from '@/features/it/audits-page'
 import { AuditDetailPage } from '@/features/it/audit-detail-page'
 import { SecurityHomePage, VulnerabilityDetailPage } from '@/features/it/security-page'
+import { SecurityAwarenessPage } from '@/features/it/security-awareness-page'
+import { SecurityAwarenessCampaignPage } from '@/features/it/security-awareness-campaign-page'
 import {
   ContinuityHomePage,
   BiaDetailPage,
@@ -114,8 +116,16 @@ export function AppRouter() {
           <Route path="employee/policies" element={<MyPoliciesPage />} />
           <Route path="employee/policies/:id" element={<EmployeePolicyDetailPage />} />
           <Route path="employee/security" element={<EmployeeSecurityPage />} />
-          <Route path="employee/security/awareness" element={<EmployeeAwarenessPage />} />
-          <Route path="employee/security/awareness/:assignmentId" element={<EmployeeAwarenessDetailPage />} />
+          <Route path="employee/awareness" element={<EmployeeAwarenessPage />} />
+          <Route path="employee/awareness/:assignmentId" element={<EmployeeAwarenessDetailPage />} />
+          <Route
+            path="employee/security/awareness"
+            element={<Navigate to="/employee/awareness" replace />}
+          />
+          <Route
+            path="employee/security/awareness/:assignmentId"
+            element={<EmployeeAwarenessDetailPage />}
+          />
           <Route path="employee/security/report" element={<ReportSecurityConcernPage />} />
           <Route path="employee/remote-support" element={<EmployeeRemoteSupportPage />} />
           <Route path="employee/remote-support/new" element={<EmployeeRemoteSupportNewPage />} />
@@ -304,6 +314,20 @@ export function AppRouter() {
           </Route>
           <Route element={<RequirePermission permission="sec.dashboard" />}>
             <Route path="it/security" element={<SecurityHomePage />} />
+          </Route>
+          <Route
+            element={
+              <RequireAnyPermission
+                permissions={['sec.awareness.read', 'sec.awareness.manage', 'sec.awareness.report']}
+              />
+            }
+          >
+            <Route path="it/security/awareness" element={<SecurityAwarenessPage />} />
+            <Route
+              path="it/security/awareness/campaigns"
+              element={<Navigate to="/it/security/awareness?tab=campaigns" replace />}
+            />
+            <Route path="it/security/awareness/campaigns/:id" element={<SecurityAwarenessCampaignPage />} />
           </Route>
           <Route element={<RequirePermission permission="vuln.read" />}>
             <Route path="it/security/vulnerabilities/:id" element={<VulnerabilityDetailPage />} />

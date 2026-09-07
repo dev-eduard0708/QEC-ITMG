@@ -136,12 +136,21 @@ internal sealed class AwarenessCampaignConfiguration : IEntityTypeConfiguration<
     {
         builder.ToTable("AwarenessCampaign");
         builder.HasKey(x => x.Id);
-        builder.Property(x => x.Title).IsRequired().HasMaxLength(512);
-        builder.Property(x => x.Description).HasMaxLength(4000);
+        builder.Ignore(x => x.Title);
+        builder.Ignore(x => x.Description);
+        builder.Property(x => x.Number).HasMaxLength(32);
+        builder.Property(x => x.TitleEn).IsRequired().HasMaxLength(512);
+        builder.Property(x => x.TitleAr).HasMaxLength(512);
+        builder.Property(x => x.DescriptionEn).HasMaxLength(4000);
+        builder.Property(x => x.DescriptionAr).HasMaxLength(4000);
         builder.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
+        builder.HasIndex(x => x.Number).IsUnique().HasDatabaseName("IX_AwarenessCampaign_Number")
+            .HasFilter("[Number] IS NOT NULL");
         builder.HasIndex(x => x.Status).HasDatabaseName("IX_AwarenessCampaign_Status");
         builder.HasIndex(x => x.DueAtUtc).HasDatabaseName("IX_AwarenessCampaign_DueAtUtc");
         builder.HasIndex(x => x.ModuleId).HasDatabaseName("IX_AwarenessCampaign_ModuleId");
+        builder.HasIndex(x => x.PublishedVersionId).HasDatabaseName("IX_AwarenessCampaign_PublishedVersionId");
     }
 }
 
@@ -153,9 +162,16 @@ internal sealed class AwarenessCompletionConfiguration : IEntityTypeConfiguratio
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.Notes).HasMaxLength(2000);
+        builder.Property(x => x.AssignmentSource).HasMaxLength(64);
+        builder.Property(x => x.SnapshotDisplayName).HasMaxLength(256);
+        builder.Property(x => x.SnapshotUpn).HasMaxLength(320);
+        builder.Property(x => x.SnapshotDepartmentName).HasMaxLength(256);
+        builder.Property(x => x.SnapshotPositionNames).HasMaxLength(1000);
         builder.HasIndex(x => new { x.CampaignId, x.UserId })
             .IsUnique()
             .HasDatabaseName("IX_AwarenessCompletion_Campaign_User");
+        builder.HasIndex(x => new { x.CampaignVersionId, x.UserId })
+            .HasDatabaseName("IX_AwarenessCompletion_Version_User");
         builder.HasIndex(x => x.UserId).HasDatabaseName("IX_AwarenessCompletion_UserId");
         builder.HasIndex(x => x.DueAtUtc).HasDatabaseName("IX_AwarenessCompletion_DueAtUtc");
         builder.HasIndex(x => x.Status).HasDatabaseName("IX_AwarenessCompletion_Status");
@@ -209,11 +225,104 @@ internal sealed class AwarenessAttemptConfiguration : IEntityTypeConfiguration<A
     {
         builder.ToTable("AwarenessAttempt");
         builder.HasKey(x => x.Id);
+        builder.Property(x => x.Score).IsRequired(false);
+        builder.Property(x => x.Passed).IsRequired(false);
+        builder.Property(x => x.SubmittedAtUtc).IsRequired(false);
         builder.HasIndex(x => x.AssignmentId).HasDatabaseName("IX_AwarenessAttempt_AssignmentId");
         builder.HasIndex(x => new { x.AssignmentId, x.AttemptNumber })
             .IsUnique()
             .HasDatabaseName("IX_AwarenessAttempt_Assignment_Number");
+        builder.HasIndex(x => x.CampaignVersionId).HasDatabaseName("IX_AwarenessAttempt_CampaignVersionId");
         builder.HasOne<AwarenessCompletion>().WithMany().HasForeignKey(x => x.AssignmentId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AwarenessCampaignVersionConfiguration : IEntityTypeConfiguration<AwarenessCampaignVersion>
+{
+    public void Configure(EntityTypeBuilder<AwarenessCampaignVersion> builder)
+    {
+        builder.ToTable("AwarenessCampaignVersion");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.TitleEn).IsRequired().HasMaxLength(512);
+        builder.Property(x => x.TitleAr).HasMaxLength(512);
+        builder.Property(x => x.DescriptionEn).HasMaxLength(4000);
+        builder.Property(x => x.DescriptionAr).HasMaxLength(4000);
+        builder.HasIndex(x => new { x.CampaignId, x.VersionNumber })
+            .IsUnique()
+            .HasDatabaseName("IX_AwarenessCampaignVersion_Campaign_Number");
+        builder.HasOne<AwarenessCampaign>().WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AwarenessContentBlockConfiguration : IEntityTypeConfiguration<AwarenessContentBlock>
+{
+    public void Configure(EntityTypeBuilder<AwarenessContentBlock> builder)
+    {
+        builder.ToTable("AwarenessContentBlock");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.ContentType).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.TitleEn).IsRequired().HasMaxLength(512);
+        builder.Property(x => x.TitleAr).HasMaxLength(512);
+        builder.Property(x => x.BodyEn).HasMaxLength(16000);
+        builder.Property(x => x.BodyAr).HasMaxLength(16000);
+        builder.Property(x => x.Url).HasMaxLength(2000);
+        builder.HasIndex(x => new { x.CampaignId, x.SortOrder }).HasDatabaseName("IX_AwarenessContentBlock_Campaign_Order");
+        builder.HasIndex(x => new { x.CampaignVersionId, x.SortOrder }).HasDatabaseName("IX_AwarenessContentBlock_Version_Order");
+    }
+}
+
+internal sealed class AwarenessAudienceRuleConfiguration : IEntityTypeConfiguration<AwarenessAudienceRule>
+{
+    public void Configure(EntityTypeBuilder<AwarenessAudienceRule> builder)
+    {
+        builder.ToTable("AwarenessAudienceRule");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.RuleType).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.HasIndex(x => x.CampaignId).HasDatabaseName("IX_AwarenessAudienceRule_CampaignId");
+        builder.HasOne<AwarenessCampaign>().WithMany().HasForeignKey(x => x.CampaignId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AwarenessCampaignQuestionConfiguration : IEntityTypeConfiguration<AwarenessCampaignQuestion>
+{
+    public void Configure(EntityTypeBuilder<AwarenessCampaignQuestion> builder)
+    {
+        builder.ToTable("AwarenessCampaignQuestion");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Type).IsRequired().HasConversion<string>().HasMaxLength(32);
+        builder.Property(x => x.QuestionEn).IsRequired().HasMaxLength(2000);
+        builder.Property(x => x.QuestionAr).HasMaxLength(2000);
+        builder.Property(x => x.ExplanationEn).HasMaxLength(4000);
+        builder.Property(x => x.ExplanationAr).HasMaxLength(4000);
+        builder.HasIndex(x => new { x.CampaignId, x.SortOrder }).HasDatabaseName("IX_AwarenessCampaignQuestion_Campaign_Order");
+        builder.HasIndex(x => new { x.CampaignVersionId, x.SortOrder }).HasDatabaseName("IX_AwarenessCampaignQuestion_Version_Order");
+    }
+}
+
+internal sealed class AwarenessCampaignQuestionOptionConfiguration : IEntityTypeConfiguration<AwarenessCampaignQuestionOption>
+{
+    public void Configure(EntityTypeBuilder<AwarenessCampaignQuestionOption> builder)
+    {
+        builder.ToTable("AwarenessCampaignQuestionOption");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.TextEn).IsRequired().HasMaxLength(1000);
+        builder.Property(x => x.TextAr).HasMaxLength(1000);
+        builder.HasIndex(x => new { x.QuestionId, x.SortOrder }).HasDatabaseName("IX_AwarenessCampaignQuestionOption_Order");
+        builder.HasOne<AwarenessCampaignQuestion>().WithMany().HasForeignKey(x => x.QuestionId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class AwarenessQuizAnswerConfiguration : IEntityTypeConfiguration<AwarenessQuizAnswer>
+{
+    public void Configure(EntityTypeBuilder<AwarenessQuizAnswer> builder)
+    {
+        builder.ToTable("AwarenessQuizAnswer");
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.SelectedOptionIdsJson).IsRequired().HasMaxLength(4000);
+        builder.HasIndex(x => new { x.AttemptId, x.QuestionId })
+            .IsUnique()
+            .HasDatabaseName("IX_AwarenessQuizAnswer_Attempt_Question");
+        builder.HasOne<AwarenessAttempt>().WithMany().HasForeignKey(x => x.AttemptId).OnDelete(DeleteBehavior.Cascade);
     }
 }
 

@@ -3810,7 +3810,7 @@ export const awarenessApi = {
   activateModule: (moduleId: string) =>
     apiFetch<void>(`/api/v1/security/awareness/modules/${moduleId}/activate`, { method: 'POST' }),
   createCampaign: (payload: { moduleId: string; title?: string | null; dueAtUtc?: string | null }) =>
-    apiFetch<AwarenessCampaignItem>('/api/v1/security/awareness/campaigns', {
+    apiFetch<AwarenessCampaignItem>('/api/v1/security/awareness/module-campaigns', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
@@ -3834,6 +3834,370 @@ export const awarenessApi = {
     apiFetch<AwarenessQuizResult>(`/api/v1/me/security/awareness/${assignmentId}/submit`, {
       method: 'POST',
       body: JSON.stringify({ answers }),
+    }),
+}
+
+// ——— Security Awareness V1 (Head Office) ———
+
+export type AwarenessV1Dashboard = {
+  activeCampaigns: number
+  assignedEmployees: number
+  completed: number
+  overdue: number
+  notStarted: number
+  completionRatePercent: number
+  campaigns: AwarenessV1CampaignListItem[]
+}
+
+export type AwarenessV1CampaignListItem = {
+  id: string
+  number: string | null
+  titleEn: string
+  titleAr: string | null
+  status: string
+  startAtUtc: string | null
+  dueAtUtc: string | null
+  audienceSummary: string
+  assignedCount: number
+  completedCount: number
+  outstandingCount: number
+  overdueCount: number
+  notStartedCount: number
+  completionRatePercent: number
+  requireQuiz: boolean
+  estimatedMinutes: number | null
+}
+
+export type AwarenessV1ContentBlock = {
+  id: string
+  sortOrder: number
+  contentType: string
+  titleEn: string
+  titleAr: string | null
+  bodyEn: string | null
+  bodyAr: string | null
+  url: string | null
+  documentId: string | null
+  estimatedMinutes: number | null
+}
+
+export type AwarenessV1AudienceRule = {
+  id: string
+  ruleType: string
+  departmentId: string | null
+  positionId: string | null
+  userId: string | null
+}
+
+export type AwarenessV1QuestionOption = {
+  id: string
+  sortOrder: number
+  textEn: string
+  textAr: string | null
+  isCorrect: boolean | null
+}
+
+export type AwarenessV1Question = {
+  id: string
+  sortOrder: number
+  type: string
+  questionEn: string
+  questionAr: string | null
+  explanationEn: string | null
+  explanationAr: string | null
+  points: number
+  options: AwarenessV1QuestionOption[]
+}
+
+export type AwarenessV1CampaignDetail = {
+  id: string
+  number: string | null
+  titleEn: string
+  titleAr: string | null
+  descriptionEn: string | null
+  descriptionAr: string | null
+  status: string
+  ownerUserId: string
+  createdByUserId: string | null
+  startAtUtc: string | null
+  dueAtUtc: string | null
+  requireQuiz: boolean
+  passingScorePercent: number
+  allowRetry: boolean
+  maxAttempts: number | null
+  requireCompletion: boolean
+  publishedVersionId: string | null
+  publishedVersionNumber: number | null
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  assignedCount: number
+  completedCount: number
+  outstandingCount: number
+  overdueCount: number
+  audienceRules: AwarenessV1AudienceRule[]
+  contentBlocks: AwarenessV1ContentBlock[]
+  questions: AwarenessV1Question[]
+}
+
+export type AwarenessV1AudienceMember = {
+  userId: string
+  displayName: string
+  upn: string
+  departmentName: string | null
+  departmentId: string | null
+  positionNames: string | null
+  primaryPositionId: string | null
+}
+
+export type AwarenessV1AudiencePreview = {
+  departmentRuleCount: number
+  positionRuleCount: number
+  specificUserRuleCount: number
+  uniqueEmployees: number
+  members: AwarenessV1AudienceMember[]
+}
+
+export type AwarenessV1ReportEmployee = {
+  assignmentId: string
+  userId: string
+  displayName: string
+  upn: string
+  departmentName: string | null
+  positionNames: string | null
+  status: string
+  assignedAtUtc: string
+  dueAtUtc: string | null
+  startedAtUtc: string | null
+  completedAtUtc: string | null
+  score: number | null
+  passed: boolean | null
+  attemptCount: number
+}
+
+export type AwarenessV1ReportDepartment = {
+  departmentName: string
+  assigned: number
+  completed: number
+  completionRatePercent: number
+}
+
+export type AwarenessV1CampaignReport = {
+  campaignId: string
+  number: string | null
+  titleEn: string
+  versionNumber: number | null
+  assigned: number
+  completed: number
+  inProgress: number
+  notStarted: number
+  overdue: number
+  passed: number
+  notYetPassed: number
+  byDepartment: AwarenessV1ReportDepartment[]
+  employees: AwarenessV1ReportEmployee[]
+}
+
+export type AwarenessV1CreateDraftPayload = {
+  titleEn: string
+  titleAr?: string | null
+  descriptionEn?: string | null
+  descriptionAr?: string | null
+  startAtUtc?: string | null
+  dueAtUtc?: string | null
+  requireQuiz?: boolean
+  passingScorePercent?: number
+  allowRetry?: boolean
+  maxAttempts?: number | null
+  requireCompletion?: boolean
+}
+
+export type AwarenessV1UpdateDetailsPayload = {
+  titleEn: string
+  titleAr?: string | null
+  descriptionEn?: string | null
+  descriptionAr?: string | null
+  startAtUtc?: string | null
+  dueAtUtc?: string | null
+  requireQuiz: boolean
+  passingScorePercent: number
+  allowRetry: boolean
+  maxAttempts?: number | null
+  requireCompletion: boolean
+  rowVersion?: string | null
+}
+
+export type AwarenessV1SetAudiencePayload = {
+  allHeadOffice: boolean
+  departmentIds?: string[]
+  positionIds?: string[]
+  userIds?: string[]
+}
+
+export type AwarenessV1SetContentBlockPayload = {
+  contentType: string
+  titleEn: string
+  titleAr?: string | null
+  bodyEn?: string | null
+  bodyAr?: string | null
+  url?: string | null
+  documentId?: string | null
+  estimatedMinutes?: number | null
+}
+
+export type AwarenessV1SetQuestionPayload = {
+  type: string
+  questionEn: string
+  questionAr?: string | null
+  explanationEn?: string | null
+  explanationAr?: string | null
+  points?: number
+  options: { textEn: string; textAr?: string | null; isCorrect: boolean }[]
+}
+
+export type EmployeeAwarenessV1Item = {
+  assignmentId: string
+  campaignId: string
+  campaignVersionId: string | null
+  number: string | null
+  titleEn: string
+  titleAr: string | null
+  descriptionEn: string | null
+  descriptionAr: string | null
+  estimatedMinutes: number
+  assignedAtUtc: string
+  dueAtUtc: string | null
+  status: string
+  completedAtUtc: string | null
+  score: number | null
+  attemptCount: number
+  requireQuiz: boolean
+  allowRetry: boolean
+  maxAttempts: number | null
+  isOverdue: boolean
+}
+
+export type EmployeeAwarenessV1Detail = {
+  assignment: EmployeeAwarenessV1Item
+  contentBlocks: AwarenessV1ContentBlock[]
+  questions: AwarenessV1Question[]
+  passingScorePercent: number
+  requireQuiz: boolean
+  allowRetry: boolean
+  maxAttempts: number | null
+  attemptsUsed: number
+}
+
+export type AwarenessV1QuizAttempt = {
+  attemptId: string
+  attemptNumber: number
+  startedAtUtc: string
+  submittedAtUtc: string | null
+  scorePercent: number | null
+  passed: boolean | null
+}
+
+export type AwarenessV1QuizSubmitResult = {
+  attemptId: string
+  attemptNumber: number
+  scorePercent: number
+  passed: boolean
+  passingScorePercent: number
+  message: string
+  completedAtUtc: string | null
+  answers: {
+    questionId: string
+    isCorrect: boolean
+    selectedOptionIds: string[]
+    correctOptionIds: string[]
+  }[]
+}
+
+export type AwarenessV1LaunchResult = {
+  campaign: AwarenessV1CampaignDetail
+  assigned: number
+  items: AwarenessCompletionRow[]
+}
+
+export const awarenessV1Api = {
+  dashboard: () => apiFetch<AwarenessV1Dashboard>('/api/v1/security/awareness/dashboard'),
+  listCampaigns: (status?: string) =>
+    apiFetch<AwarenessV1CampaignListItem[]>(
+      `/api/v1/security/awareness/campaigns${opsQuery({ status })}`,
+    ),
+  getCampaign: (id: string) =>
+    apiFetch<AwarenessV1CampaignDetail>(`/api/v1/security/awareness/campaigns/${id}`),
+  createDraft: (payload: AwarenessV1CreateDraftPayload) =>
+    apiFetch<AwarenessV1CampaignDetail>('/api/v1/security/awareness/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateDetails: (id: string, payload: AwarenessV1UpdateDetailsPayload) =>
+    apiFetch<AwarenessV1CampaignDetail>(`/api/v1/security/awareness/campaigns/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  setAudience: (id: string, payload: AwarenessV1SetAudiencePayload) =>
+    apiFetch<AwarenessV1CampaignDetail>(`/api/v1/security/awareness/campaigns/${id}/audience`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  setContent: (id: string, blocks: AwarenessV1SetContentBlockPayload[]) =>
+    apiFetch<AwarenessV1CampaignDetail>(`/api/v1/security/awareness/campaigns/${id}/content`, {
+      method: 'PUT',
+      body: JSON.stringify(blocks),
+    }),
+  setQuiz: (id: string, questions: AwarenessV1SetQuestionPayload[]) =>
+    apiFetch<AwarenessV1CampaignDetail>(`/api/v1/security/awareness/campaigns/${id}/quiz`, {
+      method: 'PUT',
+      body: JSON.stringify(questions),
+    }),
+  previewAudience: (id: string) =>
+    apiFetch<AwarenessV1AudiencePreview>(
+      `/api/v1/security/awareness/campaigns/${id}/preview-audience`,
+      { method: 'POST' },
+    ),
+  launch: (id: string, rowVersion?: string | null) =>
+    apiFetch<AwarenessV1LaunchResult>(`/api/v1/security/awareness/campaigns/${id}/launch`, {
+      method: 'POST',
+      body: JSON.stringify({ rowVersion: rowVersion ?? null }),
+    }),
+  close: (id: string) =>
+    apiFetch<AwarenessV1CampaignDetail>(`/api/v1/security/awareness/campaigns/${id}/close`, {
+      method: 'POST',
+    }),
+  archive: (id: string) =>
+    apiFetch<AwarenessV1CampaignDetail>(`/api/v1/security/awareness/campaigns/${id}/archive`, {
+      method: 'POST',
+    }),
+  report: (id: string) =>
+    apiFetch<AwarenessV1CampaignReport>(`/api/v1/security/awareness/campaigns/${id}/report`),
+  exportUrl: (id: string) => `/api/v1/security/awareness/campaigns/${id}/export.csv`,
+
+  myList: (filter?: EmployeeAwarenessFilter) =>
+    apiFetch<EmployeeAwarenessV1Item[]>(`/api/v1/me/awareness${opsQuery({ filter })}`),
+  myGet: (assignmentId: string) =>
+    apiFetch<EmployeeAwarenessV1Detail>(`/api/v1/me/awareness/${assignmentId}`),
+  start: (assignmentId: string) =>
+    apiFetch<EmployeeAwarenessV1Item>(`/api/v1/me/awareness/${assignmentId}/start`, {
+      method: 'POST',
+    }),
+  startQuizAttempt: (assignmentId: string) =>
+    apiFetch<AwarenessV1QuizAttempt>(`/api/v1/me/awareness/${assignmentId}/quiz-attempts`, {
+      method: 'POST',
+    }),
+  submitQuizAttempt: (
+    assignmentId: string,
+    attemptId: string,
+    answers: { questionId: string; selectedOptionIds: string[] }[],
+  ) =>
+    apiFetch<AwarenessV1QuizSubmitResult>(
+      `/api/v1/me/awareness/${assignmentId}/quiz-attempts/${attemptId}/submit`,
+      { method: 'POST', body: JSON.stringify({ answers }) },
+    ),
+  complete: (assignmentId: string) =>
+    apiFetch<EmployeeAwarenessV1Item>(`/api/v1/me/awareness/${assignmentId}/complete`, {
+      method: 'POST',
     }),
 }
 

@@ -22,6 +22,12 @@ public sealed class SecurityDbContext(DbContextOptions<SecurityDbContext> option
     public DbSet<AwarenessAnswerOption> AwarenessAnswerOptions => Set<AwarenessAnswerOption>();
     public DbSet<AwarenessAttempt> AwarenessAttempts => Set<AwarenessAttempt>();
     public DbSet<AwarenessReminderLog> AwarenessReminderLogs => Set<AwarenessReminderLog>();
+    public DbSet<AwarenessCampaignVersion> AwarenessCampaignVersions => Set<AwarenessCampaignVersion>();
+    public DbSet<AwarenessContentBlock> AwarenessContentBlocks => Set<AwarenessContentBlock>();
+    public DbSet<AwarenessAudienceRule> AwarenessAudienceRules => Set<AwarenessAudienceRule>();
+    public DbSet<AwarenessCampaignQuestion> AwarenessCampaignQuestions => Set<AwarenessCampaignQuestion>();
+    public DbSet<AwarenessCampaignQuestionOption> AwarenessCampaignQuestionOptions => Set<AwarenessCampaignQuestionOption>();
+    public DbSet<AwarenessQuizAnswer> AwarenessQuizAnswers => Set<AwarenessQuizAnswer>();
     public DbSet<ExceptionExpiryNotificationLog> ExceptionExpiryNotificationLogs => Set<ExceptionExpiryNotificationLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

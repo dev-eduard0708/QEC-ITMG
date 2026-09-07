@@ -9,6 +9,7 @@ import {
   ChevronRight,
   ClipboardList,
   FileText,
+  GraduationCap,
   HardDrive,
   KeyRound,
   Languages,
@@ -257,6 +258,7 @@ function buildNavGroups(can: (permissionKey: string) => boolean): NavGroupDef[] 
         { to: '/employee/equipment', labelKey: 'nav.equipment', icon: HardDrive, visible: true },
         { to: '/employee/knowledge', labelKey: 'nav.knowledge', icon: BookOpen, visible: true },
         { to: '/employee/policies', labelKey: 'nav.myPolicies', icon: FileText, visible: true },
+        { to: '/employee/awareness', labelKey: 'nav.myAwareness', icon: GraduationCap, visible: true },
         { to: '/employee/security', labelKey: 'nav.employeeSecurity', icon: Shield, visible: true },
         { to: '/employee/remote-support', labelKey: 'nav.remoteSupport', icon: Laptop, visible: true },
       ],
@@ -328,6 +330,12 @@ function buildNavGroups(can: (permissionKey: string) => boolean): NavGroupDef[] 
         { to: '/it/evidence', labelKey: 'nav.evidence', icon: FileText, visible: can('evidence.read') },
         { to: '/it/audits', labelKey: 'nav.audits', icon: ClipboardList, visible: can('audit.read') },
         { to: '/it/security', labelKey: 'nav.security', icon: Shield, visible: can('sec.dashboard') },
+        {
+          to: '/it/security/awareness',
+          labelKey: 'nav.securityAwareness',
+          icon: GraduationCap,
+          visible: can('sec.awareness.read') || can('sec.awareness.manage'),
+        },
         { to: '/it/continuity', labelKey: 'nav.continuity', icon: Shield, visible: can('bcm.read') },
         { to: '/it/vendors', labelKey: 'nav.vendors', icon: Building2, visible: can('vendor.read') },
       ],
@@ -851,7 +859,9 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/compliance')) return t('nav.compliance')
   if (pathname.startsWith('/it/evidence')) return t('nav.evidence')
   if (pathname.startsWith('/it/audits')) return t('nav.audits')
+  if (pathname.startsWith('/it/security/awareness')) return t('nav.securityAwareness')
   if (pathname.startsWith('/it/security')) return t('nav.security')
+  if (pathname.startsWith('/employee/awareness')) return t('nav.myAwareness')
   if (pathname.startsWith('/it/continuity')) return t('nav.continuity')
   if (pathname.startsWith('/it/vendors')) return t('nav.vendors')
   if (pathname.startsWith('/it/reports')) return t('nav.reports')

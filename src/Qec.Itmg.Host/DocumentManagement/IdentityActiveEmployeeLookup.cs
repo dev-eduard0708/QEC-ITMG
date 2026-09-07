@@ -10,7 +10,7 @@ public sealed class IdentityActiveEmployeeLookup(IdentityDbContext db) : IActive
     public async Task<IReadOnlyList<ActiveEmployeeInfo>> ListActiveAsync(CancellationToken cancellationToken = default)
     {
         return await db.Users.AsNoTracking()
-            .Where(x => x.Status == UserStatus.Active)
+            .Where(x => x.Status == UserStatus.Active && x.UserType == UserType.Employee)
             .OrderBy(x => x.DisplayName)
             .Select(x => new ActiveEmployeeInfo(x.Id, x.Upn, x.DisplayName))
             .ToListAsync(cancellationToken);

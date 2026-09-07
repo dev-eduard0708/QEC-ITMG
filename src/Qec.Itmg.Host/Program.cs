@@ -17,6 +17,7 @@ using Qec.Itmg.Host.ChangeManagement;
 using Qec.Itmg.Host.AccessManagement;
 using Qec.Itmg.Host.DocumentManagement;
 using Qec.Itmg.Contracts.Identity;
+using Qec.Itmg.Contracts.Organization;
 using Qec.Itmg.Host.Governance;
 using Qec.Itmg.Host.Compliance;
 using Qec.Itmg.Host.Evidence;
@@ -84,6 +85,7 @@ try
     builder.Services.AddScoped<DocumentNotificationService>();
     builder.Services.AddScoped<SecurityAwarenessNotificationService>();
     builder.Services.AddScoped<IActiveEmployeeLookup, IdentityActiveEmployeeLookup>();
+    builder.Services.AddScoped<IHeadOfficeAudienceResolver, HeadOfficeAudienceResolver>();
     builder.Services.AddScoped<IUserDisplayLookup, IdentityUserDisplayLookup>();
     builder.Services.AddScoped<AuditNotificationService>();
 

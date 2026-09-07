@@ -42,6 +42,8 @@ This phase does **not** claim that all QEC project, school, branch, academy, sit
 
 Planned Security Awareness V1 will initially target **Head Office employees only**.
 
+See [SECURITY-AWARENESS.md](SECURITY-AWARENESS.md) for the implemented Head Office awareness audience model, campaign builder, and employee My Awareness experience. Project/site targeting and phishing simulation remain deferred per [ORGANIZATION-EXPANSION-PLAN.md](../11-planning/ORGANIZATION-EXPANSION-PLAN.md).
+
 Examples of intended V1 audiences:
 
 - All Head Office Employees

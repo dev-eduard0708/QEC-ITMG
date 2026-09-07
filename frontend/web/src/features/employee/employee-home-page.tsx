@@ -140,7 +140,7 @@ export function EmployeeHomePage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <SecondaryCard
-          to="/employee/security/awareness"
+          to="/employee/awareness"
           icon={Shield}
           title={t('employee.security.awareness.cardTitle')}
           description={t('employee.actions.awarenessHint')}
