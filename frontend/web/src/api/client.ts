@@ -4965,6 +4965,7 @@ export type OrganizationCompanyDepartmentCard = {
   nameEn: string
   nameAr: string | null
   code: string
+  parentDepartmentId: string | null
   isActive: boolean
   peopleCount: number
   positionCount: number

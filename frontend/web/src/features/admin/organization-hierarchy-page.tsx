@@ -2,11 +2,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Building2, Plus, Users } from 'lucide-react'
+import { Plus, Users } from 'lucide-react'
 import {
   ApiError,
   organizationHierarchyApi,
   type OrganizationActiveUser,
+  type OrganizationCompanyDepartmentCard,
   type OrganizationDepartmentMember,
   type OrganizationDepartmentSummary,
   type OrganizationPosition,
@@ -17,6 +18,10 @@ import {
 import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { UserAvatar } from '@/components/user-avatar'
+import {
+  buildOrganizationDepartmentForest,
+  OrganizationDepartmentTree,
+} from '@/features/admin/organization-department-tree'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -160,6 +165,7 @@ type DepartmentFormState = {
   code: string
   descriptionEn: string
   descriptionAr: string
+  parentDepartmentId: string
   sortOrder: string
   isActive: boolean
 }
@@ -170,9 +176,33 @@ const emptyDepartmentForm = (): DepartmentFormState => ({
   code: '',
   descriptionEn: '',
   descriptionAr: '',
+  parentDepartmentId: '',
   sortOrder: '100',
   isActive: true,
 })
+
+function collectDepartmentDescendantIds(
+  departments: OrganizationDepartmentSummary[],
+  rootId: string,
+): Set<string> {
+  const childrenByParent = new Map<string, string[]>()
+  for (const dept of departments) {
+    if (!dept.parentDepartmentId) continue
+    const list = childrenByParent.get(dept.parentDepartmentId) ?? []
+    list.push(dept.id)
+    childrenByParent.set(dept.parentDepartmentId, list)
+  }
+  const ids = new Set<string>()
+  const walk = (id: string) => {
+    for (const childId of childrenByParent.get(id) ?? []) {
+      if (ids.has(childId)) continue
+      ids.add(childId)
+      walk(childId)
+    }
+  }
+  walk(rootId)
+  return ids
+}
 
 export function OrganizationHierarchyPage() {
   const { t, i18n } = useTranslation()
@@ -428,6 +458,7 @@ export function OrganizationHierarchyPage() {
         code: departmentForm.code,
         descriptionEn: departmentForm.descriptionEn || null,
         descriptionAr: departmentForm.descriptionAr || null,
+        parentDepartmentId: departmentForm.parentDepartmentId || null,
         sortOrder: Number(departmentForm.sortOrder) || 0,
       }),
     onSuccess: async () => {
@@ -452,6 +483,7 @@ export function OrganizationHierarchyPage() {
         code: departmentForm.code,
         descriptionEn: departmentForm.descriptionEn || null,
         descriptionAr: departmentForm.descriptionAr || null,
+        parentDepartmentId: departmentForm.parentDepartmentId || null,
         sortOrder: Number(departmentForm.sortOrder) || 0,
         isActive: departmentForm.isActive,
       }),
@@ -547,6 +579,7 @@ export function OrganizationHierarchyPage() {
       code: dept.code || '',
       descriptionEn: dept.descriptionEn ?? '',
       descriptionAr: dept.descriptionAr ?? '',
+      parentDepartmentId: dept.parentDepartmentId ?? '',
       sortOrder: String(dept.sortOrder ?? 0),
       isActive: dept.isActive,
     })
@@ -595,6 +628,26 @@ export function OrganizationHierarchyPage() {
 
   const membersDepartment = (departmentsQuery.data ?? []).find(
     (d) => d.id === membersDepartmentId,
+  )
+  const selectedDepartment = (departmentsQuery.data ?? []).find(
+    (d) => d.id === resolvedDepartmentId,
+  )
+  const departmentParentChoices = useMemo(() => {
+    const departments = departmentsQuery.data ?? []
+    const exclude = editingDepartment
+      ? collectDepartmentDescendantIds(departments, editingDepartment.id)
+      : new Set<string>()
+    if (editingDepartment) exclude.add(editingDepartment.id)
+    return departments
+      .filter((d) => !exclude.has(d.id))
+      .sort((a, b) => a.sortOrder - b.sortOrder || (a.nameEn || '').localeCompare(b.nameEn || ''))
+  }, [departmentsQuery.data, editingDepartment])
+  const childDepartments = useMemo(
+    () =>
+      (departmentsQuery.data ?? []).filter(
+        (d) => d.parentDepartmentId === resolvedDepartmentId,
+      ),
+    [departmentsQuery.data, resolvedDepartmentId],
   )
 
   return (
@@ -661,6 +714,41 @@ export function OrganizationHierarchyPage() {
               ) : null}
             </div>
           </div>
+
+          {selectedDepartment?.code === 'PM' ? (
+            <ProjectManagementScopePanel
+              language={language}
+              descriptionEn={selectedDepartment.descriptionEn}
+              descriptionAr={selectedDepartment.descriptionAr}
+            />
+          ) : null}
+
+          {selectedDepartment?.code === 'EXEC' && childDepartments.length > 0 ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">
+                  {t('admin.hierarchy.executiveChildDepartments')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p>{t('admin.hierarchy.executiveChildDepartmentsHint')}</p>
+                <ul className="flex flex-wrap gap-2">
+                  {childDepartments.map((dept) => (
+                    <li key={dept.id}>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDepartmentId(dept.id)}
+                      >
+                        {departmentLabel(language, dept)}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <HierarchyChart
             isLoading={hierarchyQuery.isLoading}
@@ -1286,6 +1374,32 @@ export function OrganizationHierarchyPage() {
               />
             </div>
             <div className="space-y-1.5">
+              <Label>{t('admin.hierarchy.fields.parentDepartment')}</Label>
+              <Select
+                value={departmentForm.parentDepartmentId || '__none__'}
+                onValueChange={(value) =>
+                  setDepartmentForm({
+                    ...departmentForm,
+                    parentDepartmentId: value === '__none__' ? '' : value,
+                  })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">
+                    {t('admin.hierarchy.noParentDepartment')}
+                  </SelectItem>
+                  {departmentParentChoices.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {departmentLabel(language, dept)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label>{t('admin.hierarchy.fields.sortOrder')}</Label>
               <Input
                 type="number"
@@ -1383,24 +1497,18 @@ function CompanyViewTab({
 }: {
   language: string
   isLoading: boolean
-  cards: Array<{
-    id: string
-    nameEn: string
-    nameAr: string | null
-    code: string
-    peopleCount: number
-    positionCount: number
-    isActive: boolean
-  }>
+  cards: OrganizationCompanyDepartmentCard[]
   onSelect: (departmentId: string) => void
 }) {
   const { t } = useTranslation()
+  const roots = useMemo(() => buildOrganizationDepartmentForest(cards), [cards])
+
   if (isLoading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
+      <div className="space-y-3">
+        <Skeleton className="mx-auto h-8 w-24" />
+        <Skeleton className="mx-auto h-28 w-full max-w-sm" />
+        <Skeleton className="h-28 w-full max-w-sm" />
       </div>
     )
   }
@@ -1412,37 +1520,59 @@ function CompanyViewTab({
     )
   }
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {cards.map((card) => (
-        <button
-          key={card.id}
-          type="button"
-          onClick={() => onSelect(card.id)}
-          className="text-start"
-        >
-          <Card className="h-full transition hover:border-primary/40 hover:shadow-md">
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <CardTitle className="text-base">
-                    {localizedName(language, card.nameEn, card.nameAr)}
-                  </CardTitle>
-                  <p className="mt-1 text-xs text-muted-foreground">{card.code}</p>
-                </div>
-                <Building2 className="h-5 w-5 text-muted-foreground" />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1 text-sm text-muted-foreground">
-              <p>{t('admin.hierarchy.peopleCount', { count: card.peopleCount })}</p>
-              <p>{t('admin.hierarchy.positionsCount', { count: card.positionCount })}</p>
-              {!card.isActive ? (
-                <Badge variant="secondary">{t('admin.hierarchy.inactive')}</Badge>
-              ) : null}
-            </CardContent>
-          </Card>
-        </button>
-      ))}
-    </div>
+    <OrganizationDepartmentTree language={language} roots={roots} onSelect={onSelect} />
+  )
+}
+
+function ProjectManagementScopePanel({
+  language,
+  descriptionEn,
+  descriptionAr,
+}: {
+  language: string
+  descriptionEn: string | null
+  descriptionAr: string | null
+}) {
+  const { t } = useTranslation()
+  const description = language.startsWith('ar')
+    ? descriptionAr || descriptionEn
+    : descriptionEn || descriptionAr
+  const steps = [
+    t('admin.hierarchy.pmScope.stepOpportunity'),
+    t('admin.hierarchy.pmScope.stepDelivery'),
+    t('admin.hierarchy.pmScope.stepStaffing'),
+    t('admin.hierarchy.pmScope.stepEndorse'),
+  ]
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base">{t('admin.hierarchy.pmScope.title')}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {description ? <p className="text-muted-foreground">{description}</p> : null}
+        <ol className="space-y-1.5">
+          {steps.map((step, index) => (
+            <li key={step} className="flex items-start gap-2">
+              <span className="mt-0.5 text-xs font-semibold text-muted-foreground">
+                {index + 1}.
+              </span>
+              <span>
+                {step}
+                {index < steps.length - 1 ? (
+                  <span className="ms-1 text-muted-foreground" aria-hidden>
+                    →
+                  </span>
+                ) : null}
+              </span>
+            </li>
+          ))}
+        </ol>
+        <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+          {t('admin.hierarchy.pmScope.hrNote')}
+        </p>
+      </CardContent>
+    </Card>
   )
 }
 

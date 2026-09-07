@@ -28,6 +28,7 @@ public sealed record CompanyDepartmentCardDto(
     string NameEn,
     string? NameAr,
     string Code,
+    Guid? ParentDepartmentId,
     bool IsActive,
     int PeopleCount,
     int PositionCount,
@@ -101,7 +102,15 @@ public sealed class DepartmentService(
         IReadOnlyList<DepartmentDetailDto> details = await ListDetailedAsync(activeOnly: true, ct);
         return details
             .Select(d => new CompanyDepartmentCardDto(
-                d.Id, d.NameEn, d.NameAr, d.Code, d.IsActive, d.MemberCount, d.PositionCount, d.SortOrder))
+                d.Id,
+                d.NameEn,
+                d.NameAr,
+                d.Code,
+                d.ParentDepartmentId,
+                d.IsActive,
+                d.MemberCount,
+                d.PositionCount,
+                d.SortOrder))
             .ToList();
     }
 
@@ -204,6 +213,8 @@ public sealed class DepartmentService(
             {
                 throw new InvalidOperationException("Parent department was not found.");
             }
+
+            await EnsureNoDepartmentParentCycleAsync(id, parentId, ct);
         }
 
         await sharedDbTransaction.ExecuteAsync(async innerCt =>
@@ -529,6 +540,40 @@ public sealed class DepartmentService(
             primary?.NameEn,
             deptSummaries,
             userPositions);
+    }
+
+    private async Task EnsureNoDepartmentParentCycleAsync(
+        Guid departmentId,
+        Guid parentDepartmentId,
+        CancellationToken ct)
+    {
+        Dictionary<Guid, Guid?> parents = await db.Departments.AsNoTracking()
+            .Select(d => new { d.Id, d.ParentDepartmentId })
+            .ToDictionaryAsync(x => x.Id, x => x.ParentDepartmentId, ct);
+
+        Guid? current = parentDepartmentId;
+        HashSet<Guid> seen = [];
+        while (current is Guid walkId)
+        {
+            if (walkId == departmentId)
+            {
+                throw new InvalidOperationException(
+                    "Department parent would create a cycle in the organization hierarchy.");
+            }
+
+            if (!seen.Add(walkId))
+            {
+                throw new InvalidOperationException(
+                    "Department parent would create a cycle in the organization hierarchy.");
+            }
+
+            if (!parents.TryGetValue(walkId, out Guid? next) || next is null)
+            {
+                break;
+            }
+
+            current = next;
+        }
     }
 
     private async Task ClearPrimaryForUserAsync(Guid userId, Guid? exceptMembershipId, CancellationToken ct)
