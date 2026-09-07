@@ -34,7 +34,7 @@ Modular monolith: ASP.NET Core 10 host, React/Vite SPA, SQL Server, Hangfire, Si
 
 Identity · Organization · Platform · Notifications · Cmdb · ServiceDesk · ChangeManagement · RemoteSupport · AccessManagement · ItOperations · SecurityManagement · Governance · PolicyDocuments · Compliance · Evidence · AuditManagement · BusinessContinuity · ThirdParty · Reporting · Administration
 
-Boundaries: [01-architecture/MODULAR-MONOLITH.md](01-architecture/MODULAR-MONOLITH.md) · Details: [03-modules/](03-modules/)
+Boundaries: [01-architecture/MODULAR-MONOLITH.md](01-architecture/MODULAR-MONOLITH.md) · Details: [03-modules/](03-modules/) · Organization Head Office scope & future expansion: [11-planning/ORGANIZATION-EXPANSION-PLAN.md](11-planning/ORGANIZATION-EXPANSION-PLAN.md) · [03-modules/ORGANIZATION.md](03-modules/ORGANIZATION.md)
 
 ## 5. Domain relationship overview
 

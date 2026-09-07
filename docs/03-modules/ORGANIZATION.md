@@ -1,12 +1,59 @@
 # Organization
 
-Related: [ADMINISTRATION.md](ADMINISTRATION.md) · [ACCESS-MANAGEMENT.md](ACCESS-MANAGEMENT.md) · [../04-security/AUTHORIZATION-RBAC.md](../04-security/AUTHORIZATION-RBAC.md) · [../04-security/AUTHENTICATION.md](../04-security/AUTHENTICATION.md)
+Related: [ADMINISTRATION.md](ADMINISTRATION.md) · [ACCESS-MANAGEMENT.md](ACCESS-MANAGEMENT.md) · [../04-security/AUTHORIZATION-RBAC.md](../04-security/AUTHORIZATION-RBAC.md) · [../04-security/AUTHENTICATION.md](../04-security/AUTHENTICATION.md) · [../11-planning/ORGANIZATION-EXPANSION-PLAN.md](../11-planning/ORGANIZATION-EXPANSION-PLAN.md)
 
 ## Purpose
 
-Organization holds company-wide structure for QEC: **Departments**, **Department membership**, **Locations**, and the **Position hierarchy** (reporting structure of roles/posts per department).
+Organization holds structure for QEC: **Departments**, **Department membership**, **Locations**, and the **Position hierarchy** (reporting structure of roles/posts per department).
 
 This organizational reference data is reusable for future targeting (for example policy or security-awareness assignments by company, department, child department, position, or employee). Those workflows are **not** implemented here.
+
+## Current rollout scope — QEC Head Office
+
+**The first production scope of QEC ITMG Organization is QEC Head Office only.**
+
+The Head Office hierarchy currently covers organizational structures such as:
+
+```
+QEC
+└─ Executive
+   ├─ Project Management
+   ├─ Human Resources
+   ├─ Finance
+   └─ Information Technology
+```
+
+The exact hierarchy remains administrator-configurable.
+
+For the current phase:
+
+- **Departments** represent Head Office functional departments.
+- **Positions** represent Head Office positions/posts.
+- **DepartmentMembership** organizes Head Office employees.
+- **PositionAssignment** assigns employees to Head Office positions.
+- **Google** provides identity / name / email / avatar.
+- **ITMG** provides organizational placement.
+- Department / Position **never** automatically grant RBAC.
+- Access Management routing remains separate (selects users, not positions).
+
+This phase does **not** claim that all QEC project, school, branch, academy, site, or field employees are already modeled. Future expansion to projects/sites is documented in [ORGANIZATION-EXPANSION-PLAN.md](../11-planning/ORGANIZATION-EXPANSION-PLAN.md) and is **not implemented**.
+
+### Security Awareness V1 (planned — not implemented here)
+
+Planned Security Awareness V1 will initially target **Head Office employees only**.
+
+Examples of intended V1 audiences:
+
+- All Head Office Employees
+- Executive
+- Project Management
+- Human Resources
+- Finance
+- Information Technology
+- Head Office positions
+- Specific Head Office employees
+
+For V1, **“All Employees”** inside Security Awareness means all employees within the currently enabled **Head Office** awareness scope — **not** automatically every employee working at every QEC project/site. Future organization expansion will extend awareness targeting.
 
 ## Identity ownership split
 

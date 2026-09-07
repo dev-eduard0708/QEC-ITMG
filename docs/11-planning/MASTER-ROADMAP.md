@@ -49,3 +49,12 @@ P0 Foundation
 ## AI (P20) examples (future)
 
 Classification, KB suggest, summaries, change risk hints, missing rollback detection, questionnaire mapping, evidence search, NL query. **Must call APIs as the user; never bypass RBAC.**
+
+## Deferred — Organization expansion
+
+**Organization Expansion — Projects / Sites / Field Employees**
+
+- **Status:** Deferred after Head Office rollout.
+- **Detail:** [ORGANIZATION-EXPANSION-PLAN.md](ORGANIZATION-EXPANSION-PLAN.md)
+
+Current Organization / QEC Hierarchy production scope is **Head Office only**. Do not model every project, school, academy, branch, or site as a normal functional Department.
