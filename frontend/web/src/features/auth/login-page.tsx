@@ -1,7 +1,18 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, ChevronDown, Languages, Moon, ShieldAlert, Sun, Monitor } from 'lucide-react'
+import {
+  AlertCircle,
+  ChevronDown,
+  Languages,
+  Moon,
+  RefreshCw,
+  RotateCcw,
+  Server,
+  ShieldAlert,
+  Sun,
+  Monitor,
+} from 'lucide-react'
 import { isAppLanguage, type AppLanguage } from '@/i18n'
 import { useTheme } from '@/app/theme-provider'
 import type { ThemeOption } from '@/app/theme'
@@ -11,6 +22,30 @@ import { Separator } from '@/components/ui/separator'
 import { ApiError, apiFetch } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
 import { cn } from '@/lib/utils'
+
+type ApiHealthStatus = 'checking' | 'up' | 'down'
+
+async function probeApiHealth(): Promise<'up' | 'down'> {
+  // Prefer Vite local probe (does not depend on proxy), fall back to proxied health.
+  if (import.meta.env.DEV) {
+    try {
+      const response = await fetch('/__dev/api-health', { cache: 'no-store' })
+      if (response.ok) {
+        const body = (await response.json()) as { status?: string }
+        if (body.status === 'up' || body.status === 'down') return body.status
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+
+  try {
+    const response = await fetch('/health/live', { cache: 'no-store', signal: AbortSignal.timeout(2500) })
+    return response.ok ? 'up' : 'down'
+  } catch {
+    return 'down'
+  }
+}
 
 type QuickLoginKind = 'admin' | 'employee'
 
@@ -75,6 +110,87 @@ export function LoginPage() {
   const [googleBusy, setGoogleBusy] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
   const [errorDismissed, setErrorDismissed] = useState(false)
+  const [apiStatus, setApiStatus] = useState<ApiHealthStatus>('checking')
+  const [healthBusy, setHealthBusy] = useState(false)
+  const [restartBusy, setRestartBusy] = useState(false)
+  const [restartMessage, setRestartMessage] = useState<string | null>(null)
+
+  async function refreshApiHealth() {
+    setHealthBusy(true)
+    setApiStatus('checking')
+    try {
+      const next = await probeApiHealth()
+      setApiStatus(next)
+      return next
+    } finally {
+      setHealthBusy(false)
+    }
+  }
+
+  async function restartLocalApi() {
+    if (!import.meta.env.DEV || restartBusy) return
+    setRestartBusy(true)
+    setRestartMessage(null)
+    setQuickLoginError(null)
+    try {
+      const response = await fetch('/__dev/restart-api', { method: 'POST' })
+      if (response.status === 404) {
+        setApiStatus(await probeApiHealth())
+        setRestartMessage(t('login.server.restartNeedsUiReload'))
+        return
+      }
+      const body = (await response.json().catch(() => null)) as { message?: string; ok?: boolean } | null
+      if (!response.ok) {
+        throw new Error(body?.message || t('login.server.restartFailed'))
+      }
+      setRestartMessage(t('login.server.restarting'))
+      setApiStatus('checking')
+
+      // Poll until the API is back (dotnet run can take a bit).
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500))
+        const next = await probeApiHealth()
+        if (next === 'up') {
+          setApiStatus('up')
+          setRestartMessage(t('login.server.restartSuccess'))
+          return
+        }
+      }
+      setApiStatus('down')
+      setRestartMessage(t('login.server.restartTimeout'))
+    } catch (caught) {
+      setApiStatus('down')
+      setRestartMessage(
+        caught instanceof Error && caught.message
+          ? caught.message
+          : t('login.server.restartFailed'),
+      )
+    } finally {
+      setRestartBusy(false)
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      setHealthBusy(true)
+      setApiStatus('checking')
+      const next = await probeApiHealth()
+      if (!cancelled) {
+        setApiStatus(next)
+        setHealthBusy(false)
+      }
+    })()
+    const id = window.setInterval(() => {
+      void probeApiHealth().then((next) => {
+        if (!cancelled) setApiStatus(next)
+      })
+    }, 12_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [])
 
   const authErrorCode = searchParams.get('authError')
   const showAuthError = Boolean(authErrorCode) && !errorDismissed
@@ -326,20 +442,20 @@ export function LoginPage() {
                 size="lg"
                 className={cn(
                   'h-12 w-full text-base font-semibold shadow-sm',
-                  googleBusy && 'pointer-events-none opacity-70',
+                  (googleBusy || apiStatus === 'down') && 'pointer-events-none opacity-70',
                 )}
               >
                 <a
                   href={googleLoginHref}
                   onClick={(event) => {
-                    if (googleBusy) {
+                    if (googleBusy || apiStatus === 'down') {
                       event.preventDefault()
                       return
                     }
                     setGoogleBusy(true)
                   }}
                   aria-busy={googleBusy}
-                  aria-disabled={googleBusy}
+                  aria-disabled={googleBusy || apiStatus === 'down'}
                   aria-label={t('login.google')}
                 >
                   {googleBusy ? (
@@ -352,14 +468,77 @@ export function LoginPage() {
                   )}
                 </a>
               </Button>
-              <p className="text-center text-xs text-muted-foreground">{t('login.googleHint')}</p>
+              <p className="text-center text-xs text-muted-foreground">
+                {apiStatus === 'down' ? t('login.server.signInDisabled') : t('login.googleHint')}
+              </p>
             </div>
 
-            <div className="rounded-xl border border-border/70 bg-muted/30 p-3.5">
-              <p className="text-sm font-medium text-foreground">{t('login.firstTime.title')}</p>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                {t('login.firstTime.body')}
-              </p>
+            <div
+              className={cn(
+                'rounded-xl border p-3.5',
+                apiStatus === 'up' && 'border-emerald-500/30 bg-emerald-500/5',
+                apiStatus === 'down' && 'border-destructive/30 bg-destructive/5',
+                apiStatus === 'checking' && 'border-border/70 bg-muted/30',
+              )}
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <Server
+                    className={cn(
+                      'mt-0.5 h-4 w-4 shrink-0',
+                      apiStatus === 'up' && 'text-emerald-600 dark:text-emerald-400',
+                      apiStatus === 'down' && 'text-destructive',
+                      apiStatus === 'checking' && 'text-muted-foreground',
+                    )}
+                    aria-hidden
+                  />
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-sm font-medium text-foreground">{t('login.server.title')}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {apiStatus === 'up'
+                        ? t('login.server.up')
+                        : apiStatus === 'down'
+                          ? t('login.server.down')
+                          : t('login.server.checking')}
+                    </p>
+                    {restartMessage ? (
+                      <p className="text-xs text-muted-foreground">{restartMessage}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={healthBusy || restartBusy}
+                    onClick={() => void refreshApiHealth()}
+                  >
+                    <RefreshCw
+                      className={cn('h-3.5 w-3.5', (healthBusy || restartBusy) && 'animate-spin')}
+                      aria-hidden
+                    />
+                    {t('login.server.checkAgain')}
+                  </Button>
+                  {import.meta.env.DEV ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={apiStatus === 'down' ? 'default' : 'secondary'}
+                      disabled={restartBusy}
+                      onClick={() => void restartLocalApi()}
+                    >
+                      <RotateCcw
+                        className={cn('h-3.5 w-3.5', restartBusy && 'animate-spin')}
+                        aria-hidden
+                      />
+                      {restartBusy ? t('login.server.restartBusy') : t('login.server.restart')}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             </div>
 
             {import.meta.env.DEV ? (
@@ -393,7 +572,7 @@ export function LoginPage() {
                       variant="outline"
                       size="sm"
                       className="h-9 w-full"
-                      disabled={busyKind !== null || busyPersona !== null}
+                      disabled={busyKind !== null || busyPersona !== null || apiStatus === 'down'}
                       onClick={() => void quickLogin('admin')}
                     >
                       {busyKind === 'admin' ? t('login.quickLogin.busy') : t('login.quickLogin.admin')}
@@ -403,7 +582,7 @@ export function LoginPage() {
                       variant="outline"
                       size="sm"
                       className="h-9 w-full"
-                      disabled={busyKind !== null || busyPersona !== null}
+                      disabled={busyKind !== null || busyPersona !== null || apiStatus === 'down'}
                       onClick={() => void quickLogin('employee')}
                     >
                       {busyKind === 'employee'
@@ -424,7 +603,7 @@ export function LoginPage() {
                             variant="outline"
                             size="sm"
                             className="h-9 justify-start"
-                            disabled={busyKind !== null || busyPersona !== null}
+                            disabled={busyKind !== null || busyPersona !== null || apiStatus === 'down'}
                             onClick={() => void personaLogin(key)}
                           >
                             {busyPersona === key

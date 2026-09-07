@@ -1,10 +1,14 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { spawn } from 'node:child_process'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { Plugin } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
+const repoRoot = path.resolve(rootDir, '../..')
 
 /** Proxy API/auth/OIDC to the ASP.NET host while keeping the browser Host as localhost:5173. */
 function backendProxy(preserveBrowserHost: boolean) {
@@ -15,8 +19,78 @@ function backendProxy(preserveBrowserHost: boolean) {
   }
 }
 
+function sendJson(res: ServerResponse, status: number, body: unknown) {
+  res.statusCode = status
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.end(JSON.stringify(body))
+}
+
+/**
+ * Development-only helpers used by the login page:
+ * - GET  /__dev/api-health  → { status: 'up' | 'down' }
+ * - POST /__dev/restart-api → launches scripts/restart-local-api.ps1
+ */
+function localApiControlPlugin(): Plugin {
+  return {
+    name: 'qec-local-api-control',
+    configureServer(server) {
+      server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
+        const url = req.url?.split('?')[0] ?? ''
+        if (url !== '/__dev/api-health' && url !== '/__dev/restart-api') {
+          next()
+          return
+        }
+
+        if (url === '/__dev/api-health' && (req.method === 'GET' || req.method === 'HEAD')) {
+          try {
+            const response = await fetch('http://127.0.0.1:5080/health/live', {
+              signal: AbortSignal.timeout(2500),
+            })
+            sendJson(res, 200, {
+              status: response.ok ? 'up' : 'down',
+              httpStatus: response.status,
+            })
+          } catch {
+            sendJson(res, 200, { status: 'down', httpStatus: null })
+          }
+          return
+        }
+
+        if (url === '/__dev/restart-api' && req.method === 'POST') {
+          const script = path.join(repoRoot, 'scripts', 'restart-local-api.ps1')
+          try {
+            const child = spawn(
+              'powershell.exe',
+              ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script],
+              {
+                cwd: repoRoot,
+                detached: true,
+                stdio: 'ignore',
+                windowsHide: true,
+              },
+            )
+            child.unref()
+            sendJson(res, 202, {
+              ok: true,
+              message: 'API restart launched. Waiting for health…',
+            })
+          } catch (error) {
+            sendJson(res, 500, {
+              ok: false,
+              message: error instanceof Error ? error.message : 'Failed to launch API restart.',
+            })
+          }
+          return
+        }
+
+        sendJson(res, 405, { ok: false, message: 'Method not allowed.' })
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), localApiControlPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(rootDir, './src'),
