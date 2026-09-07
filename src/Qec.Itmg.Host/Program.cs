@@ -9,6 +9,7 @@ using Qec.Itmg.BuildingBlocks.Persistence;
 using Qec.Itmg.Host;
 using Qec.Itmg.Host.Cmdb;
 using Qec.Itmg.Host.Email;
+using Qec.Itmg.Host.Organization;
 using Qec.Itmg.Host.Lookups;
 using Qec.Itmg.Host.Notifications;
 using Qec.Itmg.Host.Persistence;
@@ -71,6 +72,7 @@ try
     builder.Services.AddIdentitySeed(builder.Configuration);
     builder.Services.AddCmdbSeed();
     builder.Services.AddAccessCatalogSeed();
+    builder.Services.AddOrganizationPositionsSeed();
     builder.Services.AddDevelopmentAccessDemoSeed();
     builder.Services.AddServiceDeskSeed();
     builder.Services.AddComplianceReadinessSeed();
@@ -82,6 +84,7 @@ try
     builder.Services.AddScoped<DocumentNotificationService>();
     builder.Services.AddScoped<SecurityAwarenessNotificationService>();
     builder.Services.AddScoped<IActiveEmployeeLookup, IdentityActiveEmployeeLookup>();
+    builder.Services.AddScoped<IUserDisplayLookup, IdentityUserDisplayLookup>();
     builder.Services.AddScoped<AuditNotificationService>();
 
     bool enableHangfire = !builder.Environment.IsEnvironment("Testing");
@@ -151,6 +154,7 @@ try
     await app.RunServiceDeskSeedAsync();
     await app.RunComplianceReadinessSeedAsync();
     await app.RunAccessCatalogSeedAsync();
+    await app.RunOrganizationPositionsSeedAsync();
     await app.RunDevelopmentAccessDemoSeedAsync();
 
     if (enableHangfire)
@@ -245,6 +249,7 @@ try
     app.MapTicketCollaborationEndpoints();
     app.MapIdentityAdminEndpoints();
     app.MapLookupAdminEndpoints();
+    app.MapOrganizationHierarchyEndpoints();
     app.MapCmdbEndpoints();
     app.MapAssetEndpoints();
     app.MapTicketEndpoints();

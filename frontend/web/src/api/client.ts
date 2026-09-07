@@ -4683,5 +4683,183 @@ export const remoteSupportApi = {
     }),
 }
 
+export type OrganizationDepartmentSummary = {
+  id: string
+  name: string
+  isActive: boolean
+}
+
+export type OrganizationPositionOccupant = {
+  assignmentId: string
+  userId: string
+  displayName: string
+  upn: string
+  isPrimary: boolean
+  isActiveUser: boolean
+  avatarUrl: string | null
+}
+
+export type OrganizationPositionNode = {
+  id: string
+  departmentId: string
+  parentPositionId: string | null
+  key: string
+  nameEn: string
+  nameAr: string
+  descriptionEn: string | null
+  descriptionAr: string | null
+  isManagerial: boolean
+  isActive: boolean
+  sortOrder: number
+  occupants: OrganizationPositionOccupant[]
+  children: OrganizationPositionNode[]
+}
+
+export type OrganizationHierarchyResponse = {
+  departmentId: string | null
+  departmentName: string | null
+  roots: OrganizationPositionNode[]
+}
+
+export type OrganizationPosition = {
+  id: string
+  departmentId: string
+  parentPositionId: string | null
+  key: string
+  nameEn: string
+  nameAr: string
+  descriptionEn: string | null
+  descriptionAr: string | null
+  isManagerial: boolean
+  isActive: boolean
+  sortOrder: number
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  occupantCount: number
+}
+
+export type OrganizationPositionAssignment = {
+  id: string
+  positionId: string
+  userId: string
+  displayName: string
+  upn: string
+  isPrimary: boolean
+  isActiveUser: boolean
+  avatarUrl: string | null
+  effectiveFrom: string | null
+  effectiveTo: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type OrganizationUserPosition = {
+  assignmentId: string
+  positionId: string
+  positionKey: string
+  positionNameEn: string
+  positionNameAr: string
+  departmentId: string
+  isPrimary: boolean
+  isActive: boolean
+  isManagerial: boolean
+}
+
+export type OrganizationActiveUser = {
+  id: string
+  upn: string
+  displayName: string
+}
+
+export type CreateOrganizationPositionPayload = {
+  departmentId: string
+  key: string
+  nameEn: string
+  nameAr: string
+  parentPositionId?: string | null
+  descriptionEn?: string | null
+  descriptionAr?: string | null
+  isManagerial: boolean
+  sortOrder: number
+  isActive?: boolean
+}
+
+export type UpdateOrganizationPositionPayload = {
+  nameEn: string
+  nameAr: string
+  descriptionEn?: string | null
+  descriptionAr?: string | null
+  isManagerial: boolean
+  sortOrder: number
+  isActive: boolean
+}
+
+export const organizationHierarchyApi = {
+  listDepartments: () =>
+    apiFetch<OrganizationDepartmentSummary[]>('/api/v1/organization/departments'),
+  listPositions: (departmentId?: string, activeOnly?: boolean) => {
+    const params = new URLSearchParams()
+    if (departmentId) params.set('departmentId', departmentId)
+    if (activeOnly != null) params.set('activeOnly', String(activeOnly))
+    const query = params.toString()
+    return apiFetch<OrganizationPosition[]>(
+      `/api/v1/organization/positions${query ? `?${query}` : ''}`,
+    )
+  },
+  getHierarchy: (departmentId?: string) => {
+    const query = departmentId ? `?departmentId=${encodeURIComponent(departmentId)}` : ''
+    return apiFetch<OrganizationHierarchyResponse>(
+      `/api/v1/organization/positions/hierarchy${query}`,
+    )
+  },
+  createPosition: (payload: CreateOrganizationPositionPayload) =>
+    apiFetch<OrganizationPosition>('/api/v1/organization/positions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updatePosition: (id: string, payload: UpdateOrganizationPositionPayload) =>
+    apiFetch<OrganizationPosition>(`/api/v1/organization/positions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  changeParent: (id: string, parentPositionId: string | null) =>
+    apiFetch<OrganizationPosition>(`/api/v1/organization/positions/${id}/parent`, {
+      method: 'POST',
+      body: JSON.stringify({ parentPositionId }),
+    }),
+  deactivatePosition: (id: string) =>
+    apiFetch<OrganizationPosition>(`/api/v1/organization/positions/${id}/deactivate`, {
+      method: 'POST',
+    }),
+  listAssignments: (positionId: string) =>
+    apiFetch<OrganizationPositionAssignment[]>(
+      `/api/v1/organization/positions/${positionId}/assignments`,
+    ),
+  assignUser: (positionId: string, userId: string, isPrimary?: boolean) =>
+    apiFetch<OrganizationPositionAssignment>(
+      `/api/v1/organization/positions/${positionId}/assignments`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, isPrimary }),
+      },
+    ),
+  removeAssignment: (positionId: string, assignmentId: string) =>
+    apiFetch<void>(`/api/v1/organization/positions/${positionId}/assignments/${assignmentId}`, {
+      method: 'DELETE',
+    }),
+  setPrimary: (positionId: string, assignmentId: string) =>
+    apiFetch<OrganizationPositionAssignment>(
+      `/api/v1/organization/positions/${positionId}/assignments/${assignmentId}/primary`,
+      { method: 'POST' },
+    ),
+  listUserPositions: (userId: string) =>
+    apiFetch<OrganizationUserPosition[]>(`/api/v1/organization/users/${userId}/positions`),
+  searchActiveUsers: (search?: string) => {
+    const query = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : ''
+    return apiFetch<OrganizationActiveUser[]>(`/api/v1/organization/active-users${query}`)
+  },
+}
+
 /** @deprecated Prefer relative same-origin requests through the Vite proxy. */
 export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? ''

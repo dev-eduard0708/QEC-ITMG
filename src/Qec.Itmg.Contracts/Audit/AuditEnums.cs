@@ -31,6 +31,7 @@ public enum AuditAggregateType
     IntegrationRun = 27,
     AiInteraction = 28,
     RemoteSession = 29,
+    OrganizationPosition = 30,
 }
 
 public enum AuditActorType

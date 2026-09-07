@@ -4,10 +4,19 @@ import { useAuth } from '@/auth/auth-provider'
 import { cn } from '@/lib/utils'
 
 const adminLinks = [
-  { to: '/it/admin/users', labelKey: 'admin.nav.users', permission: 'admin.users' },
-  { to: '/it/admin/roles', labelKey: 'admin.nav.roles', permission: 'admin.roles' },
-  { to: '/it/admin/lookups', labelKey: 'admin.nav.lookups', permission: 'admin.lookups' },
-  { to: '/it/admin/integrations', labelKey: 'admin.nav.integrations', permission: 'admin.integrations' },
+  { to: '/it/admin/users', labelKey: 'admin.nav.users', permissions: ['admin.users'] },
+  { to: '/it/admin/roles', labelKey: 'admin.nav.roles', permissions: ['admin.roles'] },
+  { to: '/it/admin/lookups', labelKey: 'admin.nav.lookups', permissions: ['admin.lookups'] },
+  {
+    to: '/it/admin/organization/hierarchy',
+    labelKey: 'admin.nav.hierarchy',
+    permissions: ['organization.hierarchy.read', 'organization.hierarchy.manage'],
+  },
+  {
+    to: '/it/admin/integrations',
+    labelKey: 'admin.nav.integrations',
+    permissions: ['admin.integrations'],
+  },
 ] as const
 
 export function AdminLayout() {
@@ -24,9 +33,9 @@ export function AdminLayout() {
           <h2 className="mt-1 text-xl font-semibold text-foreground">{t('admin.title')}</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t('admin.description')}</p>
         </div>
-        <nav className="flex gap-1 rounded-md border border-border bg-card p-1" aria-label={t('admin.nav')}>
+        <nav className="flex flex-wrap gap-1 rounded-md border border-border bg-card p-1" aria-label={t('admin.nav')}>
           {adminLinks
-            .filter((link) => can(link.permission))
+            .filter((link) => link.permissions.some((permission) => can(permission)))
             .map((link) => (
               <NavLink
                 key={link.to}

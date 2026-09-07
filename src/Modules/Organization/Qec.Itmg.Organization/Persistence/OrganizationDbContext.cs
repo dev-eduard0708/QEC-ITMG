@@ -12,6 +12,10 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
 
     public DbSet<Location> Locations => Set<Location>();
 
+    public DbSet<Position> Positions => Set<Position>();
+
+    public DbSet<PositionAssignment> PositionAssignments => Set<PositionAssignment>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);

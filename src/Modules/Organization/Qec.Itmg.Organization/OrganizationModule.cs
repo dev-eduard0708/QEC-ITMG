@@ -24,5 +24,6 @@ public sealed class OrganizationModule : IModule
             connectionString,
             OrganizationDbContext.SchemaName);
         services.AddScoped<Admin.LookupAdminService>();
+        services.AddScoped<Services.PositionService>();
     }
 }

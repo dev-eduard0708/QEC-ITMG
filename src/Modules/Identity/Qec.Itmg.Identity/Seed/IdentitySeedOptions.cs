@@ -29,6 +29,8 @@ public static class IdentitySeedCatalog
         ("admin.settings", "Manage platform settings"),
         ("admin.integrations", "Manage integrations"),
         ("admin.lookups", "Manage organization lookups"),
+        ("organization.hierarchy.read", "View organization position hierarchy"),
+        ("organization.hierarchy.manage", "Manage positions and assignments"),
         ("cmdb.read", "View configuration items and CMDB data"),
         ("cmdb.manage", "Manage configuration items and CMDB data"),
         ("assets.read", "View assets"),

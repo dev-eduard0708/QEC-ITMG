@@ -7,6 +7,7 @@ import { AdminLookupsPage } from '@/features/admin/lookups-page'
 import { AdminRolesPage } from '@/features/admin/roles-page'
 import { AdminUsersPage } from '@/features/admin/users-page'
 import { IntegrationsAdminPage } from '@/features/admin/integrations-page'
+import { OrganizationHierarchyPage } from '@/features/admin/organization-hierarchy-page'
 import { BreakGlassPage } from '@/features/auth/break-glass-page'
 import { LoginPage } from '@/features/auth/login-page'
 import { UnauthorizedPage } from '@/features/auth/unauthorized-page'
@@ -198,7 +199,14 @@ export function AppRouter() {
             path="it/admin"
             element={
               <RequireAnyPermission
-                permissions={['admin.users', 'admin.roles', 'admin.lookups', 'admin.integrations']}
+                permissions={[
+                  'admin.users',
+                  'admin.roles',
+                  'admin.lookups',
+                  'admin.integrations',
+                  'organization.hierarchy.read',
+                  'organization.hierarchy.manage',
+                ]}
               />
             }
           >
@@ -212,6 +220,15 @@ export function AppRouter() {
               </Route>
               <Route element={<RequirePermission permission="admin.lookups" />}>
                 <Route path="lookups" element={<AdminLookupsPage />} />
+              </Route>
+              <Route
+                element={
+                  <RequireAnyPermission
+                    permissions={['organization.hierarchy.read', 'organization.hierarchy.manage']}
+                  />
+                }
+              >
+                <Route path="organization/hierarchy" element={<OrganizationHierarchyPage />} />
               </Route>
               <Route element={<RequirePermission permission="admin.integrations" />}>
                 <Route path="integrations" element={<IntegrationsAdminPage />} />

@@ -109,6 +109,8 @@ const IT_PERMISSION_KEYS = [
   'admin.roles',
   'admin.lookups',
   'admin.integrations',
+  'organization.hierarchy.read',
+  'organization.hierarchy.manage',
 ] as const
 
 export function hasMeaningfulItAccess(can: (permissionKey: string) => boolean): boolean {
@@ -279,7 +281,9 @@ function buildNavGroups(can: (permissionKey: string) => boolean): NavGroupDef[] 
             can('admin.users') ||
             can('admin.roles') ||
             can('admin.lookups') ||
-            can('admin.integrations'),
+            can('admin.integrations') ||
+            can('organization.hierarchy.read') ||
+            can('organization.hierarchy.manage'),
         },
         {
           to: '/it/admin/integrations',
