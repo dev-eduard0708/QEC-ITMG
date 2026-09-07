@@ -141,6 +141,29 @@ Authoritative completion rows are the evidence. Do **not** create thousands of E
 
 Legacy module seed/assign UI remains under Security → Awareness tab and links to the new workspace.
 
+## Starter awareness campaigns
+
+Five bilingual Head Office starter campaigns are bootstrapped as editable **Draft** catalog items (production-safe, idempotent):
+
+| StarterKey | Title (EN) |
+|------------|------------|
+| `SEC-AWARE-PHISHING` | Phishing & Suspicious Email Awareness |
+| `SEC-AWARE-PASSWORD` | Password & Authentication Security |
+| `SEC-AWARE-DATA` | Data Protection & Confidentiality |
+| `SEC-AWARE-COLLAB` | Safe Internet, Email & Collaboration |
+| `SEC-AWARE-REMOTE` | Remote Access & Device Security |
+
+Rules:
+
+- Seeded as **Draft only** — no launch, no audience, no schedule/due date, no assignments, no notifications, no quiz attempts, no fake completions
+- `StarterKey` is a stable, non-editable seed identity (filtered unique index); title/content edits do **not** cause re-seed or overwrite
+- Administrators review content, choose audience (All Head Office Employees / department / position / specific users), set schedule, preview, then launch through the normal V1 flow
+- Launch creates an immutable `AwarenessCampaignVersion` and audience snapshot exactly like any user-created campaign
+- Starter content supports awareness/training preparation; it does **not** by itself prove that employees were trained
+- Evidence of staff awareness begins only after actual campaign assignment and employee completion (assignment, quiz results, reminders, completion timestamps)
+
+Completed awareness campaigns can later support audit readiness questions about ongoing staff awareness training and knowledge assessment — templates alone do **not** claim audit compliance.
+
 ## Future expansion
 
 - Project / site / location audience targeting (deferred)  

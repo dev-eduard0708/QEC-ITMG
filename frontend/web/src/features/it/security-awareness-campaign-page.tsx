@@ -324,6 +324,9 @@ export function SecurityAwarenessCampaignPage() {
         actions={
           <div className="flex flex-wrap gap-2">
             <Badge variant="outline">{campaign.status}</Badge>
+            {campaign.starterKey ? (
+              <Badge variant="secondary">{t('awarenessAdmin.starter.badge')}</Badge>
+            ) : null}
             <Button asChild variant="outline" size="sm">
               <Link to="/it/security/awareness">{t('awarenessAdmin.back')}</Link>
             </Button>
@@ -352,6 +355,15 @@ export function SecurityAwarenessCampaignPage() {
           </div>
         }
       />
+
+      {campaign.starterKey && isDraft ? (
+        <div
+          role="status"
+          className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground"
+        >
+          {t('awarenessAdmin.starter.notice')}
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap gap-2">
         {sections.map(([key, label]) => (
@@ -479,6 +491,9 @@ export function SecurityAwarenessCampaignPage() {
         <section className="space-y-4 rounded-xl border bg-card p-4 sm:p-6">
           <h2 className="text-lg font-semibold">{t('awarenessAdmin.sections.audience')}</h2>
           <p className="text-sm text-muted-foreground">{t('awarenessAdmin.audience.hint')}</p>
+          {isDraft && (campaign?.audienceRules.length ?? 0) === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('awarenessAdmin.audience.notSelected')}</p>
+          ) : null}
 
           <label className="flex items-center gap-2 text-sm font-medium">
             <Checkbox

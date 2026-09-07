@@ -48,7 +48,7 @@ public sealed record PentestFindingDto(
     DateTimeOffset CreatedAtUtc);
 
 public sealed record AwarenessCampaignDto(
-    Guid Id, string Title, string? Description, DateTimeOffset StartsAtUtc, DateTimeOffset? DueAtUtc,
+    Guid Id, string Title, string? Description, DateTimeOffset? StartsAtUtc, DateTimeOffset? DueAtUtc,
     string Status, Guid OwnerUserId, DateTimeOffset CreatedAtUtc,
     int AssignedCount, int CompletedCount, int OutstandingCount, int OverdueCount,
     Guid? ModuleId = null, int? ModuleVersion = null, int PassThresholdPercent = 80);

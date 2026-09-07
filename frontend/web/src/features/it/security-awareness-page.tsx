@@ -249,9 +249,14 @@ function CampaignRow({
         >
           {title}
         </Link>
-        {campaign.number ? (
-          <div className="text-xs text-muted-foreground">{campaign.number}</div>
-        ) : null}
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          {campaign.number ? (
+            <span className="text-xs text-muted-foreground">{campaign.number}</span>
+          ) : null}
+          {campaign.starterKey ? (
+            <Badge variant="secondary">{t('awarenessAdmin.starter.badge')}</Badge>
+          ) : null}
+        </div>
       </td>
       <td className="px-3 py-2">
         <Badge variant={statusVariant(campaign.status)}>{campaign.status}</Badge>

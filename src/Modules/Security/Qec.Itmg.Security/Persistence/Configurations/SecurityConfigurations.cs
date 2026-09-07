@@ -143,10 +143,13 @@ internal sealed class AwarenessCampaignConfiguration : IEntityTypeConfiguration<
         builder.Property(x => x.TitleAr).HasMaxLength(512);
         builder.Property(x => x.DescriptionEn).HasMaxLength(4000);
         builder.Property(x => x.DescriptionAr).HasMaxLength(4000);
+        builder.Property(x => x.StarterKey).HasMaxLength(64);
         builder.Property(x => x.Status).IsRequired().HasConversion<string>().HasMaxLength(32);
         builder.Property(x => x.RowVersion).IsRowVersion().IsConcurrencyToken();
         builder.HasIndex(x => x.Number).IsUnique().HasDatabaseName("IX_AwarenessCampaign_Number")
             .HasFilter("[Number] IS NOT NULL");
+        builder.HasIndex(x => x.StarterKey).IsUnique().HasDatabaseName("IX_AwarenessCampaign_StarterKey")
+            .HasFilter("[StarterKey] IS NOT NULL");
         builder.HasIndex(x => x.Status).HasDatabaseName("IX_AwarenessCampaign_Status");
         builder.HasIndex(x => x.DueAtUtc).HasDatabaseName("IX_AwarenessCampaign_DueAtUtc");
         builder.HasIndex(x => x.ModuleId).HasDatabaseName("IX_AwarenessCampaign_ModuleId");

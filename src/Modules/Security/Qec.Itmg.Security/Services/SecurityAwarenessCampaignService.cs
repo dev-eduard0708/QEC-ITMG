@@ -35,7 +35,8 @@ public sealed record AwarenessCampaignListItemDto(
     int NotStartedCount,
     double CompletionRatePercent,
     bool RequireQuiz,
-    int? EstimatedMinutes);
+    int? EstimatedMinutes,
+    string? StarterKey);
 
 public sealed record AwarenessContentBlockDto(
     Guid Id,
@@ -102,7 +103,8 @@ public sealed record AwarenessCampaignDetailDto(
     int OverdueCount,
     IReadOnlyList<AwarenessAudienceRuleDto> AudienceRules,
     IReadOnlyList<AwarenessContentBlockDto> ContentBlocks,
-    IReadOnlyList<AwarenessCampaignQuestionDto> Questions);
+    IReadOnlyList<AwarenessCampaignQuestionDto> Questions,
+    string? StarterKey);
 
 public sealed record AwarenessCampaignReportEmployeeDto(
     Guid AssignmentId,
@@ -405,7 +407,8 @@ public sealed class SecurityAwarenessCampaignService(
             rules.Select(r => new AwarenessAudienceRuleDto(
                 r.Id, r.RuleType.ToString(), r.DepartmentId, r.PositionId, r.UserId)).ToList(),
             blocks.Select(MapContentBlock).ToList(),
-            questions.Select(q => MapQuestion(q, options.Where(o => o.QuestionId == q.Id).ToList(), includeAnswerKeys)).ToList());
+            questions.Select(q => MapQuestion(q, options.Where(o => o.QuestionId == q.Id).ToList(), includeAnswerKeys)).ToList(),
+            campaign.StarterKey);
     }
 
     public async Task<AwarenessCampaignDetailDto> UpdateDetailsAsync(
@@ -1061,7 +1064,7 @@ public sealed class SecurityAwarenessCampaignService(
         return new AwarenessCampaignListItemDto(
             c.Id, c.Number, c.TitleEn, c.TitleAr, c.Status.ToString(), c.StartsAtUtc, c.DueAtUtc,
             SummarizeAudience(rules), assigned, completed, outstanding, overdue, notStarted, rate,
-            c.RequireQuiz, estimatedMinutes == 0 ? null : estimatedMinutes);
+            c.RequireQuiz, estimatedMinutes == 0 ? null : estimatedMinutes, c.StarterKey);
     }
 
     private static string SummarizeAudience(IReadOnlyList<AwarenessAudienceRule> rules)

@@ -74,6 +74,7 @@ try
     builder.Services.AddCmdbSeed(builder.Environment);
     builder.Services.AddAccessCatalogSeed();
     builder.Services.AddOrganizationPositionsSeed();
+    builder.Services.AddSecurityAwarenessStarterSeed();
     builder.Services.AddDevelopmentAccessDemoSeed();
     builder.Services.AddServiceDeskSeed();
     builder.Services.AddComplianceReadinessSeed();
@@ -157,6 +158,7 @@ try
     await app.RunComplianceReadinessSeedAsync();
     await app.RunAccessCatalogSeedAsync();
     await app.RunOrganizationPositionsSeedAsync();
+    await app.RunSecurityAwarenessStarterSeedAsync();
     await app.RunDevelopmentAccessDemoSeedAsync();
 
     if (enableHangfire)

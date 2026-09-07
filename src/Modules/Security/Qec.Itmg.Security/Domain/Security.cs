@@ -771,7 +771,7 @@ public sealed class AwarenessCampaign
     public Guid? ModuleId { get; private set; }
     public int? ModuleVersion { get; private set; }
     public int PassThresholdPercent { get; private set; }
-    public DateTimeOffset StartsAtUtc { get; private set; }
+    public DateTimeOffset? StartsAtUtc { get; private set; }
     public DateTimeOffset? DueAtUtc { get; private set; }
     public bool RequireQuiz { get; private set; }
     public bool AllowRetry { get; private set; }
@@ -781,6 +781,8 @@ public sealed class AwarenessCampaign
     public Guid OwnerUserId { get; private set; }
     public Guid? CreatedByUserId { get; private set; }
     public Guid? PublishedVersionId { get; private set; }
+    /// <summary>Stable seed identity for catalog starter campaigns. Null for user-created campaigns. Not user-editable.</summary>
+    public string? StarterKey { get; private set; }
     public DateTimeOffset CreatedAtUtc { get; private set; }
     public DateTimeOffset UpdatedAtUtc { get; private set; }
     public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
@@ -832,13 +834,16 @@ public sealed class AwarenessCampaign
         int passingScorePercent = 80,
         bool allowRetry = true,
         int? maxAttempts = null,
-        bool requireCompletion = true)
+        bool requireCompletion = true,
+        string? starterKey = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(number);
         ArgumentException.ThrowIfNullOrWhiteSpace(titleEn);
         if (ownerUserId == Guid.Empty) throw new ArgumentException("Owner required.");
         if (passingScorePercent is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(passingScorePercent));
         if (maxAttempts is < 1) throw new ArgumentOutOfRangeException(nameof(maxAttempts));
+        string? key = TrimOrNull(starterKey);
+        if (key is not null) key = key.ToUpperInvariant();
         return new AwarenessCampaign
         {
             Id = Guid.CreateVersion7(),
@@ -848,7 +853,7 @@ public sealed class AwarenessCampaign
             DescriptionEn = TrimOrNull(descriptionEn),
             DescriptionAr = TrimOrNull(descriptionAr),
             PassThresholdPercent = passingScorePercent,
-            StartsAtUtc = startAtUtc ?? utcNow,
+            StartsAtUtc = startAtUtc,
             DueAtUtc = dueAtUtc,
             RequireQuiz = requireQuiz,
             AllowRetry = allowRetry,
@@ -857,6 +862,7 @@ public sealed class AwarenessCampaign
             Status = AwarenessCampaignStatus.Draft,
             OwnerUserId = ownerUserId,
             CreatedByUserId = createdByUserId == Guid.Empty ? ownerUserId : createdByUserId,
+            StarterKey = key,
             CreatedAtUtc = utcNow,
             UpdatedAtUtc = utcNow,
         };
@@ -884,7 +890,7 @@ public sealed class AwarenessCampaign
         TitleAr = TrimOrNull(titleAr);
         DescriptionEn = TrimOrNull(descriptionEn);
         DescriptionAr = TrimOrNull(descriptionAr);
-        if (startAtUtc is not null) StartsAtUtc = startAtUtc.Value;
+        StartsAtUtc = startAtUtc;
         DueAtUtc = dueAtUtc;
         RequireQuiz = requireQuiz;
         PassThresholdPercent = passingScorePercent;

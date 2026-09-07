@@ -3866,6 +3866,7 @@ export type AwarenessV1CampaignListItem = {
   completionRatePercent: number
   requireQuiz: boolean
   estimatedMinutes: number | null
+  starterKey: string | null
 }
 
 export type AwarenessV1ContentBlock = {
@@ -3938,6 +3939,7 @@ export type AwarenessV1CampaignDetail = {
   audienceRules: AwarenessV1AudienceRule[]
   contentBlocks: AwarenessV1ContentBlock[]
   questions: AwarenessV1Question[]
+  starterKey: string | null
 }
 
 export type AwarenessV1AudienceMember = {
