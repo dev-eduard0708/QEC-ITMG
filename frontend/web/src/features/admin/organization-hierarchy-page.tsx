@@ -118,9 +118,16 @@ function findNode(
 
 function findDefaultDepartmentId(departments: OrganizationDepartmentSummary[]): string {
   const it =
-    departments.find((d) => d.code.toUpperCase() === 'IT') ??
-    departments.find((d) => d.nameEn.toUpperCase() === 'IT')
+    departments.find((d) => (d.code ?? '').toUpperCase() === 'IT') ??
+    departments.find((d) => (d.nameEn ?? d.name ?? '').toUpperCase() === 'IT')
   return it?.id ?? departments[0]?.id ?? ''
+}
+
+function departmentLabel(
+  language: string,
+  dept: Pick<OrganizationDepartmentSummary, 'nameEn' | 'nameAr' | 'name'>,
+): string {
+  return localizedName(language, dept.nameEn || dept.name || '', dept.nameAr)
 }
 
 type PositionFormState = {
@@ -535,12 +542,12 @@ export function OrganizationHierarchyPage() {
   const openEditDepartment = (dept: OrganizationDepartmentSummary) => {
     setEditingDepartment(dept)
     setDepartmentForm({
-      nameEn: dept.nameEn,
+      nameEn: dept.nameEn || dept.name || '',
       nameAr: dept.nameAr ?? '',
-      code: dept.code,
+      code: dept.code || '',
       descriptionEn: dept.descriptionEn ?? '',
       descriptionAr: dept.descriptionAr ?? '',
-      sortOrder: String(dept.sortOrder),
+      sortOrder: String(dept.sortOrder ?? 0),
       isActive: dept.isActive,
     })
     setDepartmentFormError(null)
@@ -558,7 +565,7 @@ export function OrganizationHierarchyPage() {
   const assignDepartmentName = useMemo(() => {
     const deptId = selectedPosition?.departmentId ?? resolvedDepartmentId
     const dept = (departmentsQuery.data ?? []).find((d) => d.id === deptId)
-    return dept ? localizedName(language, dept.nameEn, dept.nameAr) : ''
+    return dept ? departmentLabel(language, dept) : ''
   }, [
     departmentsQuery.data,
     language,
@@ -636,7 +643,7 @@ export function OrganizationHierarchyPage() {
                 <SelectContent>
                   {(departmentsQuery.data ?? []).map((dept) => (
                     <SelectItem key={dept.id} value={dept.id}>
-                      {localizedName(language, dept.nameEn, dept.nameAr)}
+                      {departmentLabel(language, dept)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -700,7 +707,7 @@ export function OrganizationHierarchyPage() {
                 <SelectContent>
                   {(departmentsQuery.data ?? []).map((dept) => (
                     <SelectItem key={dept.id} value={dept.id}>
-                      {localizedName(language, dept.nameEn, dept.nameAr)}
+                      {departmentLabel(language, dept)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -953,11 +960,7 @@ export function OrganizationHierarchyPage() {
 
             {membersDepartmentId && membersDepartment ? (
               <MembersPanel
-                departmentName={localizedName(
-                  language,
-                  membersDepartment.nameEn,
-                  membersDepartment.nameAr,
-                )}
+                departmentName={departmentLabel(language, membersDepartment)}
                 members={membersQuery.data ?? []}
                 isLoading={membersQuery.isLoading}
                 canManage={canManage}
@@ -985,7 +988,7 @@ export function OrganizationHierarchyPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-medium">
-                          {localizedName(language, dept.nameEn, dept.nameAr)}
+                          {departmentLabel(language, dept)}
                         </p>
                         <p className="text-xs text-muted-foreground">{dept.code}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -1499,7 +1502,7 @@ function PeopleTab({
               <SelectItem value="__all__">{t('admin.hierarchy.allDepartments')}</SelectItem>
               {departments.map((dept) => (
                 <SelectItem key={dept.id} value={dept.id}>
-                  {localizedName(language, dept.nameEn, dept.nameAr)}
+                  {departmentLabel(language, dept)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -1861,7 +1864,7 @@ function ProfileSummarySheet({
           <ul className="space-y-1">
             {additionalDepts.map((dept) => (
               <li key={dept.departmentId}>
-                {localizedName(language, dept.nameEn, dept.nameAr)}
+                {departmentLabel(language, dept)}
               </li>
             ))}
           </ul>
