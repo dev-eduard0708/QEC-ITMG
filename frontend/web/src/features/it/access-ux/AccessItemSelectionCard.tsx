@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { selectableSurfaceClass } from '@/components/ui/selectable-card'
 import { cn } from '@/lib/utils'
 
 export function AccessItemSelectionCard({
@@ -29,10 +30,11 @@ export function AccessItemSelectionCard({
     <button
       type="button"
       disabled={disabled}
+      aria-pressed={selected}
+      data-selected={selected ? 'true' : 'false'}
       onClick={() => onSelectedChange(!selected)}
       className={cn(
-        'flex w-full items-start gap-3 rounded-lg border p-3 text-start transition-colors',
-        selected ? 'border-primary/40 bg-primary/5' : 'bg-card hover:bg-muted/40',
+        selectableSurfaceClass(selected, 'flex w-full items-start gap-3 p-3'),
         disabled && 'pointer-events-none opacity-50',
         className,
       )}

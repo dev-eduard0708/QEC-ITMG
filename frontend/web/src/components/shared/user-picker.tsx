@@ -56,6 +56,7 @@ export function UserPicker({
   allowClear = true,
   className,
   id,
+  invalid,
 }: {
   users: PickableUser[]
   value: string | null
@@ -65,6 +66,8 @@ export function UserPicker({
   allowClear?: boolean
   className?: string
   id?: string
+  /** Highlights the trigger when a required selection is missing. */
+  invalid?: boolean
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -84,8 +87,13 @@ export function UserPicker({
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-invalid={invalid || undefined}
         onClick={() => setOpen((prev) => !prev)}
-        className="flex h-auto min-h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        className={cn(
+          'flex h-auto min-h-9 w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+          invalid &&
+            'border-destructive/70 bg-destructive/[0.04] focus:ring-destructive dark:bg-destructive/[0.09]',
+        )}
       >
         {selected ? (
           <UserLine user={selected} />

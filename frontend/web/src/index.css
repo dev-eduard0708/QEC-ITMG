@@ -99,3 +99,31 @@ body {
   margin: 0;
   @apply bg-background text-foreground font-sans antialiased;
 }
+
+/* Shared selectable choice-card highlight (light + dark). */
+@keyframes selectable-border-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.35),
+      0 0 0 4px hsl(var(--primary) / 0.08);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.7),
+      0 0 14px 2px hsl(var(--primary) / 0.22);
+  }
+}
+
+.selectable-surface[data-selected='true'] {
+  animation: selectable-border-glow 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selectable-surface[data-selected='true'] {
+    animation: none;
+    box-shadow:
+      0 0 0 1px hsl(var(--primary) / 0.5),
+      0 0 0 4px hsl(var(--primary) / 0.12);
+  }
+}

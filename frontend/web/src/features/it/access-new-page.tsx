@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
+import { RequiredFieldsHint, requiredControlClass } from '@/components/ui/field'
 import {
   Dialog,
   DialogContent,
@@ -36,6 +37,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
+import { SelectableCard } from '@/components/ui/selectable-card'
 import { toast } from '@/components/ui/toast-store'
 import { AccessNavTabs } from '@/features/it/access-nav'
 import {
@@ -181,6 +183,7 @@ export function AccessNewPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [showCustomFields, setShowCustomFields] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showRequiredErrors, setShowRequiredErrors] = useState(false)
 
   const categoriesQuery = useQuery({
     queryKey: ['access', 'categories', 'active'],
@@ -526,11 +529,24 @@ export function AccessNewPage() {
 
   const subjectOk = externalSubject ? Boolean(subjectName.trim()) : Boolean(subjectUserId)
   const moverLeaverNeedsUser = (type === 'Mover' || type === 'Leaver') && !subjectUserId
-  const canSubmit =
-    Boolean(reason.trim() && categoryId) &&
-    subjectOk &&
-    !moverLeaverNeedsUser &&
-    !createMutation.isPending
+  const categoryMissing = !categoryId
+  const reasonMissing = !reason.trim()
+  const subjectMissing = !subjectOk || moverLeaverNeedsUser
+  const formValid =
+    Boolean(reason.trim() && categoryId) && subjectOk && !moverLeaverNeedsUser
+
+  const requiredLabel = t('form.required')
+  const ensureRequiredOrSubmit = (submitForApproval: boolean) => {
+    if (!formValid) {
+      setShowRequiredErrors(true)
+      setError(t('form.completeRequired'))
+      return
+    }
+    if (createMutation.isPending) return
+    setShowRequiredErrors(false)
+    setError(null)
+    createMutation.mutate(submitForApproval)
+  }
 
   const showGrantSection = type === 'Joiner' || type === 'AccessRequest' || type === 'Mover'
   const showCurrentSection = (type === 'Mover' || type === 'Leaver') && !externalSubject
@@ -731,12 +747,16 @@ export function AccessNewPage() {
         <Button
           type="button"
           variant="secondary"
-          disabled={!canSubmit}
-          onClick={() => createMutation.mutate(false)}
+          disabled={createMutation.isPending}
+          onClick={() => ensureRequiredOrSubmit(false)}
         >
           {t('access.saveAsDraft')}
         </Button>
-        <Button type="button" disabled={!canSubmit} onClick={() => createMutation.mutate(true)}>
+        <Button
+          type="button"
+          disabled={createMutation.isPending}
+          onClick={() => ensureRequiredOrSubmit(true)}
+        >
           {t('access.createAndSubmit')}
         </Button>
       </div>
@@ -763,10 +783,16 @@ export function AccessNewPage() {
               <CardTitle className="text-base">{t('access.sections.requestDetails')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <RequiredFieldsHint />
               <div className="space-y-1">
-                <Label>{t('access.fields.category')}</Label>
+                <Label required requiredLabel={requiredLabel}>
+                  {t('access.fields.category')}
+                </Label>
                 <Select value={categoryId || undefined} onValueChange={setCategoryId}>
-                  <SelectTrigger>
+                  <SelectTrigger
+                    aria-invalid={showRequiredErrors && categoryMissing ? true : undefined}
+                    className={requiredControlClass(showRequiredErrors && categoryMissing)}
+                  >
                     <SelectValue placeholder={t('access.fields.categoryPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
@@ -780,38 +806,43 @@ export function AccessNewPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>{t('access.columns.type')}</Label>
+                <Label required requiredLabel={requiredLabel}>
+                  {t('access.columns.type')}
+                </Label>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {types.map((item) => {
                     const selected = type === item
                     return (
-                      <button
+                      <SelectableCard
                         key={item}
-                        type="button"
+                        selected={selected}
                         onClick={() => setType(item)}
-                        className={cn(
-                          'rounded-lg border p-3 text-start transition-colors',
-                          selected ? 'border-primary/40 bg-primary/5' : 'hover:bg-muted/40',
-                        )}
+                        className="p-3"
                       >
                         <p className="text-sm font-medium">{t(`access.types.${item}`)}</p>
                         <p className="mt-0.5 text-xs text-muted-foreground">
                           {t(`access.typeHelp.${item}`)}
                         </p>
-                      </button>
+                      </SelectableCard>
                     )
                   })}
                 </div>
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="reason">{t('access.columns.reason')}</Label>
+                <Label htmlFor="reason" required requiredLabel={requiredLabel}>
+                  {t('access.columns.reason')}
+                </Label>
                 <Textarea
                   id="reason"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   rows={3}
+                  required
+                  aria-required
+                  aria-invalid={showRequiredErrors && reasonMissing ? true : undefined}
                   placeholder={t(`access.reasonHint.${type}`)}
+                  className={requiredControlClass(showRequiredErrors && reasonMissing)}
                 />
               </div>
             </CardContent>
@@ -844,11 +875,17 @@ export function AccessNewPage() {
               {externalSubject ? (
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
-                    <Label htmlFor="subjectName">{t('access.fields.subjectName')}</Label>
+                    <Label htmlFor="subjectName" required requiredLabel={requiredLabel}>
+                      {t('access.fields.subjectName')}
+                    </Label>
                     <Input
                       id="subjectName"
                       value={subjectName}
                       onChange={(e) => setSubjectName(e.target.value)}
+                      required
+                      aria-required
+                      aria-invalid={showRequiredErrors && subjectMissing ? true : undefined}
+                      className={requiredControlClass(showRequiredErrors && subjectMissing)}
                     />
                   </div>
                   <div className="space-y-1">
@@ -868,13 +905,16 @@ export function AccessNewPage() {
                 />
               ) : (
                 <div className="space-y-1">
-                  <Label>{t('access.fields.subjectUser')}</Label>
+                  <Label required requiredLabel={requiredLabel}>
+                    {t('access.fields.subjectUser')}
+                  </Label>
                   <UserPicker
                     users={activeUsers}
                     value={subjectUserId}
                     onChange={setSubjectUserId}
                     placeholder={t('access.fields.subjectUserPlaceholder')}
                     allowClear
+                    invalid={showRequiredErrors && subjectMissing}
                   />
                   {!isDirectoryAvailable ? (
                     <p className="text-xs text-muted-foreground">{t('access.directoryUnavailable')}</p>
