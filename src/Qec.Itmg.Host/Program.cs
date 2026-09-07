@@ -70,7 +70,7 @@ try
     builder.AddQecModules();
     builder.Services.AddIdentityAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddIdentitySeed(builder.Configuration);
-    builder.Services.AddCmdbSeed();
+    builder.Services.AddCmdbSeed(builder.Environment);
     builder.Services.AddAccessCatalogSeed();
     builder.Services.AddOrganizationPositionsSeed();
     builder.Services.AddDevelopmentAccessDemoSeed();
@@ -251,6 +251,7 @@ try
     app.MapLookupAdminEndpoints();
     app.MapOrganizationHierarchyEndpoints();
     app.MapCmdbEndpoints();
+    app.MapNetworkCmdbEndpoints();
     app.MapAssetEndpoints();
     app.MapTicketEndpoints();
     app.MapIncidentEndpoints();

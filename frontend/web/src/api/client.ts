@@ -380,6 +380,253 @@ export const cmdbApi = {
   deleteRelationship: (id: string) =>
     apiFetch<void>(`/api/v1/cmdb/relationships/${id}`, { method: 'DELETE' }),
   listServices: () => apiFetch<BusinessServiceItem[]>('/api/v1/cmdb/services'),
+  listTopologyViews: () => apiFetch<NetworkTopologyView[]>('/api/v1/cmdb/network-topology/views'),
+  getTopologyGraph: (params?: {
+    viewId?: string
+    locationId?: string
+    type?: string
+    search?: string
+  }) => {
+    const query = new URLSearchParams()
+    if (params?.viewId) query.set('viewId', params.viewId)
+    if (params?.locationId) query.set('locationId', params.locationId)
+    if (params?.type) query.set('type', params.type)
+    if (params?.search?.trim()) query.set('search', params.search.trim())
+    const qs = query.toString()
+    return apiFetch<NetworkTopologyGraph>(`/api/v1/cmdb/network-topology/graph${qs ? `?${qs}` : ''}`)
+  },
+  saveTopologyLayouts: (
+    viewId: string,
+    layouts: { configurationItemId: string; positionX: number; positionY: number }[],
+  ) =>
+    apiFetch<void>(`/api/v1/cmdb/network-topology/views/${viewId}/layouts`, {
+      method: 'PUT',
+      body: JSON.stringify({ layouts }),
+    }),
+  createNetworkConnection: (payload: {
+    sourceCiId: string
+    targetCiId: string
+    fromPort?: string | null
+    toPort?: string | null
+    mediaType?: string | null
+    linkMode?: string | null
+    notes?: string | null
+  }) =>
+    apiFetch<NetworkLinkDetail>('/api/v1/cmdb/network-topology/connections', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateNetworkLinkDetail: (
+    relationshipId: string,
+    payload: {
+      fromPort?: string | null
+      toPort?: string | null
+      mediaType?: string | null
+      linkMode?: string | null
+      notes?: string | null
+      isConfirmed: boolean
+    },
+  ) =>
+    apiFetch<NetworkLinkDetail>(`/api/v1/cmdb/network-topology/relationships/${relationshipId}/link-detail`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteNetworkConnection: (relationshipId: string) =>
+    apiFetch<void>(`/api/v1/cmdb/network-topology/relationships/${relationshipId}`, {
+      method: 'DELETE',
+    }),
+  listNetworkIdentities: (ciId: string) =>
+    apiFetch<CiNetworkIdentity[]>(`/api/v1/cmdb/cis/${ciId}/network-identities`),
+  listDiscoveryProfiles: () =>
+    apiFetch<NetworkDiscoveryProfile[]>('/api/v1/cmdb/network-discovery/profiles'),
+  createDiscoveryProfile: (payload: {
+    name: string
+    cidr: string
+    locationId?: string | null
+    timeoutMs?: number
+    maxConcurrency?: number
+    isActive?: boolean
+  }) =>
+    apiFetch<NetworkDiscoveryProfile>('/api/v1/cmdb/network-discovery/profiles', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateDiscoveryProfile: (
+    id: string,
+    payload: {
+      name: string
+      cidr: string
+      locationId?: string | null
+      isActive: boolean
+      timeoutMs: number
+      maxConcurrency: number
+    },
+  ) =>
+    apiFetch<NetworkDiscoveryProfile>(`/api/v1/cmdb/network-discovery/profiles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deleteDiscoveryProfile: (id: string) =>
+    apiFetch<void>(`/api/v1/cmdb/network-discovery/profiles/${id}`, { method: 'DELETE' }),
+  startDiscoveryScan: (profileId: string) =>
+    apiFetch<NetworkDiscoveryRun>(`/api/v1/cmdb/network-discovery/profiles/${profileId}/scan`, {
+      method: 'POST',
+    }),
+  getDiscoveryRun: (runId: string) =>
+    apiFetch<NetworkDiscoveryRun>(`/api/v1/cmdb/network-discovery/runs/${runId}`),
+  listDiscoveryObservations: (runId: string) =>
+    apiFetch<NetworkDiscoveryObservation[]>(`/api/v1/cmdb/network-discovery/runs/${runId}/observations`),
+  matchDiscoveryObservation: (
+    id: string,
+    payload: { configurationItemId: string; addIdentityIfMissing?: boolean },
+  ) =>
+    apiFetch<NetworkDiscoveryObservation>(`/api/v1/cmdb/network-discovery/observations/${id}/match`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  createCiFromDiscoveryObservation: (
+    id: string,
+    payload: { ciTypeId: string; name: string; locationId?: string | null; description?: string | null },
+  ) =>
+    apiFetch<NetworkDiscoveryObservation>(`/api/v1/cmdb/network-discovery/observations/${id}/create-ci`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  acceptDiscoveryChanges: (
+    id: string,
+    payload?: { updateIp?: boolean; updateHostname?: boolean; updateMac?: boolean },
+  ) =>
+    apiFetch<NetworkDiscoveryObservation>(
+      `/api/v1/cmdb/network-discovery/observations/${id}/accept-changes`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload ?? {}),
+      },
+    ),
+  ignoreDiscoveryObservation: (id: string) =>
+    apiFetch<NetworkDiscoveryObservation>(`/api/v1/cmdb/network-discovery/observations/${id}/ignore`, {
+      method: 'POST',
+    }),
+}
+
+export type CiNetworkIdentity = {
+  id: string
+  configurationItemId: string
+  ipAddress: string
+  hostname: string | null
+  macAddress: string | null
+  isPrimary: boolean
+}
+
+export type NetworkTopologyView = {
+  id: string
+  name: string
+  locationId: string | null
+  description: string | null
+  isDefault: boolean
+  rowVersion: string
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type TopologyNode = {
+  configurationItemId: string
+  ciNumber: string
+  name: string
+  ciTypeKey: string
+  ciTypeName: string
+  status: string
+  criticality: string | null
+  manufacturer: string | null
+  model: string | null
+  serialNumber: string | null
+  locationId: string | null
+  positionX: number | null
+  positionY: number | null
+  identities: CiNetworkIdentity[]
+}
+
+export type TopologyEdge = {
+  relationshipId: string
+  sourceCiId: string
+  targetCiId: string
+  relationshipType: string
+  fromPort: string | null
+  toPort: string | null
+  mediaType: string | null
+  linkMode: string | null
+  notes: string | null
+  isConfirmed: boolean
+}
+
+export type TopologyUnmappedDevice = {
+  configurationItemId: string
+  ciNumber: string
+  name: string
+  ciTypeKey: string
+  ciTypeName: string
+  manufacturer: string | null
+  model: string | null
+  serialNumber: string | null
+}
+
+export type NetworkTopologyGraph = {
+  view: NetworkTopologyView
+  nodes: TopologyNode[]
+  edges: TopologyEdge[]
+  unmapped: TopologyUnmappedDevice[]
+}
+
+export type NetworkLinkDetail = {
+  id: string
+  relationshipId: string
+  fromPort: string | null
+  toPort: string | null
+  mediaType: string | null
+  linkMode: string | null
+  notes: string | null
+  isConfirmed: boolean
+  updatedAtUtc: string
+}
+
+export type NetworkDiscoveryProfile = {
+  id: string
+  name: string
+  cidr: string
+  locationId: string | null
+  isActive: boolean
+  timeoutMs: number
+  maxConcurrency: number
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export type NetworkDiscoveryRun = {
+  id: string
+  profileId: string
+  status: string
+  startedAtUtc: string
+  completedAtUtc: string | null
+  startedByUserId: string
+  addressesScanned: number
+  responsiveHosts: number
+  errorSummary: string | null
+  expectedAddressCount: number
+}
+
+export type NetworkDiscoveryObservation = {
+  id: string
+  runId: string
+  ipAddress: string
+  hostname: string | null
+  macAddress: string | null
+  vendor: string | null
+  responseMs: number | null
+  matchStatus: string
+  matchedConfigurationItemId: string | null
+  matchedCiName: string | null
+  observedAtUtc: string
+  reviewStatus: string
 }
 
 export type BusinessServiceItem = {

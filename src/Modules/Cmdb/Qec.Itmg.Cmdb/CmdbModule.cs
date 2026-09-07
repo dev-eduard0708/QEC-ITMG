@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Qec.Itmg.BuildingBlocks.Persistence;
+using Qec.Itmg.Cmdb.Discovery;
 using Qec.Itmg.Cmdb.Persistence;
 using Qec.Itmg.Cmdb.Services;
 using Qec.Itmg.Contracts.Modules;
@@ -25,5 +26,9 @@ public sealed class CmdbModule : IModule
         services.AddScoped<CiRelationshipService>();
         services.AddScoped<AssetService>();
         services.AddScoped<BusinessServiceService>();
+        services.AddScoped<NetworkTopologyService>();
+        services.AddScoped<NetworkDiscoveryService>();
+        services.AddSingleton<INetworkDiscoveryRunQueue, NetworkDiscoveryRunQueue>();
+        services.AddSingleton<INetworkDiscoveryProvider, IcmpDnsDiscoveryProvider>();
     }
 }

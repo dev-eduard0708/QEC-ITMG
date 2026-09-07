@@ -16,6 +16,8 @@ Asset and CI overlap but are not identical. UI may show a combined “laptop” 
 
 Computers, laptops, servers, VMs, network devices, printers, applications, databases, network links, services, integrations/interfaces, endpoints, facilities (limited).
 
+Seeded network types: `network-device`, `firewall`, `network-link` (plus laptop/server/application/kiosk).
+
 Licenses: **Asset** (and entitlement), not a default infrastructure CI unless used as a software CI for compliance installs.
 
 ## Relationships
@@ -24,13 +26,35 @@ Typed, directed: `HostedOn`, `DependsOn`, `ConnectsTo`, `RunsOn`, `BackedUpBy`, 
 
 Prevent cycles on selected types if needed (warning first).
 
+## Manual Topology
+
+**Manual Topology** (`/it/cmdb/network-topology`) is the **approved CMDB network truth**.
+
+- Nodes are existing Configuration Items (network-relevant types, `ConnectsTo` participants, or placed layouts).
+- Edges are authoritative CMDB `ConnectsTo` relationships.
+- Optional `NetworkLinkDetail` stores ports, media, and mode without inventing a second inventory.
+- Saved node positions live in `NetworkTopologyView` / `NetworkTopologyNodeLayout`.
+- Administrators place unmapped devices and create confirmed connections explicitly.
+- Discovery never auto-creates topology links.
+
+## Network Discovery
+
+**Network Discovery** (`/it/cmdb/network-discovery`) is **observed** network data awaiting review.
+
+- Profiles define an explicit IPv4 CIDR (RFC1918 by default), timeout, and concurrency.
+- The ITMG backend scans (ICMP + reverse DNS). The browser does **not** scan the LAN.
+- Observations are suggestions only (`Matched` / `PossibleMatch` / `New` / `Changed`).
+- Humans must Match Existing, Create CI, Accept Changes, or Ignore before CMDB identities change.
+- Discovery **enriches** CMDB; it does **not** bypass CMDB governance or silently overwrite trusted CIs.
+- Accepted/created CIs appear in Manual Topology as unmapped devices until an admin connects them.
+
 ## History
 
 Custody transfers, location changes, assignment, disposal — business audit + `AssetCustodyRecord`.
 
 ## Network identities
 
-Hostname, MAC, IP (may be multiple) as value table on CI, not a second inventory.
+Hostname, MAC, IP (may be multiple) as `CiNetworkIdentity` value table on CI, not a second inventory.
 
 ## Governance registers
 
@@ -38,6 +62,11 @@ Applications register, infrastructure register, interface register, network diag
 
 ## Permissions
 
-`asset.read`, `asset.manage`, `cmdb.read`, `cmdb.manage`, `cmdb.relationship.manage`
+`asset.read`, `asset.manage`, `cmdb.read`, `cmdb.manage`, `cmdb.relationship.manage`, `cmdb.discovery.manage`
+
+- View topology / discovery results: `cmdb.read`
+- Save layouts / manage CIs: `cmdb.manage`
+- Create/edit topology connections: `cmdb.relationship.manage`
+- Scan and accept discovery results: `cmdb.discovery.manage`
 
 Discovery integrations later **enrich**; they do not bypass authorization to delete.

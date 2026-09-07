@@ -52,6 +52,8 @@ import { AiAssistantPage } from '@/features/it/ai-page'
 import { AssetDetailPage } from '@/features/it/asset-detail-page'
 import { AssetsPage } from '@/features/it/assets-page'
 import { CmdbPage } from '@/features/it/cmdb-page'
+import { NetworkTopologyPage } from '@/features/it/network-topology-page'
+import { NetworkDiscoveryPage } from '@/features/it/network-discovery-page'
 import { ItHomePage } from '@/features/it/it-home-page'
 import { ItKnowledgePage } from '@/features/it/knowledge-page'
 import { ProblemDetailPage } from '@/features/it/problem-detail-page'
@@ -127,6 +129,8 @@ export function AppRouter() {
           </Route>
           <Route element={<RequirePermission permission="cmdb.read" />}>
             <Route path="it/cmdb" element={<CmdbPage />} />
+            <Route path="it/cmdb/network-topology" element={<NetworkTopologyPage />} />
+            <Route path="it/cmdb/network-discovery" element={<NetworkDiscoveryPage />} />
           </Route>
           <Route element={<RequirePermission permission="tickets.read" />}>
             <Route path="it/tickets" element={<TicketsPage />} />

@@ -23,6 +23,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Radio,
+  Radar,
   RefreshCw,
   Scale,
   ScrollText,
@@ -192,7 +193,19 @@ function buildNavGroups(can: (permissionKey: string) => boolean): NavGroupDef[] 
         { to: '/it/events', labelKey: 'nav.events', icon: Radio, visible: can('event.read') },
         { to: '/it/operations', labelKey: 'nav.operations', icon: Wrench, visible: can('ops.read') },
         { to: '/it/assets', labelKey: 'nav.assets', icon: Monitor, visible: can('assets.read') },
-        { to: '/it/cmdb', labelKey: 'nav.cmdb', icon: Network, visible: can('cmdb.read') },
+        { to: '/it/cmdb', labelKey: 'nav.cmdbItems', icon: Network, visible: can('cmdb.read') },
+        {
+          to: '/it/cmdb/network-topology',
+          labelKey: 'nav.networkTopology',
+          icon: Network,
+          visible: can('cmdb.read'),
+        },
+        {
+          to: '/it/cmdb/network-discovery',
+          labelKey: 'nav.networkDiscovery',
+          icon: Radar,
+          visible: can('cmdb.read'),
+        },
         { to: '/it/knowledge', labelKey: 'nav.knowledgeAdmin', icon: BookOpen, visible: can('kb.read') },
         {
           to: '/it/remote-support',
@@ -782,7 +795,9 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
   if (pathname.startsWith('/it/policies')) return t('nav.policies')
   if (pathname.startsWith('/it/documents')) return t('nav.documents')
   if (pathname.startsWith('/it/knowledge')) return t('nav.knowledgeAdmin')
-  if (pathname.startsWith('/it/cmdb')) return t('nav.cmdb')
+  if (pathname.startsWith('/it/cmdb/network-topology')) return t('nav.networkTopology')
+  if (pathname.startsWith('/it/cmdb/network-discovery')) return t('nav.networkDiscovery')
+  if (pathname.startsWith('/it/cmdb')) return t('nav.cmdbItems')
   if (pathname.startsWith('/it/controls')) return t('nav.controls')
   if (pathname.startsWith('/it/compliance')) return t('nav.compliance')
   if (pathname.startsWith('/it/evidence')) return t('nav.evidence')

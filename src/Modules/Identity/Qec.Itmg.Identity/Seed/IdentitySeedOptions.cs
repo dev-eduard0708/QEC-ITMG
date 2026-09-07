@@ -33,6 +33,8 @@ public static class IdentitySeedCatalog
         ("organization.hierarchy.manage", "Manage positions and assignments"),
         ("cmdb.read", "View configuration items and CMDB data"),
         ("cmdb.manage", "Manage configuration items and CMDB data"),
+        ("cmdb.relationship.manage", "Create and manage CMDB relationships and network connections"),
+        ("cmdb.discovery.manage", "Manage network discovery profiles, scans, and review actions"),
         ("assets.read", "View assets"),
         ("assets.manage", "Manage assets"),
         ("tickets.read", "View service desk tickets"),

@@ -23,6 +23,20 @@ public sealed class CmdbDbContext(DbContextOptions<CmdbDbContext> options) : DbC
     public DbSet<BusinessServiceConfigurationItem> BusinessServiceConfigurationItems =>
         Set<BusinessServiceConfigurationItem>();
 
+    public DbSet<CiNetworkIdentity> CiNetworkIdentities => Set<CiNetworkIdentity>();
+
+    public DbSet<NetworkTopologyView> NetworkTopologyViews => Set<NetworkTopologyView>();
+
+    public DbSet<NetworkTopologyNodeLayout> NetworkTopologyNodeLayouts => Set<NetworkTopologyNodeLayout>();
+
+    public DbSet<NetworkLinkDetail> NetworkLinkDetails => Set<NetworkLinkDetail>();
+
+    public DbSet<NetworkDiscoveryProfile> NetworkDiscoveryProfiles => Set<NetworkDiscoveryProfile>();
+
+    public DbSet<NetworkDiscoveryRun> NetworkDiscoveryRuns => Set<NetworkDiscoveryRun>();
+
+    public DbSet<NetworkDiscoveryObservation> NetworkDiscoveryObservations => Set<NetworkDiscoveryObservation>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);

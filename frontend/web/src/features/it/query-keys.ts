@@ -10,6 +10,11 @@ export const cmdbKeys = {
   types: () => [...cmdbKeys.all, 'types'] as const,
   cis: (search: string) => [...cmdbKeys.all, 'cis', search] as const,
   relationships: (ciId: string) => [...cmdbKeys.all, 'relationships', ciId] as const,
+  topologyGraph: (filters: string) => [...cmdbKeys.all, 'topology', filters] as const,
+  discoveryProfiles: () => [...cmdbKeys.all, 'discovery', 'profiles'] as const,
+  discoveryRun: (id: string) => [...cmdbKeys.all, 'discovery', 'run', id] as const,
+  discoveryObservations: (runId: string) =>
+    [...cmdbKeys.all, 'discovery', 'observations', runId] as const,
 }
 
 export const equipmentKeys = {
