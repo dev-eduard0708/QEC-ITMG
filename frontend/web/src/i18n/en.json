@@ -44,6 +44,8 @@
   "shell.closeMenu": "Close navigation",
   "shell.collapseSidebar": "Collapse sidebar",
   "shell.expandSidebar": "Expand sidebar",
+  "shell.expandAllNav": "Expand all sections",
+  "shell.collapseAllNav": "Collapse all sections",
   "shell.devOnly": "Development only",
   "shell.sidebarNote": "Workspace shells only. Business modules will appear as implementation phases complete.",
   "shell.theme": "Theme",

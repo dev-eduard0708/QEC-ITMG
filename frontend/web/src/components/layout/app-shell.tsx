@@ -15,6 +15,8 @@ import {
   Laptop,
   LayoutDashboard,
   LifeBuoy,
+  ListCollapse,
+  ListTree,
   LogOut,
   Menu,
   Monitor,
@@ -156,6 +158,78 @@ function writeGroupState(state: Record<string, boolean>) {
     sessionStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(state))
   } catch {
     /* ignore */
+  }
+}
+
+function useSidebarGroupOpen(groups: NavGroupDef[]) {
+  const location = useLocation()
+  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(() => readGroupState())
+
+  const effectiveOpen = useMemo(() => {
+    const next: Record<string, boolean> = { ...groupOpen }
+    for (const group of groups) {
+      const visible = group.items.filter((item) => item.visible)
+      if (visible.length === 0) continue
+      // Respect an explicit user toggle; only auto-open when unset.
+      if (next[group.id] !== undefined) continue
+
+      const active = visible.some((item) => pathMatches(location.pathname, item.to, item.end))
+      if (active) {
+        next[group.id] = true
+      } else if (group.id === 'my-workspace' && location.pathname.startsWith('/employee')) {
+        next[group.id] = true
+      } else if (
+        group.id === 'it-operations' &&
+        (location.pathname === '/it' || location.pathname.startsWith('/it/'))
+      ) {
+        next[group.id] = true
+      } else {
+        next[group.id] = false
+      }
+    }
+    return next
+  }, [groupOpen, groups, location.pathname])
+
+  const visibleGroupIds = useMemo(
+    () =>
+      groups
+        .filter((group) => group.items.some((item) => item.visible))
+        .map((group) => group.id),
+    [groups],
+  )
+
+  const allGroupsExpanded =
+    visibleGroupIds.length > 0 && visibleGroupIds.every((id) => effectiveOpen[id] ?? false)
+
+  function isGroupOpen(id: string): boolean {
+    return effectiveOpen[id] ?? false
+  }
+
+  function toggleGroup(id: string) {
+    setGroupOpen((prev) => {
+      const currentlyOpen = effectiveOpen[id] ?? false
+      const next = { ...prev, [id]: !currentlyOpen }
+      writeGroupState(next)
+      return next
+    })
+  }
+
+  function toggleAllGroups() {
+    const nextOpen = !allGroupsExpanded
+    setGroupOpen((prev) => {
+      const next = { ...prev }
+      for (const id of visibleGroupIds) next[id] = nextOpen
+      writeGroupState(next)
+      return next
+    })
+  }
+
+  return {
+    visibleGroupIds,
+    allGroupsExpanded,
+    isGroupOpen,
+    toggleGroup,
+    toggleAllGroups,
   }
 }
 
@@ -477,56 +551,19 @@ function SidebarContent({
   onToggleCollapsed,
   onNavigate,
   showCollapseControl,
+  isGroupOpen,
+  onToggleGroup,
 }: {
   collapsed: boolean
   onToggleCollapsed?: () => void
   onNavigate?: () => void
   showCollapseControl?: boolean
+  isGroupOpen: (id: string) => boolean
+  onToggleGroup: (id: string) => void
 }) {
   const { t } = useTranslation()
   const { can } = useAuth()
-  const location = useLocation()
   const groups = useMemo(() => buildNavGroups(can), [can])
-
-  const [groupOpen, setGroupOpen] = useState<Record<string, boolean>>(() => readGroupState())
-
-  const effectiveOpen = useMemo(() => {
-    const next: Record<string, boolean> = { ...groupOpen }
-    for (const group of groups) {
-      const visible = group.items.filter((item) => item.visible)
-      if (visible.length === 0) continue
-      // Respect an explicit user toggle; only auto-open when unset.
-      if (next[group.id] !== undefined) continue
-
-      const active = visible.some((item) => pathMatches(location.pathname, item.to, item.end))
-      if (active) {
-        next[group.id] = true
-      } else if (group.id === 'my-workspace' && location.pathname.startsWith('/employee')) {
-        next[group.id] = true
-      } else if (
-        group.id === 'it-operations' &&
-        (location.pathname === '/it' || location.pathname.startsWith('/it/'))
-      ) {
-        next[group.id] = true
-      } else {
-        next[group.id] = false
-      }
-    }
-    return next
-  }, [groupOpen, groups, location.pathname])
-
-  function toggleGroup(id: string) {
-    setGroupOpen((prev) => {
-      const currentlyOpen = effectiveOpen[id] ?? false
-      const next = { ...prev, [id]: !currentlyOpen }
-      writeGroupState(next)
-      return next
-    })
-  }
-
-  function isGroupOpen(id: string): boolean {
-    return effectiveOpen[id] ?? false
-  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-sidebar text-sidebar-foreground">
@@ -545,7 +582,7 @@ function SidebarContent({
             group={group}
             collapsed={collapsed}
             open={isGroupOpen(group.id)}
-            onToggle={() => toggleGroup(group.id)}
+            onToggle={() => onToggleGroup(group.id)}
             onNavigate={onNavigate}
           />
         ))}
@@ -834,9 +871,13 @@ function workspaceTitle(pathname: string, t: (key: string) => string) {
 
 export function AppShell() {
   const { t } = useTranslation()
+  const { can } = useAuth()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(readCollapsedPreference)
+  const groups = useMemo(() => buildNavGroups(can), [can])
+  const { visibleGroupIds, allGroupsExpanded, isGroupOpen, toggleGroup, toggleAllGroups } =
+    useSidebarGroupOpen(groups)
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -858,6 +899,8 @@ export function AppShell() {
           collapsed={collapsed}
           onToggleCollapsed={toggleCollapsed}
           showCollapseControl
+          isGroupOpen={isGroupOpen}
+          onToggleGroup={toggleGroup}
         />
       </aside>
 
@@ -880,9 +923,29 @@ export function AppShell() {
                   collapsed={false}
                   onNavigate={() => setMobileOpen(false)}
                   showCollapseControl={false}
+                  isGroupOpen={isGroupOpen}
+                  onToggleGroup={toggleGroup}
                 />
               </SheetContent>
             </Sheet>
+
+            {visibleGroupIds.length > 0 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
+                aria-label={allGroupsExpanded ? t('shell.collapseAllNav') : t('shell.expandAllNav')}
+                title={allGroupsExpanded ? t('shell.collapseAllNav') : t('shell.expandAllNav')}
+                onClick={toggleAllGroups}
+              >
+                {allGroupsExpanded ? (
+                  <ListCollapse className="h-4 w-4" aria-hidden />
+                ) : (
+                  <ListTree className="h-4 w-4" aria-hidden />
+                )}
+              </Button>
+            ) : null}
 
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-foreground">{t('brand.name')}</div>

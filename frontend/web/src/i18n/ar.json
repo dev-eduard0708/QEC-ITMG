@@ -44,6 +44,8 @@
   "shell.closeMenu": "إغلاق القائمة",
   "shell.collapseSidebar": "طي الشريط الجانبي",
   "shell.expandSidebar": "توسيع الشريط الجانبي",
+  "shell.expandAllNav": "توسيع كل الأقسام",
+  "shell.collapseAllNav": "طي كل الأقسام",
   "shell.devOnly": "للتطوير فقط",
   "shell.sidebarNote": "هذه مساحات عمل أولية فقط.",
   "shell.theme": "المظهر",
