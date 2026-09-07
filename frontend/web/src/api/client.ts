@@ -2114,6 +2114,15 @@ export type ManagedDocument = {
   translationComplete?: boolean
 }
 
+export type DocumentWarning = {
+  code: string
+}
+
+export type DocumentPublishResult = {
+  document: ManagedDocument
+  warnings: DocumentWarning[]
+}
+
 export type DocumentListResult = OpsPaged<ManagedDocument> & {
   reviewOverdueCount: number
   reviewDueSoonCount: number
@@ -2246,7 +2255,8 @@ export const documentsApi = {
       method: 'POST',
       body: JSON.stringify({ reason }),
     }),
-  publish: (id: string) => apiFetch<ManagedDocument>(`/api/v1/documents/${id}/publish`, { method: 'POST' }),
+  publish: (id: string) =>
+    apiFetch<DocumentPublishResult>(`/api/v1/documents/${id}/publish`, { method: 'POST' }),
   retire: (id: string, reason: string) =>
     apiFetch<ManagedDocument>(`/api/v1/documents/${id}/retire`, {
       method: 'POST',
@@ -2353,7 +2363,8 @@ export const policiesApi = {
       method: 'POST',
       body: JSON.stringify({ reason }),
     }),
-  publish: (id: string) => apiFetch<ManagedDocument>(`/api/v1/policies/${id}/publish`, { method: 'POST' }),
+  publish: (id: string) =>
+    apiFetch<DocumentPublishResult>(`/api/v1/policies/${id}/publish`, { method: 'POST' }),
   assign: (
     id: string,
     payload: {

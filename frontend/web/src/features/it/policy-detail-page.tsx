@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { toast } from '@/components/ui/toast-store'
 import { usePolicyUsers } from '@/features/it/policy-users'
 import { cn } from '@/lib/utils'
 
@@ -90,6 +91,25 @@ export function PolicyDetailPage() {
     onError: (err) => setError(err instanceof ApiError ? err.message : t('docs.error.generic')),
   })
 
+  const publishMutation = useMutation({
+    mutationFn: () => policiesApi.publish(id),
+    onSuccess: async (result) => {
+      setError(null)
+      setNotice(null)
+      const missingArabic = result.warnings.some((w) => w.code === 'policy.arabic_content_missing')
+      if (missingArabic) {
+        toast.info(
+          t('policyMgmt.i18n.publishWarningAr'),
+          t('policyMgmt.i18n.publishWarningArDesc'),
+        )
+      } else {
+        toast.success(t('policyMgmt.i18n.publishSuccess'))
+      }
+      await invalidateAll()
+    },
+    onError: (err) => setError(err instanceof ApiError ? err.message : t('docs.error.generic')),
+  })
+
   const doc = docQuery.data
 
   if (docQuery.isLoading) return <p className="text-sm text-muted-foreground">{t('docs.loading')}</p>
@@ -127,11 +147,11 @@ export function PolicyDetailPage() {
         canManage={canManage}
         canApprove={canApprove}
         nameFor={nameFor}
-        busy={run.isPending}
+        busy={run.isPending || publishMutation.isPending}
         onSubmit={() => run.mutate(() => policiesApi.submit(id))}
         onApprove={() => run.mutate(() => policiesApi.approve(id))}
         onReturn={() => run.mutate(() => policiesApi.returnToDraft(id))}
-        onPublish={() => run.mutate(() => policiesApi.publish(id))}
+        onPublish={() => publishMutation.mutate()}
         onRevise={() => run.mutate(() => policiesApi.createRevision(id))}
       />
 
@@ -373,12 +393,16 @@ function ContentSection({
           <CardDescription>{t('policyMgmt.content.description')}</CardDescription>
           <div className="flex flex-wrap gap-2 pt-1 text-xs">
             <Badge variant={enComplete || doc.hasEnglishContent ? 'success' : 'warning'}>
-              {t('policyMgmt.i18n.english')}{' '}
-              {enComplete || doc.hasEnglishContent ? '✓' : t('policyMgmt.i18n.missingShort')}
+              {t('policyMgmt.i18n.english')}:{' '}
+              {enComplete || doc.hasEnglishContent
+                ? t('policyMgmt.i18n.available')
+                : t('policyMgmt.i18n.notAvailable')}
             </Badge>
             <Badge variant={arComplete || doc.hasArabicContent ? 'success' : 'warning'}>
-              {t('policyMgmt.i18n.arabic')}{' '}
-              {arComplete || doc.hasArabicContent ? '✓' : t('policyMgmt.i18n.missingShort')}
+              {t('policyMgmt.i18n.arabic')}:{' '}
+              {arComplete || doc.hasArabicContent
+                ? t('policyMgmt.i18n.available')
+                : t('policyMgmt.i18n.notAvailable')}
             </Badge>
             {!(doc.translationComplete || (enComplete && arComplete)) ? (
               <Badge variant="outline">{t('policyMgmt.i18n.incomplete')}</Badge>

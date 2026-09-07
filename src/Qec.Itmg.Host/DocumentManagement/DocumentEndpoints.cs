@@ -426,9 +426,9 @@ public static class DocumentEndpoints
             if (session is null) return SessionUnavailable();
             try
             {
-                DocumentDto updated = await svc.PublishAsync(id, session.Id, ct);
-                await notifications.NotifyPublishedAsync(updated, ct);
-                return Results.Ok(updated);
+                DocumentPublishResult published = await svc.PublishAsync(id, session.Id, ct);
+                await notifications.NotifyPublishedAsync(published.Document, ct);
+                return Results.Ok(published);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(managePerm);

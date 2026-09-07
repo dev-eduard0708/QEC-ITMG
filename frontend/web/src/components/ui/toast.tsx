@@ -42,7 +42,12 @@ export function Toaster(): ReactNode {
           )}
         >
           <ToastIcon variant={item.variant} />
-          <p className="min-w-0 flex-1 leading-snug">{item.message}</p>
+          <div className="min-w-0 flex-1 space-y-0.5 leading-snug">
+            <p>{item.message}</p>
+            {item.description ? (
+              <p className="text-xs text-muted-foreground">{item.description}</p>
+            ) : null}
+          </div>
           <button
             type="button"
             className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

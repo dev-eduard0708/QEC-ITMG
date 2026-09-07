@@ -3,6 +3,7 @@ export type ToastVariant = 'success' | 'error' | 'info'
 export type ToastItem = {
   id: number
   message: string
+  description?: string
   variant: ToastVariant
 }
 
@@ -16,11 +17,11 @@ function emit() {
   for (const listener of listeners) listener()
 }
 
-function push(message: string, variant: ToastVariant) {
+function push(message: string, variant: ToastVariant, description?: string) {
   const id = nextId++
-  toasts = [...toasts, { id, message, variant }].slice(-4)
+  toasts = [...toasts, { id, message, description, variant }].slice(-4)
   emit()
-  window.setTimeout(() => dismissToast(id), 4500)
+  window.setTimeout(() => dismissToast(id), description ? 6500 : 4500)
   return id
 }
 
@@ -43,8 +44,8 @@ export function getToasts() {
 }
 
 export const toast = {
-  success: (message: string) => push(message, 'success'),
-  error: (message: string) => push(message, 'error'),
-  info: (message: string) => push(message, 'info'),
+  success: (message: string, description?: string) => push(message, 'success', description),
+  error: (message: string, description?: string) => push(message, 'error', description),
+  info: (message: string, description?: string) => push(message, 'info', description),
   dismiss: dismissToast,
 }

@@ -32,6 +32,12 @@ public sealed record DocumentDto(
     bool HasArabicContent = false,
     bool TranslationComplete = false);
 
+public sealed record DocumentWarningDto(string Code);
+
+public sealed record DocumentPublishResult(
+    DocumentDto Document,
+    IReadOnlyList<DocumentWarningDto> Warnings);
+
 public sealed record DocumentListResult(
     IReadOnlyList<DocumentDto> Items, int TotalCount, int Page, int PageSize,
     int ReviewOverdueCount, int ReviewDueSoonCount,
@@ -477,7 +483,7 @@ public sealed class DocumentService(
         return (await GetAsync(id, true, true, ct))!;
     }
 
-    public async Task<DocumentDto> PublishAsync(Guid id, Guid actorUserId, CancellationToken ct)
+    public async Task<DocumentPublishResult> PublishAsync(Guid id, Guid actorUserId, CancellationToken ct)
     {
         if (actorUserId == Guid.Empty) throw new ArgumentException("Actor is required.", nameof(actorUserId));
         ManagedDocument doc = await LoadAsync(id, ct);
@@ -491,14 +497,22 @@ public sealed class DocumentService(
         if (version.ApprovedAtUtc is null)
             throw new InvalidOperationException("Current version is not approved.");
 
+        List<DocumentWarningDto> warnings = [];
+        bool arabicContentPresent = true;
         if (doc.DocumentType == DocumentType.Policy)
         {
             DocumentLocalizationBundle loc = await DocumentLocalization.LoadBundleAsync(
                 db, doc.Id, version.Id, doc, version, ct);
-            if (!loc.HasEnglishContent || !loc.HasArabicContent)
+            if (!loc.HasEnglishContent)
             {
                 throw new InvalidOperationException(
-                    "Arabic policy content is required before publication. / المحتوى العربي للسياسة مطلوب قبل النشر.");
+                    "English policy content is required before publication. / المحتوى الإنجليزي للسياسة مطلوب قبل النشر.");
+            }
+
+            arabicContentPresent = loc.HasArabicContent;
+            if (!arabicContentPresent)
+            {
+                warnings.Add(new DocumentWarningDto("policy.arabic_content_missing"));
             }
         }
 
@@ -509,11 +523,15 @@ public sealed class DocumentService(
         doc.TransitionTo(DocumentStatus.Published, clock.UtcNow);
         doc.SetEffectiveDateIfMissing(clock.UtcNow, clock.UtcNow);
 
+        string? publishReason = doc.DocumentType == DocumentType.Policy
+            ? $"ArabicContentPresent={(arabicContentPresent ? "true" : "false")}"
+            : null;
         await businessAudit.AppendAsync(DocumentAudit.Field(
             doc.Id, doc.DocumentNumber, "PolicyPublished", from.ToString(), nameof(DocumentStatus.Published),
-            BusinessAuditAction.StatusChanged), ct);
+            BusinessAuditAction.StatusChanged, publishReason), ct);
         await db.SaveChangesAsync(ct);
-        return (await GetAsync(id, true, true, ct))!;
+        DocumentDto dto = (await GetAsync(id, true, true, ct))!;
+        return new DocumentPublishResult(dto, warnings);
     }
 
     public async Task<DocumentDto> RetireAsync(Guid id, string reason, CancellationToken ct)

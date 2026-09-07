@@ -12,6 +12,15 @@ Number, title, type, owner, approver, version, effective date, review date, clas
 
 Draft → In Review → Approved → Published → Superseded / Retired. Historic versions immutable.
 
+## Languages (EN / AR)
+
+Policies support bilingual title and body content. **English content is required to publish.** Arabic content is **strongly recommended but not publication-blocking**.
+
+- Publishing with missing Arabic succeeds and returns warning `policy.arabic_content_missing`.
+- The UI shows language availability (Available / Not available) and a non-blocking toast when Arabic is absent.
+- Employee Arabic views continue to fall back to English when Arabic is unavailable.
+- Do not auto-generate Arabic translations.
+
 ## Workflow responsibilities
 
 Each policy carries four named responsibilities: **Policy Owner**, **Reviewer**, **Approver**, and **Publisher** (`OwnerUserId`, `ReviewerUserId`, `DesignatedApproverUserId`, `PublisherUserId`). They are set from the policy detail page, including an "assign all to me" shortcut for small teams.
