@@ -102,6 +102,7 @@ export function AccessPage() {
         status: status === 'all' ? undefined : status,
         queue,
       }),
+    enabled: Boolean(user?.id),
     refetchInterval: 12_000,
     refetchOnWindowFocus: true,
   })
@@ -110,6 +111,7 @@ export function AccessPage() {
     queries: visibleQueues.map((tab) => ({
       queryKey: ['access', 'cases', 'count', user?.id, tab.id] as const,
       queryFn: () => accessApi.listCases({ pageSize: 1, queue: tab.id }),
+      enabled: Boolean(user?.id),
       refetchInterval: 12_000,
       refetchOnWindowFocus: true,
     })),

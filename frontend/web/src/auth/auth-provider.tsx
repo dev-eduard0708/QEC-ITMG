@@ -53,10 +53,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const previousId = previousUserIdRef.current
     previousUserIdRef.current = nextId
     if (previousId === undefined || previousId === nextId) return
-    void Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['access'] }),
-      queryClient.invalidateQueries({ queryKey: ['me', 'notifications'] }),
-    ])
+    // Drop actor-sensitive Access caches so persona/user switch never reuses another
+    // user's case actions / queues. Leave static catalog/category queries intact.
+    queryClient.removeQueries({
+      predicate: (query) => {
+        const key = query.queryKey
+        if (!Array.isArray(key) || key[0] !== 'access') return false
+        const scope = key[1]
+        return scope === 'case' || scope === 'cases' || scope === 'users'
+      },
+    })
+    queryClient.removeQueries({ queryKey: ['me', 'notifications'] })
   }, [queryClient, user?.id])
 
   const can = useCallback(
@@ -68,7 +75,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   )
 
   const refresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: meKeys.session() })
+    await queryClient.refetchQueries({ queryKey: meKeys.session() })
   }, [queryClient])
 
   const logout = useCallback(async () => {

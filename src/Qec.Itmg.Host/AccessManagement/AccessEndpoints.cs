@@ -653,14 +653,19 @@ public static class AccessEndpoints
         AccessCaseService svc,
         CancellationToken ct)
     {
+        // Actor must be the authoritative ITMG SQL User.Id (never email/OIDC sub/persona key).
+        Guid actorUserId = session.Id;
+        bool has(string permission) =>
+            session.Permissions.Any(p => string.Equals(p, permission, StringComparison.OrdinalIgnoreCase));
+
         AccessCaseActionsDto actions = await svc.ResolveActionsAsync(
             accessCase,
-            session.Id,
-            session.Permissions.Contains(AccessRequest),
-            session.Permissions.Contains(AccessApprove),
-            session.Permissions.Contains(AccessFulfill),
+            actorUserId,
+            has(AccessRequest),
+            has(AccessApprove),
+            has(AccessFulfill),
             ct,
-            hasAccessConfigure: session.Permissions.Contains(AccessConfigure));
+            hasAccessConfigure: has(AccessConfigure));
         return accessCase with { Actions = actions };
     }
 

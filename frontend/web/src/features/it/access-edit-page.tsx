@@ -10,6 +10,7 @@ import {
   type AccessCategoryEntitlement,
   type AccessEntitlement,
 } from '@/api/client'
+import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -51,7 +52,9 @@ export function AccessEditPage() {
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const language = isAppLanguage(i18n.language) ? i18n.language : 'en'
+  const { user } = useAuth()
   const { nameFor } = useAccessUsers()
+  const actorId = user?.id
   const [reason, setReason] = useState('')
   const [grants, setGrants] = useState<GrantDraft[]>([])
   const [customName, setCustomName] = useState('')
@@ -60,14 +63,14 @@ export function AccessEditPage() {
   const [hydrated, setHydrated] = useState(false)
 
   const caseQuery = useQuery({
-    queryKey: ['access', 'case', id],
+    queryKey: ['access', 'case', id, actorId],
     queryFn: () => accessApi.getCase(id),
-    enabled: !!id,
+    enabled: !!id && !!actorId,
   })
   const itemsQuery = useQuery({
-    queryKey: ['access', 'case', id, 'items'],
+    queryKey: ['access', 'case', id, actorId, 'items'],
     queryFn: () => accessApi.listItems(id),
-    enabled: !!id,
+    enabled: !!id && !!actorId,
   })
   const categoryId = caseQuery.data?.accessCategoryId ?? null
   const categoryEntitlementsQuery = useQuery({

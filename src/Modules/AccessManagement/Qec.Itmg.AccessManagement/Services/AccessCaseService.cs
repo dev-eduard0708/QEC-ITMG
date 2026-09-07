@@ -277,7 +277,9 @@ public sealed class AccessCaseService(
         bool canSubmit = isDraft && (hasAccessRequest || isRequester);
         bool canResubmit = isRework && (hasAccessRequest || isRequester);
         bool canEditRequest = (isDraft || isRework) && (hasAccessRequest || isRequester || hasAccessConfigure);
-        bool isRoutedApproverMissingPermission = isApproval && isSnapshottedApprover && !hasAccessApprove;
+        // Routed Approver (snapshot or legacy) without access.approve → explicit warning, never silent.
+        bool isRoutedApproverMissingPermission =
+            isApproval && !hasAccessApprove && (isSnapshottedApprover || isRoutedApprover);
 
         return Task.FromResult(new AccessCaseActionsDto(
             canSubmit,

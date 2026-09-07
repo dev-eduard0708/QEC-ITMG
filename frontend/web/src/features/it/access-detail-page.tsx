@@ -10,6 +10,7 @@ import {
   type AccessCaseRouteParticipant,
   type AccessEvidenceProjection,
 } from '@/api/client'
+import { useAuth } from '@/auth/auth-provider'
 import { PageHeader } from '@/components/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -81,8 +82,10 @@ export function AccessDetailPage() {
   const { id = '' } = useParams()
   const { t, i18n } = useTranslation()
   const language = isAppLanguage(i18n.language) ? i18n.language : 'en'
+  const { user } = useAuth()
   const { nameFor } = useAccessUsers()
   const qc = useQueryClient()
+  const actorId = user?.id
   const [entitlement, setEntitlement] = useState('')
   const [action, setAction] = useState('Grant')
   const [existingKey, setExistingKey] = useState('')
@@ -98,35 +101,36 @@ export function AccessDetailPage() {
   const [fallbackOpen, setFallbackOpen] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
 
+  // AccessCase.actions are actor-specific — always scope the cache by SQL user id.
   const caseQuery = useQuery({
-    queryKey: ['access', 'case', id],
+    queryKey: ['access', 'case', id, actorId],
     queryFn: () => accessApi.getCase(id),
-    enabled: !!id,
+    enabled: !!id && !!actorId,
   })
   const itemsQuery = useQuery({
-    queryKey: ['access', 'case', id, 'items'],
+    queryKey: ['access', 'case', id, actorId, 'items'],
     queryFn: () => accessApi.listItems(id),
-    enabled: !!id,
+    enabled: !!id && !!actorId,
   })
   const existingQuery = useQuery({
-    queryKey: ['access', 'case', id, 'existing'],
+    queryKey: ['access', 'case', id, actorId, 'existing'],
     queryFn: () => accessApi.listExistingAccess(id),
-    enabled: !!id && caseQuery.data?.type === 'Mover',
+    enabled: !!id && !!actorId && caseQuery.data?.type === 'Mover',
   })
   const revisionsQuery = useQuery({
-    queryKey: ['access', 'case', id, 'revisions'],
+    queryKey: ['access', 'case', id, actorId, 'revisions'],
     queryFn: () => accessApi.listRevisions(id),
-    enabled: !!id,
+    enabled: !!id && !!actorId,
   })
   const currentAccessQuery = useQuery({
-    queryKey: ['access', 'users', caseQuery.data?.subjectUserId, 'current-access'],
+    queryKey: ['access', 'users', actorId, caseQuery.data?.subjectUserId, 'current-access'],
     queryFn: () => accessApi.getCurrentAccess(caseQuery.data!.subjectUserId!, { activeOnly: true }),
-    enabled: Boolean(caseQuery.data?.subjectUserId),
+    enabled: Boolean(actorId && caseQuery.data?.subjectUserId),
   })
 
   const invalidate = async () => {
     await Promise.all([
-      qc.invalidateQueries({ queryKey: ['access', 'case', id] }),
+      qc.invalidateQueries({ queryKey: ['access', 'case', id, actorId] }),
       qc.invalidateQueries({ queryKey: ['access', 'cases'] }),
       qc.invalidateQueries({ queryKey: ['me', 'notifications'] }),
     ])
@@ -224,7 +228,7 @@ export function AccessDetailPage() {
   const completeItem = (itemId: string) => {
     run.mutate(async () => {
       await accessApi.completeItem(id, itemId)
-      await qc.invalidateQueries({ queryKey: ['access', 'case', id, 'items'] })
+      await qc.invalidateQueries({ queryKey: ['access', 'case', id, actorId, 'items'] })
     })
   }
 
@@ -664,7 +668,7 @@ export function AccessDetailPage() {
                         run.mutate(async () => {
                           await accessApi.addExistingAccess(id, { entitlementKey: existingKey })
                           setExistingKey('')
-                          await qc.invalidateQueries({ queryKey: ['access', 'case', id, 'existing'] })
+                          await qc.invalidateQueries({ queryKey: ['access', 'case', id, actorId, 'existing'] })
                         })
                       }
                     >
@@ -713,7 +717,7 @@ export function AccessDetailPage() {
                       run.mutate(async () => {
                         await accessApi.addItem(id, { entitlementKey: entitlement, action })
                         setEntitlement('')
-                        await qc.invalidateQueries({ queryKey: ['access', 'case', id, 'items'] })
+                        await qc.invalidateQueries({ queryKey: ['access', 'case', id, actorId, 'items'] })
                       })
                     }
                   >
