@@ -69,6 +69,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const can = useCallback(
     (permissionKey: string) => {
       if (!user) return false
+      // Platform Administrator always has full UI permission (matches API bypass).
+      if (user.roles.some((role) => role.name === 'Platform Administrator')) {
+        return true
+      }
       return user.permissions.includes(permissionKey)
     },
     [user],

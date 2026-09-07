@@ -211,14 +211,29 @@ public sealed class CurrentUserService(
             select new CurrentUserRoleDto(role.Id, role.Name))
             .ToListAsync(cancellationToken);
 
-        List<string> permissions = await db.UserRoles
-            .AsNoTracking()
-            .Where(userRole => userRole.UserId == user.Id)
-            .SelectMany(userRole => userRole.Role.RolePermissions)
-            .Select(rolePermission => rolePermission.Permission.Key)
-            .Distinct()
-            .OrderBy(key => key)
-            .ToListAsync(cancellationToken);
+        bool isPlatformAdmin = roles.Any(role =>
+            string.Equals(
+                role.Name,
+                IdentitySeedCatalog.PlatformAdministratorRoleName,
+                StringComparison.Ordinal));
+
+        // Platform Administrator always receives the full permission catalog in /me
+        // so UI gates (can()) stay complete even when new permissions were just seeded.
+        List<string> permissions = isPlatformAdmin
+            ? await db.Permissions
+                .AsNoTracking()
+                .Select(permission => permission.Key)
+                .Distinct()
+                .OrderBy(key => key)
+                .ToListAsync(cancellationToken)
+            : await db.UserRoles
+                .AsNoTracking()
+                .Where(userRole => userRole.UserId == user.Id)
+                .SelectMany(userRole => userRole.Role.RolePermissions)
+                .Select(rolePermission => rolePermission.Permission.Key)
+                .Distinct()
+                .OrderBy(key => key)
+                .ToListAsync(cancellationToken);
 
         return new CurrentUserDto(
             user.Id,

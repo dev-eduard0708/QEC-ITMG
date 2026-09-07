@@ -299,6 +299,12 @@ function buildNavGroups(can: (permissionKey: string) => boolean): NavGroupDef[] 
             can('organization.hierarchy.manage'),
         },
         {
+          to: '/it/admin/organization/hierarchy',
+          labelKey: 'nav.itHierarchy',
+          icon: Users,
+          visible: can('organization.hierarchy.read') || can('organization.hierarchy.manage'),
+        },
+        {
           to: '/it/admin/integrations',
           labelKey: 'nav.integrations',
           icon: Network,

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Qec.Itmg.Identity.Authentication;
 using Qec.Itmg.Identity.Domain;
 using Qec.Itmg.Identity.Persistence;
+using Qec.Itmg.Identity.Seed;
 
 namespace Qec.Itmg.Identity.Authorization;
 
@@ -40,6 +41,21 @@ public sealed class SqlUserPermissionEvaluator(IdentityDbContext dbContext) : IU
         if (userId is null)
         {
             return false;
+        }
+
+        // Platform Administrator always has every catalog permission (even before role links catch up).
+        bool isPlatformAdmin = await dbContext.UserRoles
+            .AsNoTracking()
+            .AnyAsync(
+                userRole =>
+                    userRole.UserId == userId.Value
+                    && userRole.Role.Name == IdentitySeedCatalog.PlatformAdministratorRoleName,
+                cancellationToken);
+        if (isPlatformAdmin)
+        {
+            return await dbContext.Permissions
+                .AsNoTracking()
+                .AnyAsync(permission => permission.Key == normalizedKey, cancellationToken);
         }
 
         return await dbContext.UserRoles
