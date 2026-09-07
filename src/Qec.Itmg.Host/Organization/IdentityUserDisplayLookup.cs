@@ -24,7 +24,7 @@ public sealed class IdentityUserDisplayLookup(IdentityDbContext db) : IUserDispl
                 x.Upn,
                 x.DisplayName,
                 x.Status == UserStatus.Active,
-                null))
+                x.ProfileImageUrl))
             .ToListAsync(cancellationToken);
 
         return users.ToDictionary(x => x.Id);

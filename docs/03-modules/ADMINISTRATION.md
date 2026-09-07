@@ -24,7 +24,7 @@ Provisioned from SSO first login (JIT) with default **Employee** role, or pre-pr
 
 Platform Administrator is a role **composed of** these permissions (and the rest of the system permission catalog), plus break-glass procedures.
 
-Administration UI includes **IT Hierarchy** (`/it/admin/organization/hierarchy`) for the Organization position tree. See [ORGANIZATION.md](ORGANIZATION.md).
+Administration UI includes **QEC Hierarchy** (`/administration/hierarchy`; legacy IT Hierarchy route redirects) for company departments, membership, people, and position trees. See [ORGANIZATION.md](ORGANIZATION.md).
 
 ## Workflows
 

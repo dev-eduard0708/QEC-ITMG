@@ -12,12 +12,15 @@ Related: [ADR-0010](../12-decisions/ADR-0010-authentication.md) · [AUTHORIZATIO
 
 | Google claim | ITMG use |
 | --- | --- |
-| `sub` | `qec_external_id` (stable external id) |
-| `email` | UPN / login email |
-| `name` | Display name |
+| `sub` | `qec_external_id` (stable external id); stored as `User.DirectoryObjectId` |
+| `email` | UPN / login email (bound at provision; not overwritten by routine profile sync) |
+| `name` | Display name (refreshed on each successful Google session) |
+| `picture` | Profile image URL when present (`User.ProfileImageUrl`); UI falls back to initials |
 | `email_verified` | Must be `true` or sign-in fails |
 
-Google groups / IdP role claims **never** grant ITMG permissions. Authorization is SQL RBAC only.
+Google groups / IdP role claims **never** grant ITMG permissions. Authorization is SQL RBAC only. Google department/job-title claims are **not** mapped into Organization membership or positions — see [ORGANIZATION.md](../03-modules/ORGANIZATION.md).
+
+On each successful Google authentication, ITMG safely refreshes display name and profile image URL only. Department membership, position assignments, and RBAC are never modified by Google login.
 
 Optional allow-list: `Authentication:Oidc:AllowedDomains`. Empty list allows any verified Google account (typical Development). Production should restrict to the QEC Google Workspace domain(s).
 

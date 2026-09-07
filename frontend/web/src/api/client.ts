@@ -4932,8 +4932,73 @@ export const remoteSupportApi = {
 
 export type OrganizationDepartmentSummary = {
   id: string
-  name: string
+  nameEn: string
+  nameAr: string | null
+  code: string
+  descriptionEn: string | null
+  descriptionAr: string | null
+  parentDepartmentId: string | null
   isActive: boolean
+  sortOrder: number
+  memberCount: number
+  positionCount: number
+  createdAtUtc: string
+  updatedAtUtc: string
+  rowVersion: string
+  /** @deprecated Prefer nameEn — kept for transitional callers */
+  name?: string
+}
+
+export type OrganizationCompanyDepartmentCard = {
+  id: string
+  nameEn: string
+  nameAr: string | null
+  code: string
+  isActive: boolean
+  peopleCount: number
+  positionCount: number
+  sortOrder: number
+}
+
+export type OrganizationDepartmentMember = {
+  userId: string
+  displayName: string
+  upn: string
+  avatarUrl: string | null
+  isPrimary: boolean
+  isActiveUser: boolean
+  effectiveFrom: string | null
+  createdAtUtc: string
+}
+
+export type OrganizationPeopleRow = {
+  userId: string
+  displayName: string
+  upn: string
+  avatarUrl: string | null
+  isActive: boolean
+  primaryDepartmentId: string | null
+  primaryDepartmentName: string | null
+  additionalDepartmentCount: number
+  positionNames: string[]
+}
+
+export type OrganizationUserProfileSummary = {
+  userId: string
+  displayName: string
+  upn: string
+  avatarUrl: string | null
+  isActive: boolean
+  primaryDepartmentId: string | null
+  primaryDepartmentName: string | null
+  departments: Array<{
+    departmentId: string
+    nameEn: string
+    nameAr: string | null
+    code: string
+    isPrimary: boolean
+  }>
+  positions: OrganizationUserPosition[]
 }
 
 export type OrganizationPositionOccupant = {
@@ -5042,9 +5107,91 @@ export type UpdateOrganizationPositionPayload = {
   isActive: boolean
 }
 
+export type CreateOrganizationDepartmentPayload = {
+  nameEn: string
+  nameAr?: string | null
+  code: string
+  descriptionEn?: string | null
+  descriptionAr?: string | null
+  parentDepartmentId?: string | null
+  sortOrder: number
+}
+
+export type UpdateOrganizationDepartmentPayload = {
+  nameEn: string
+  nameAr?: string | null
+  code: string
+  descriptionEn?: string | null
+  descriptionAr?: string | null
+  parentDepartmentId?: string | null
+  sortOrder: number
+  isActive: boolean
+}
+
 export const organizationHierarchyApi = {
   listDepartments: () =>
     apiFetch<OrganizationDepartmentSummary[]>('/api/v1/organization/departments'),
+  companyView: () =>
+    apiFetch<OrganizationCompanyDepartmentCard[]>(
+      '/api/v1/organization/departments/company-view',
+    ),
+  getDepartment: (id: string) =>
+    apiFetch<OrganizationDepartmentSummary>(`/api/v1/organization/departments/${id}`),
+  createDepartment: (payload: CreateOrganizationDepartmentPayload) =>
+    apiFetch<OrganizationDepartmentSummary>('/api/v1/organization/departments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateDepartment: (id: string, payload: UpdateOrganizationDepartmentPayload) =>
+    apiFetch<OrganizationDepartmentSummary>(`/api/v1/organization/departments/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  deactivateDepartment: (id: string) =>
+    apiFetch<OrganizationDepartmentSummary>(
+      `/api/v1/organization/departments/${id}/deactivate`,
+      { method: 'POST' },
+    ),
+  listMembers: (departmentId: string) =>
+    apiFetch<OrganizationDepartmentMember[]>(
+      `/api/v1/organization/departments/${departmentId}/members`,
+    ),
+  addMember: (departmentId: string, userId: string, isPrimary?: boolean) =>
+    apiFetch<OrganizationDepartmentMember>(
+      `/api/v1/organization/departments/${departmentId}/members`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId, isPrimary }),
+      },
+    ),
+  removeMember: (departmentId: string, userId: string) =>
+    apiFetch<void>(
+      `/api/v1/organization/departments/${departmentId}/members/${userId}`,
+      { method: 'DELETE' },
+    ),
+  setPrimaryDepartment: (departmentId: string, userId: string) =>
+    apiFetch<void>(
+      `/api/v1/organization/departments/${departmentId}/members/${userId}/primary`,
+      { method: 'POST' },
+    ),
+  listPeople: (params?: {
+    search?: string
+    departmentId?: string
+    activeOnly?: boolean
+  }) => {
+    const searchParams = new URLSearchParams()
+    if (params?.search?.trim()) searchParams.set('search', params.search.trim())
+    if (params?.departmentId) searchParams.set('departmentId', params.departmentId)
+    if (params?.activeOnly != null) searchParams.set('activeOnly', String(params.activeOnly))
+    const query = searchParams.toString()
+    return apiFetch<OrganizationPeopleRow[]>(
+      `/api/v1/organization/people${query ? `?${query}` : ''}`,
+    )
+  },
+  getProfileSummary: (userId: string) =>
+    apiFetch<OrganizationUserProfileSummary>(
+      `/api/v1/organization/users/${userId}/profile-summary`,
+    ),
   listPositions: (departmentId?: string, activeOnly?: boolean) => {
     const params = new URLSearchParams()
     if (departmentId) params.set('departmentId', departmentId)
@@ -5083,12 +5230,20 @@ export const organizationHierarchyApi = {
     apiFetch<OrganizationPositionAssignment[]>(
       `/api/v1/organization/positions/${positionId}/assignments`,
     ),
-  assignUser: (positionId: string, userId: string, isPrimary?: boolean) =>
+  assignUser: (
+    positionId: string,
+    userId: string,
+    options?: { isPrimary?: boolean; addToDepartment?: boolean },
+  ) =>
     apiFetch<OrganizationPositionAssignment>(
       `/api/v1/organization/positions/${positionId}/assignments`,
       {
         method: 'POST',
-        body: JSON.stringify({ userId, isPrimary }),
+        body: JSON.stringify({
+          userId,
+          isPrimary: options?.isPrimary,
+          addToDepartment: options?.addToDepartment,
+        }),
       },
     ),
   removeAssignment: (positionId: string, assignmentId: string) =>
@@ -5102,9 +5257,18 @@ export const organizationHierarchyApi = {
     ),
   listUserPositions: (userId: string) =>
     apiFetch<OrganizationUserPosition[]>(`/api/v1/organization/users/${userId}/positions`),
-  searchActiveUsers: (search?: string) => {
-    const query = search?.trim() ? `?search=${encodeURIComponent(search.trim())}` : ''
-    return apiFetch<OrganizationActiveUser[]>(`/api/v1/organization/active-users${query}`)
+  searchActiveUsers: (
+    search?: string,
+    options?: { departmentId?: string; searchAll?: boolean },
+  ) => {
+    const params = new URLSearchParams()
+    if (search?.trim()) params.set('search', search.trim())
+    if (options?.departmentId) params.set('departmentId', options.departmentId)
+    if (options?.searchAll) params.set('searchAll', 'true')
+    const query = params.toString()
+    return apiFetch<OrganizationActiveUser[]>(
+      `/api/v1/organization/active-users${query ? `?${query}` : ''}`,
+    )
   },
 }
 

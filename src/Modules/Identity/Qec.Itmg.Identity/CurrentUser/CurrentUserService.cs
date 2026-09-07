@@ -69,8 +69,35 @@ public sealed class CurrentUserService(
             return null;
         }
 
-        string? avatarUrl = principal.FindFirstValue(OidcPrincipalMapper.AvatarUrlClaimType);
+        string? claimAvatar = principal.FindFirstValue(OidcPrincipalMapper.AvatarUrlClaimType);
+        if (!isBreakGlass && !DevelopmentLoginPrincipalFactory.IsDevelopment(principal))
+        {
+            await SyncGoogleProfileAsync(user, displayName, claimAvatar, cancellationToken);
+        }
+
+        string? avatarUrl = !string.IsNullOrWhiteSpace(user.ProfileImageUrl)
+            ? user.ProfileImageUrl
+            : claimAvatar;
         return await MapSessionAsync(user, authMethod, avatarUrl, cancellationToken);
+    }
+
+    private async Task SyncGoogleProfileAsync(
+        User user,
+        string? displayName,
+        string? profileImageUrl,
+        CancellationToken cancellationToken)
+    {
+        string nextName = string.IsNullOrWhiteSpace(displayName) ? user.DisplayName : displayName.Trim();
+        string? beforeImage = user.ProfileImageUrl;
+        string beforeName = user.DisplayName;
+        user.SyncGoogleProfile(nextName, profileImageUrl, clock.UtcNow);
+        if (string.Equals(beforeName, user.DisplayName, StringComparison.Ordinal)
+            && string.Equals(beforeImage, user.ProfileImageUrl, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     private bool AllowGoogleJitProvisioning(bool isBreakGlass)

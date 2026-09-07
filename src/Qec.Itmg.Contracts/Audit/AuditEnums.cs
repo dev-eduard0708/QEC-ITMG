@@ -33,6 +33,7 @@ public enum AuditAggregateType
     RemoteSession = 29,
     OrganizationPosition = 30,
     Cmdb = 31,
+    OrganizationDepartment = 32,
 }
 
 public enum AuditActorType

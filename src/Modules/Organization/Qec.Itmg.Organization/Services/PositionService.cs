@@ -73,7 +73,15 @@ public sealed record UserPositionDto(
     bool IsActive,
     bool IsManagerial);
 
-public sealed record DepartmentSummaryDto(Guid Id, string Name, bool IsActive);
+public sealed record DepartmentSummaryDto(
+    Guid Id,
+    string Name,
+    string? NameAr,
+    string Code,
+    bool IsActive,
+    int SortOrder,
+    int MemberCount,
+    int PositionCount);
 
 public sealed class PositionService(
     OrganizationDbContext db,
@@ -85,9 +93,31 @@ public sealed class PositionService(
     public async Task<IReadOnlyList<DepartmentSummaryDto>> ListDepartmentsAsync(CancellationToken ct)
     {
         List<Department> items = await db.Departments.AsNoTracking()
-            .OrderBy(x => x.Name)
+            .OrderBy(x => x.SortOrder)
+            .ThenBy(x => x.Name)
             .ToListAsync(ct);
-        return items.Select(x => new DepartmentSummaryDto(x.Id, x.Name, x.IsActive)).ToList();
+        HashSet<Guid> ids = items.Select(x => x.Id).ToHashSet();
+        var memberCounts = await db.DepartmentMemberships.AsNoTracking()
+            .Where(m => ids.Contains(m.DepartmentId) && m.EffectiveTo == null)
+            .GroupBy(m => m.DepartmentId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+        var positionCounts = await db.Positions.AsNoTracking()
+            .Where(p => ids.Contains(p.DepartmentId))
+            .GroupBy(p => p.DepartmentId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+        Dictionary<Guid, int> members = memberCounts.ToDictionary(x => x.Key, x => x.Count);
+        Dictionary<Guid, int> positions = positionCounts.ToDictionary(x => x.Key, x => x.Count);
+        return items.Select(x => new DepartmentSummaryDto(
+            x.Id,
+            x.Name,
+            x.NameAr,
+            x.Code,
+            x.IsActive,
+            x.SortOrder,
+            members.GetValueOrDefault(x.Id),
+            positions.GetValueOrDefault(x.Id))).ToList();
     }
 
     public async Task<IReadOnlyList<PositionDto>> ListPositionsAsync(
@@ -326,7 +356,8 @@ public sealed class PositionService(
         Guid positionId,
         Guid userId,
         bool isPrimary,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool addToDepartmentIfMissing = false)
     {
         Position position = await db.Positions.FirstOrDefaultAsync(x => x.Id == positionId, ct)
             ?? throw new InvalidOperationException("Position was not found.");
@@ -341,6 +372,18 @@ public sealed class PositionService(
             throw new InvalidOperationException("User is required.");
         }
 
+        bool isMember = await db.DepartmentMemberships.AnyAsync(
+            x => x.DepartmentId == position.DepartmentId && x.UserId == userId && x.EffectiveTo == null,
+            ct);
+        if (!isMember && !addToDepartmentIfMissing)
+        {
+            Department? dept = await db.Departments.AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == position.DepartmentId, ct);
+            string deptName = dept?.Name ?? "this department";
+            throw new InvalidOperationException(
+                $"User is not currently a member of {deptName}. Confirm adding them to the department before assigning.");
+        }
+
         bool duplicate = await db.PositionAssignments.AnyAsync(
             x => x.PositionId == positionId && x.UserId == userId,
             ct);
@@ -353,6 +396,20 @@ public sealed class PositionService(
 
         await sharedDbTransaction.ExecuteAsync(async innerCt =>
         {
+            if (!isMember && addToDepartmentIfMissing)
+            {
+                db.DepartmentMemberships.Add(
+                    DepartmentMembership.Create(position.DepartmentId, userId, clock.UtcNow, isPrimary: false));
+                Department? deptForAudit = await db.Departments.AsNoTracking()
+                    .FirstOrDefaultAsync(x => x.Id == position.DepartmentId, innerCt);
+                if (deptForAudit is not null)
+                {
+                    await businessAudit.AppendAsync(
+                        DepartmentAudit.MemberAdded(deptForAudit, userId),
+                        innerCt);
+                }
+            }
+
             if (isPrimary)
             {
                 await ClearPrimaryForUserAsync(userId, exceptAssignmentId: null, innerCt);
@@ -456,21 +513,31 @@ public sealed class PositionService(
     public async Task<IReadOnlyList<ActiveEmployeeInfo>> SearchActiveUsersAsync(
         string? search,
         IActiveEmployeeLookup employees,
-        CancellationToken ct)
+        CancellationToken ct,
+        Guid? departmentId = null,
+        bool searchAll = false)
     {
         IReadOnlyList<ActiveEmployeeInfo> all = await employees.ListActiveAsync(ct);
-        if (string.IsNullOrWhiteSpace(search))
+        IEnumerable<ActiveEmployeeInfo> filtered = all;
+
+        if (departmentId is Guid deptId && !searchAll)
         {
-            return all.Take(50).ToList();
+            HashSet<Guid> memberIds = (await db.DepartmentMemberships.AsNoTracking()
+                .Where(x => x.DepartmentId == deptId && x.EffectiveTo == null)
+                .Select(x => x.UserId)
+                .ToListAsync(ct)).ToHashSet();
+            filtered = filtered.Where(u => memberIds.Contains(u.Id));
         }
 
-        string term = search.Trim();
-        return all
-            .Where(u =>
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            string term = search.Trim();
+            filtered = filtered.Where(u =>
                 u.DisplayName.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || u.Upn.Contains(term, StringComparison.OrdinalIgnoreCase))
-            .Take(50)
-            .ToList();
+                || u.Upn.Contains(term, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return filtered.Take(50).ToList();
     }
 
     private async Task ClearPrimaryForUserAsync(Guid userId, Guid? exceptAssignmentId, CancellationToken ct)

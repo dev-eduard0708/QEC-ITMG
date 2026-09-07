@@ -12,7 +12,7 @@ public interface IOrganizationPositionsSeedRunner
 }
 
 /// <summary>
-/// Idempotent IT department + starter position hierarchy. Does not seed user assignments
+/// Idempotent starter departments + IT position hierarchy. Does not seed user assignments
 /// and does not overwrite existing position names/parents.
 /// </summary>
 public sealed class OrganizationPositionsSeedRunner(
@@ -20,6 +20,13 @@ public sealed class OrganizationPositionsSeedRunner(
     IClock clock,
     ILogger<OrganizationPositionsSeedRunner> logger) : IOrganizationPositionsSeedRunner
 {
+    private static readonly (string Code, string NameEn, string? NameAr, string? Description, int SortOrder)[] Departments =
+    [
+        ("IT", "IT", "تقنية المعلومات", "Information Technology", 10),
+        ("FINANCE", "Finance", "المالية", "Finance", 20),
+        ("HR", "Human Resources", "الموارد البشرية", "Human Resources", 30),
+    ];
+
     private static readonly (string Key, string NameEn, string NameAr, string? ParentKey, bool Managerial, int SortOrder)[] Seeds =
     [
         ("IT_DIRECTOR", "IT Director", "مدير تقنية المعلومات", null, true, 10),
@@ -33,13 +40,16 @@ public sealed class OrganizationPositionsSeedRunner(
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
-        Department? it = await db.Departments.FirstOrDefaultAsync(x => x.Name == "IT", cancellationToken);
-        if (it is null)
+        foreach ((string code, string nameEn, string? nameAr, string? description, int sortOrder) in Departments)
         {
-            it = Department.Create("IT", clock.UtcNow, "Information Technology");
-            db.Departments.Add(it);
+            await EnsureDepartmentAsync(code, nameEn, nameAr, description, sortOrder, cancellationToken);
+        }
+
+        Department it = await db.Departments.FirstAsync(x => x.Code == "IT" || x.Name == "IT", cancellationToken);
+        if (string.IsNullOrWhiteSpace(it.Code) || it.Code != "IT")
+        {
+            it.UpdateDetails(it.Name, it.NameAr, "IT", it.Description, it.DescriptionAr, it.ParentDepartmentId, it.SortOrder, it.IsActive, clock.UtcNow);
             await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Created IT department for organization hierarchy seed.");
         }
 
         Dictionary<string, Guid> byKey = (await db.Positions
@@ -90,8 +100,53 @@ public sealed class OrganizationPositionsSeedRunner(
         }
 
         logger.LogInformation(
-            "Organization positions seed completed for IT department ({Created} created, {Total} catalog).",
+            "Organization hierarchy seed completed ({Created} IT positions created, {Total} catalog; departments ensured).",
             created,
             Seeds.Length);
+    }
+
+    private async Task EnsureDepartmentAsync(
+        string code,
+        string nameEn,
+        string? nameAr,
+        string? description,
+        int sortOrder,
+        CancellationToken ct)
+    {
+        string normalized = Department.NormalizeCode(code);
+        Department? existing = await db.Departments
+            .FirstOrDefaultAsync(x => x.Code == normalized || x.Name == nameEn, ct);
+        if (existing is null)
+        {
+            db.Departments.Add(Department.Create(
+                nameEn,
+                clock.UtcNow,
+                description,
+                normalized,
+                nameAr,
+                sortOrder: sortOrder));
+            await db.SaveChangesAsync(ct);
+            logger.LogInformation("Created department {Code} ({Name}).", normalized, nameEn);
+            return;
+        }
+
+        // Backfill code / bilingual fields without renaming if already present.
+        if (string.IsNullOrWhiteSpace(existing.Code)
+            || existing.Code != normalized
+            || (existing.NameAr is null && nameAr is not null)
+            || existing.SortOrder == 0)
+        {
+            existing.UpdateDetails(
+                existing.Name,
+                existing.NameAr ?? nameAr,
+                normalized,
+                existing.Description ?? description,
+                existing.DescriptionAr,
+                existing.ParentDepartmentId,
+                existing.SortOrder == 0 ? sortOrder : existing.SortOrder,
+                existing.IsActive,
+                clock.UtcNow);
+            await db.SaveChangesAsync(ct);
+        }
     }
 }

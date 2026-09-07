@@ -13,7 +13,7 @@ export function AdminIndexRedirect() {
     return <Navigate to="lookups" replace />
   }
   if (can('organization.hierarchy.read') || can('organization.hierarchy.manage')) {
-    return <Navigate to="organization/hierarchy" replace />
+    return <Navigate to="/administration/hierarchy" replace />
   }
   if (can('admin.integrations')) {
     return <Navigate to="integrations" replace />

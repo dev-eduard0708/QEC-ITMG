@@ -8,7 +8,7 @@ const adminLinks = [
   { to: '/it/admin/roles', labelKey: 'admin.nav.roles', permissions: ['admin.roles'] },
   { to: '/it/admin/lookups', labelKey: 'admin.nav.lookups', permissions: ['admin.lookups'] },
   {
-    to: '/it/admin/organization/hierarchy',
+    to: '/administration/hierarchy',
     labelKey: 'admin.nav.hierarchy',
     permissions: ['organization.hierarchy.read', 'organization.hierarchy.manage'],
   },

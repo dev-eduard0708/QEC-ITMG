@@ -20,6 +20,9 @@ public sealed class User
 
     public string? TimeZone { get; private set; }
 
+    /// <summary>HTTPS profile image URL from Google (or other IdP); never a binary blob.</summary>
+    public string? ProfileImageUrl { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public DateTimeOffset UpdatedAtUtc { get; private set; }
@@ -127,6 +130,44 @@ public sealed class User
         DirectoryObjectId = NormalizeOptional(directoryObjectId);
         Status = status;
         UpdatedAtUtc = utcNow;
+    }
+
+    /// <summary>
+    /// Sync safe Google identity claims. Does not change UPN, departments, positions, or RBAC.
+    /// </summary>
+    public void SyncGoogleProfile(string displayName, string? profileImageUrl, DateTimeOffset utcNow)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(displayName);
+        string nextName = displayName.Trim();
+        string? nextImage = NormalizeProfileImageUrl(profileImageUrl);
+
+        bool changed = !string.Equals(DisplayName, nextName, StringComparison.Ordinal)
+            || !string.Equals(ProfileImageUrl, nextImage, StringComparison.Ordinal);
+        if (!changed)
+        {
+            return;
+        }
+
+        DisplayName = nextName;
+        ProfileImageUrl = nextImage;
+        UpdatedAtUtc = utcNow;
+    }
+
+    private static string? NormalizeProfileImageUrl(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        string trimmed = value.Trim();
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out Uri? uri)
+            || (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp))
+        {
+            return null;
+        }
+
+        return trimmed.Length > 2048 ? trimmed[..2048] : trimmed;
     }
 
     private static string? NormalizeOptional(string? value) =>

@@ -183,6 +183,12 @@ function useSidebarGroupOpen(groups: NavGroupDef[]) {
         (location.pathname === '/it' || location.pathname.startsWith('/it/'))
       ) {
         next[group.id] = true
+      } else if (
+        group.id === 'administration' &&
+        (location.pathname.startsWith('/it/admin') ||
+          location.pathname.startsWith('/administration'))
+      ) {
+        next[group.id] = true
       } else {
         next[group.id] = false
       }
@@ -373,8 +379,8 @@ function buildNavGroups(can: (permissionKey: string) => boolean): NavGroupDef[] 
             can('organization.hierarchy.manage'),
         },
         {
-          to: '/it/admin/organization/hierarchy',
-          labelKey: 'nav.itHierarchy',
+          to: '/administration/hierarchy',
+          labelKey: 'nav.qecHierarchy',
           icon: Users,
           visible: can('organization.hierarchy.read') || can('organization.hierarchy.manage'),
         },

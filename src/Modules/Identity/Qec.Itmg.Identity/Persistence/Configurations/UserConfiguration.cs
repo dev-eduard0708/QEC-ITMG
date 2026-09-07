@@ -42,6 +42,10 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(64)
             .HasColumnType("nvarchar(64)");
 
+        builder.Property(user => user.ProfileImageUrl)
+            .HasMaxLength(2048)
+            .HasColumnType("nvarchar(2048)");
+
         builder.Property(user => user.CreatedAtUtc).IsRequired();
         builder.Property(user => user.UpdatedAtUtc).IsRequired();
 

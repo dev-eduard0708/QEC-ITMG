@@ -16,6 +16,8 @@ public sealed class OrganizationDbContext(DbContextOptions<OrganizationDbContext
 
     public DbSet<PositionAssignment> PositionAssignments => Set<PositionAssignment>();
 
+    public DbSet<DepartmentMembership> DepartmentMemberships => Set<DepartmentMembership>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(SchemaName);

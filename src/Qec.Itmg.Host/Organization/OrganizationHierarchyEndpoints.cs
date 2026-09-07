@@ -16,9 +16,175 @@ public static class OrganizationHierarchyEndpoints
     {
         RouteGroupBuilder group = endpoints.MapGroup("/api/v1/organization");
 
-        group.MapGet("/departments", async (PositionService service, CancellationToken ct) =>
-                Results.Ok(await service.ListDepartmentsAsync(ct)))
+        group.MapGet("/departments", async (DepartmentService departments, CancellationToken ct) =>
+                Results.Ok(await departments.ListDetailedAsync(activeOnly: false, ct)))
             .RequireAnyPermission(ReadPermission, ManagePermission, "admin.lookups");
+
+        group.MapGet("/departments/company-view", async (DepartmentService departments, CancellationToken ct) =>
+                Results.Ok(await departments.CompanyViewAsync(ct)))
+            .RequireAnyPermission(ReadPermission, ManagePermission);
+
+        group.MapGet("/departments/{id:guid}", async (Guid id, DepartmentService departments, CancellationToken ct) =>
+            {
+                DepartmentDetailDto? item = await departments.GetAsync(id, ct);
+                return item is null ? Results.NotFound() : Results.Ok(item);
+            })
+            .RequireAnyPermission(ReadPermission, ManagePermission);
+
+        group.MapPost("/departments", async (
+                CreateDepartmentRequest request,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    return Results.Ok(await departments.CreateAsync(
+                        request.NameEn,
+                        request.NameAr,
+                        request.Code,
+                        request.DescriptionEn,
+                        request.DescriptionAr,
+                        request.ParentDepartmentId,
+                        request.SortOrder,
+                        ct));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status400BadRequest);
+                }
+            })
+            .RequirePermission(ManagePermission);
+
+        group.MapPut("/departments/{id:guid}", async (
+                Guid id,
+                UpdateDepartmentRequest request,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    return Results.Ok(await departments.UpdateAsync(
+                        id,
+                        request.NameEn,
+                        request.NameAr,
+                        request.Code,
+                        request.DescriptionEn,
+                        request.DescriptionAr,
+                        request.ParentDepartmentId,
+                        request.SortOrder,
+                        request.IsActive,
+                        ct));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status400BadRequest);
+                }
+            })
+            .RequirePermission(ManagePermission);
+
+        group.MapPost("/departments/{id:guid}/deactivate", async (
+                Guid id,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    return Results.Ok(await departments.DeactivateAsync(id, ct));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status400BadRequest);
+                }
+            })
+            .RequirePermission(ManagePermission);
+
+        group.MapGet("/departments/{id:guid}/members", async (
+                Guid id,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    return Results.Ok(await departments.ListMembersAsync(id, ct));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status404NotFound);
+                }
+            })
+            .RequireAnyPermission(ReadPermission, ManagePermission);
+
+        group.MapPost("/departments/{id:guid}/members", async (
+                Guid id,
+                AddDepartmentMemberRequest request,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    return Results.Ok(await departments.AddMemberAsync(id, request.UserId, request.IsPrimary ?? false, ct));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status400BadRequest);
+                }
+            })
+            .RequirePermission(ManagePermission);
+
+        group.MapDelete("/departments/{id:guid}/members/{userId:guid}", async (
+                Guid id,
+                Guid userId,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    await departments.RemoveMemberAsync(id, userId, ct);
+                    return Results.NoContent();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status400BadRequest);
+                }
+            })
+            .RequirePermission(ManagePermission);
+
+        group.MapPost("/departments/{id:guid}/members/{userId:guid}/primary", async (
+                Guid id,
+                Guid userId,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    await departments.SetPrimaryAsync(id, userId, ct);
+                    return Results.NoContent();
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status400BadRequest);
+                }
+            })
+            .RequirePermission(ManagePermission);
+
+        group.MapGet("/people", async (
+                string? search,
+                Guid? departmentId,
+                bool? activeOnly,
+                DepartmentService departments,
+                CancellationToken ct) =>
+                Results.Ok(await departments.ListPeopleAsync(search, departmentId, activeOnly, ct)))
+            .RequireAnyPermission(ReadPermission, ManagePermission);
+
+        group.MapGet("/users/{userId:guid}/profile-summary", async (
+                Guid userId,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                UserOrgProfileDto? profile = await departments.GetProfileSummaryAsync(userId, ct);
+                return profile is null ? Results.NotFound() : Results.Ok(profile);
+            })
+            .RequireAnyPermission(ReadPermission, ManagePermission);
 
         group.MapGet("/positions", async (
                 Guid? departmentId,
@@ -153,7 +319,12 @@ public static class OrganizationHierarchyEndpoints
             {
                 try
                 {
-                    return Results.Ok(await service.AssignUserAsync(id, request.UserId, request.IsPrimary ?? false, ct));
+                    return Results.Ok(await service.AssignUserAsync(
+                        id,
+                        request.UserId,
+                        request.IsPrimary ?? false,
+                        ct,
+                        addToDepartmentIfMissing: request.AddToDepartment ?? false));
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -206,10 +377,17 @@ public static class OrganizationHierarchyEndpoints
 
         group.MapGet("/active-users", async (
                 string? search,
+                Guid? departmentId,
+                bool? searchAll,
                 PositionService service,
                 IActiveEmployeeLookup employees,
                 CancellationToken ct) =>
-                Results.Ok(await service.SearchActiveUsersAsync(search, employees, ct)))
+                Results.Ok(await service.SearchActiveUsersAsync(
+                    search,
+                    employees,
+                    ct,
+                    departmentId,
+                    searchAll ?? false)))
             .RequireAnyPermission(ReadPermission, ManagePermission);
 
         return endpoints;
@@ -228,6 +406,27 @@ public static class OrganizationHierarchyEndpoints
             },
             statusCode: statusCode);
 }
+
+public sealed record CreateDepartmentRequest(
+    string NameEn,
+    string? NameAr,
+    string Code,
+    string? DescriptionEn,
+    string? DescriptionAr,
+    Guid? ParentDepartmentId,
+    int SortOrder);
+
+public sealed record UpdateDepartmentRequest(
+    string NameEn,
+    string? NameAr,
+    string Code,
+    string? DescriptionEn,
+    string? DescriptionAr,
+    Guid? ParentDepartmentId,
+    int SortOrder,
+    bool IsActive);
+
+public sealed record AddDepartmentMemberRequest(Guid UserId, bool? IsPrimary);
 
 public sealed record CreatePositionRequest(
     Guid DepartmentId,
@@ -252,4 +451,4 @@ public sealed record UpdatePositionRequest(
 
 public sealed record ChangeParentRequest(Guid? ParentPositionId);
 
-public sealed record AssignUserRequest(Guid UserId, bool? IsPrimary);
+public sealed record AssignUserRequest(Guid UserId, bool? IsPrimary, bool? AddToDepartment);

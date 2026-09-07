@@ -226,16 +226,38 @@ export function AppRouter() {
                 <Route path="lookups" element={<AdminLookupsPage />} />
               </Route>
               <Route
+                path="organization/hierarchy"
+                element={<Navigate to="/administration/hierarchy" replace />}
+              />
+              <Route element={<RequirePermission permission="admin.integrations" />}>
+                <Route path="integrations" element={<IntegrationsAdminPage />} />
+              </Route>
+            </Route>
+          </Route>
+          <Route
+            path="administration"
+            element={
+              <RequireAnyPermission
+                permissions={[
+                  'admin.users',
+                  'admin.roles',
+                  'admin.lookups',
+                  'admin.integrations',
+                  'organization.hierarchy.read',
+                  'organization.hierarchy.manage',
+                ]}
+              />
+            }
+          >
+            <Route element={<AdminLayout />}>
+              <Route
                 element={
                   <RequireAnyPermission
                     permissions={['organization.hierarchy.read', 'organization.hierarchy.manage']}
                   />
                 }
               >
-                <Route path="organization/hierarchy" element={<OrganizationHierarchyPage />} />
-              </Route>
-              <Route element={<RequirePermission permission="admin.integrations" />}>
-                <Route path="integrations" element={<IntegrationsAdminPage />} />
+                <Route path="hierarchy" element={<OrganizationHierarchyPage />} />
               </Route>
             </Route>
           </Route>

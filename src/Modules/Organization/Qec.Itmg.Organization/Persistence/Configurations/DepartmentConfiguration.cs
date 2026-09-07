@@ -17,11 +17,27 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
             .HasMaxLength(128)
             .HasColumnType("nvarchar(128)");
 
+        builder.Property(department => department.NameAr)
+            .HasMaxLength(128)
+            .HasColumnType("nvarchar(128)");
+
+        builder.Property(department => department.Code)
+            .IsRequired()
+            .HasMaxLength(64)
+            .HasColumnType("nvarchar(64)");
+
         builder.Property(department => department.Description)
             .HasMaxLength(512)
             .HasColumnType("nvarchar(512)");
 
+        builder.Property(department => department.DescriptionAr)
+            .HasMaxLength(512)
+            .HasColumnType("nvarchar(512)");
+
+        builder.Property(department => department.ParentDepartmentId);
+
         builder.Property(department => department.IsActive).IsRequired();
+        builder.Property(department => department.SortOrder).IsRequired();
         builder.Property(department => department.CreatedAtUtc).IsRequired();
         builder.Property(department => department.UpdatedAtUtc).IsRequired();
 
@@ -32,5 +48,15 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
         builder.HasIndex(department => department.Name)
             .IsUnique()
             .HasDatabaseName("IX_Department_Name");
+
+        builder.HasIndex(department => department.Code)
+            .IsUnique()
+            .HasDatabaseName("IX_Department_Code");
+
+        builder.HasOne<Department>()
+            .WithMany()
+            .HasForeignKey(department => department.ParentDepartmentId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }
