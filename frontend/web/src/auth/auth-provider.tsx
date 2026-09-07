@@ -2,7 +2,9 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
+  useRef,
   type ReactNode,
 } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -44,6 +46,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   })
 
   const user = query.data ?? null
+  const previousUserIdRef = useRef<string | null | undefined>(undefined)
+
+  useEffect(() => {
+    const nextId = user?.id ?? null
+    const previousId = previousUserIdRef.current
+    previousUserIdRef.current = nextId
+    if (previousId === undefined || previousId === nextId) return
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['access'] }),
+      queryClient.invalidateQueries({ queryKey: ['me', 'notifications'] }),
+    ])
+  }, [queryClient, user?.id])
 
   const can = useCallback(
     (permissionKey: string) => {

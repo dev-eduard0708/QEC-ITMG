@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import type { ColumnDef } from '@tanstack/react-table'
 import { Search } from 'lucide-react'
@@ -48,9 +48,13 @@ const queueTabs: QueueTab[] = [
   { id: 'all', labelKey: 'access.queue.all', configureOnly: true },
 ]
 
+function categoryLabel(row: AccessCase): string {
+  return row.accessCategoryDisplayName ?? row.accessCategoryNameSnapshot ?? '—'
+}
+
 export function AccessPage() {
   const { t } = useTranslation()
-  const { can } = useAuth()
+  const { can, user } = useAuth()
   const navigate = useNavigate()
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -58,10 +62,11 @@ export function AccessPage() {
   const [status, setStatus] = useState('all')
   const [queue, setQueue] = useState<AccessWorkQueue>('my-requests')
 
+  // Anyone who can open the access list sees workflow queues; All stays configure-only.
   const visibleQueues = queueTabs.filter((tab) => !tab.configureOnly || can('access.configure'))
 
   const listQuery = useQuery({
-    queryKey: ['access', 'cases', search, type, status, queue],
+    queryKey: ['access', 'cases', user?.id, search, type, status, queue],
     queryFn: () =>
       accessApi.listCases({
         pageSize: 50,
@@ -70,7 +75,27 @@ export function AccessPage() {
         status: status === 'all' ? undefined : status,
         queue,
       }),
+    refetchInterval: 12_000,
+    refetchOnWindowFocus: true,
   })
+
+  const countQueries = useQueries({
+    queries: visibleQueues.map((tab) => ({
+      queryKey: ['access', 'cases', 'count', user?.id, tab.id] as const,
+      queryFn: () => accessApi.listCases({ pageSize: 1, queue: tab.id }),
+      refetchInterval: 12_000,
+      refetchOnWindowFocus: true,
+    })),
+  })
+
+  const queueCounts = useMemo(() => {
+    const map = new Map<AccessWorkQueue, number>()
+    visibleQueues.forEach((tab, index) => {
+      const count = countQueries[index]?.data?.totalCount
+      if (typeof count === 'number') map.set(tab.id, count)
+    })
+    return map
+  }, [countQueries, visibleQueues])
 
   const columns = useMemo<ColumnDef<AccessCase, unknown>[]>(
     () => [
@@ -78,7 +103,7 @@ export function AccessPage() {
       {
         id: 'category',
         header: t('access.columns.category'),
-        cell: ({ row }) => row.original.accessCategoryNameSnapshot ?? '—',
+        cell: ({ row }) => categoryLabel(row.original),
       },
       {
         accessorKey: 'type',
@@ -123,18 +148,29 @@ export function AccessPage() {
       <AccessNavTabs />
 
       <div className="flex flex-wrap gap-2">
-        {visibleQueues.map((tab) => (
-          <Button
-            key={tab.id}
-            type="button"
-            size="sm"
-            variant={queue === tab.id ? 'default' : 'outline'}
-            className={cn(queue === tab.id && 'shadow-sm')}
-            onClick={() => setQueue(tab.id)}
-          >
-            {t(tab.labelKey)}
-          </Button>
-        ))}
+        {visibleQueues.map((tab) => {
+          const count = queueCounts.get(tab.id)
+          return (
+            <Button
+              key={tab.id}
+              type="button"
+              size="sm"
+              variant={queue === tab.id ? 'default' : 'outline'}
+              className={cn(queue === tab.id && 'shadow-sm')}
+              onClick={() => setQueue(tab.id)}
+            >
+              {t(tab.labelKey)}
+              {typeof count === 'number' ? (
+                <Badge
+                  variant={queue === tab.id ? 'secondary' : 'outline'}
+                  className="ms-1.5 h-5 min-w-5 justify-center px-1.5 text-[10px]"
+                >
+                  {count}
+                </Badge>
+              ) : null}
+            </Button>
+          )
+        })}
       </div>
 
       <div className="flex flex-wrap gap-2">

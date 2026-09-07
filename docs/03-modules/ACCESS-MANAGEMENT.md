@@ -30,14 +30,18 @@ Global reusable `AccessEntitlement` records (bilingual names, `DefaultRevokeActi
    - Who can fulfill
    - Who can verify (fallback)
    - Who can close
-3. **Request** a case with Category + Type + Subject + items.
-4. **Submit** → routing is **snapshotted** onto the case → status becomes Waiting for approval.
-5. **Approve** → Fulfillment (eligible fulfillers only).
-6. **Send for verification**.
-7. **Employee verifies** (preferred) or **IT fallback verifies** with a required reason.
-8. **Closer** closes the case (separate from verifier).
+3. **Create** a case with Category + Type + Subject + items:
+   - **Save as Draft** (`submitForApproval: false`) → status remains Draft; category name snapshot/display is filled for drafts.
+   - **Create & Submit for Approval** (`submitForApproval: true`) → routing is **snapshotted** onto the case → status becomes **Approval** (waiting for approval); approvers are notified.
+4. **Approver** (route snapshot + `access.approve`) → Fulfillment; fulfillers notified.
+5. **Fulfiller** completes items and **Send for verification** → Verification; subject/fallback verifiers notified.
+6. **Verify**: subject employee (preferred) or authenticated fallback verifier (server enforces route; no `access.request` required on verify endpoints).
+7. **Closer** (route snapshot + `access.fulfill`) closes when verified / ready-to-close → Closed; requester/subject notified; stage notifications resolved.
+8. Historical in-progress cases keep their original snapshot if an admin later changes the category.
 
-Historical in-progress cases keep their original snapshot if an admin later changes the category.
+### Work queues & notifications
+
+Frontend lists poll every 12s (and on window focus). Queues: My requests, For approval, For fulfillment, For verification, For closure (All for `access.configure` only). List/detail routes accept any of `access.request|approve|fulfill|configure|review|privileged.manage|sod.manage`. In-app notifications include user-scoped query keys and refresh on persona/user switch.
 
 ## Employee verification vs IT fallback
 

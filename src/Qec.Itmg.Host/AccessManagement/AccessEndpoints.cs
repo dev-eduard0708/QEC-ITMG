@@ -4,10 +4,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Qec.Itmg.AccessManagement.Domain;
 using Qec.Itmg.AccessManagement.Services;
+using Qec.Itmg.Contracts.Notifications;
 using Qec.Itmg.Identity.Authorization;
 using Qec.Itmg.Identity.CurrentUser;
-using Qec.Itmg.Platform.Domain;
-using Qec.Itmg.Platform.Notifications;
 
 namespace Qec.Itmg.Host.AccessManagement;
 
@@ -157,7 +156,14 @@ public static class AccessEndpoints
 
     private static void MapCases(IEndpointRouteBuilder endpoints)
     {
-        RouteGroupBuilder read = endpoints.MapGroup("/api/v1/access/cases").RequirePermission(AccessRequest);
+        string[] caseReadPermissions =
+        [
+            AccessRequest, AccessApprove, AccessFulfill, AccessConfigure,
+            AccessReview, AccessPrivilegedManage, SodManage,
+        ];
+
+        RouteGroupBuilder read = endpoints.MapGroup("/api/v1/access/cases")
+            .RequireAnyPermission(caseReadPermissions);
         read.MapGet(string.Empty, async (
             int? page, int? pageSize, string? search, string? type, string? status, string? queue,
             ClaimsPrincipal principal, ICurrentUserService currentUser, AccessCaseService svc, CancellationToken ct) =>
@@ -195,7 +201,7 @@ public static class AccessEndpoints
 
         endpoints.MapPost("/api/v1/access/cases", async (
             CreateAccessCaseRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
-            AccessCaseService svc, CancellationToken ct) =>
+            AccessCaseService svc, AccessNotificationService notifications, CancellationToken ct) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
@@ -220,12 +226,18 @@ public static class AccessEndpoints
                     }
                 }
 
+                bool submitForApproval = req.SubmitForApproval == true;
                 AccessCaseDto created = await svc.CreateAsync(
                     type, session.Id, req.Reason, req.SubjectUserId, req.SubjectName, req.SubjectEmail,
                     req.DepartmentId, req.ManagerUserId, req.DesignatedApproverUserId, req.EffectiveAtUtc, ct,
                     accessCategoryId: req.AccessCategoryId,
                     hasConfigureOverride: session.Permissions.Contains(AccessConfigure),
-                    items: itemSpecs);
+                    items: itemSpecs,
+                    submitForApproval: submitForApproval);
+
+                if (submitForApproval || string.Equals(created.Status, nameof(AccessCaseStatus.Approval), StringComparison.OrdinalIgnoreCase))
+                    await NotifyApproversForCaseAsync(created, svc, notifications, ct);
+
                 return Results.Created($"/api/v1/access/cases/{created.Id}", created);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
@@ -244,8 +256,21 @@ public static class AccessEndpoints
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessRequest);
 
-        MapCaseAction("/api/v1/access/cases/{id:guid}/submit", AccessRequest, async (id, session, svc, _, ct) =>
-            Results.Ok(await svc.SubmitAsync(id, session.Id, ct)));
+        endpoints.MapPost("/api/v1/access/cases/{id:guid}/submit", async (
+            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, AccessNotificationService notifications, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                AccessCaseDto updated = await svc.SubmitAsync(id, session.Id, ct);
+                await NotifyApproversForCaseAsync(updated, svc, notifications, ct);
+                return Results.Ok(updated);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessRequest);
+
         MapCaseAction("/api/v1/access/cases/{id:guid}/start-approval", AccessApprove, async (id, _, svc, _, ct) =>
             Results.Ok(await svc.StartApprovalAsync(id, ct)));
 
@@ -257,8 +282,19 @@ public static class AccessEndpoints
             if (session is null) return SessionUnavailable();
             try
             {
+                IReadOnlyList<Guid> approverIds = await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Approver, ct);
                 AccessCaseDto updated = await svc.ApproveAsync(id, session.Id, ct);
-                await notifications.NotifyApprovedAsync(updated, ct);
+                string category = AccessNotificationService.CategoryLabel(updated);
+                string typeLabel = AccessNotificationService.TypeLabel(updated);
+                string subject = AccessNotificationService.SubjectLabel(updated);
+
+                IReadOnlyList<Guid> fulfillerIds = await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Fulfiller, ct);
+                await notifications.NotifyFulfillersAsync(
+                    updated.Id, updated.CaseNumber, category, typeLabel, subject, fulfillerIds, ct);
+                await notifications.NotifyRequesterApprovedAsync(
+                    updated.Id, updated.CaseNumber, category, typeLabel, subject, updated.RequesterUserId, ct);
+                await notifications.ResolveStageNotificationsAsync(
+                    updated.Id, approverIds, [AccessNotificationService.TypeApprovalRequested], ct);
                 return Results.Ok(updated);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
@@ -272,37 +308,131 @@ public static class AccessEndpoints
             if (session is null) return SessionUnavailable();
             try
             {
+                IReadOnlyList<Guid> approverIds = await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Approver, ct);
                 AccessCaseDto updated = await svc.RejectAsync(id, session.Id, req?.Reason, ct);
-                await notifications.NotifyRejectedAsync(updated, ct);
+                string category = AccessNotificationService.CategoryLabel(updated);
+                string typeLabel = AccessNotificationService.TypeLabel(updated);
+                string subject = AccessNotificationService.SubjectLabel(updated);
+                await notifications.NotifyRequesterRejectedAsync(
+                    updated.Id, updated.CaseNumber, category, typeLabel, subject, updated.RequesterUserId, ct);
+                await notifications.ResolveStageNotificationsAsync(
+                    updated.Id, approverIds, [AccessNotificationService.TypeApprovalRequested], ct);
                 return Results.Ok(updated);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
         }).RequirePermission(AccessApprove);
 
-        MapCaseAction("/api/v1/access/cases/{id:guid}/start-verification", AccessFulfill, async (id, session, svc, notifications, ct) =>
-        {
-            AccessCaseDto updated = await svc.StartVerificationAsync(id, session.Id, ct);
-            await notifications.NotifyVerificationRequiredAsync(updated, ct);
-            return Results.Ok(updated);
-        });
-
-        endpoints.MapPost("/api/v1/access/cases/{id:guid}/verify", async (
-            Guid id, VerifyAccessCaseRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
-            AccessCaseService svc, CancellationToken ct) =>
+        endpoints.MapPost("/api/v1/access/cases/{id:guid}/start-verification", async (
+            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, AccessNotificationService notifications, CancellationToken ct) =>
         {
             CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
             if (session is null) return SessionUnavailable();
             try
             {
-                if (string.Equals(req.Mode, "fallback", StringComparison.OrdinalIgnoreCase))
-                    return Results.Ok(await svc.VerifyFallbackAsync(id, session.Id, req.FallbackReason ?? req.Comment ?? "", ct));
-                return Results.Ok(await svc.VerifyEmployeeAsync(id, session.Id, req.EverythingWorks != false, req.Comment, ct));
+                IReadOnlyList<Guid> fulfillerIds = await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Fulfiller, ct);
+                AccessCaseDto updated = await svc.StartVerificationAsync(id, session.Id, ct);
+                string category = AccessNotificationService.CategoryLabel(updated);
+                string typeLabel = AccessNotificationService.TypeLabel(updated);
+                string subject = AccessNotificationService.SubjectLabel(updated);
+                bool isLeaver = string.Equals(updated.Type, nameof(AccessCaseType.Leaver), StringComparison.OrdinalIgnoreCase);
+                IReadOnlyList<Guid> verifierIds = await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Verifier, ct);
+                IEnumerable<Guid> fallbacks = verifierIds.Where(v => updated.SubjectUserId is null || v != updated.SubjectUserId);
+                await notifications.NotifyVerificationToSubjectOrFallbacksAsync(
+                    updated.Id, updated.CaseNumber, category, typeLabel, subject,
+                    updated.SubjectUserId, fallbacks, isLeaver, ct);
+                await notifications.ResolveStageNotificationsAsync(
+                    updated.Id, fulfillerIds, [AccessNotificationService.TypeFulfillmentReady], ct);
+                return Results.Ok(updated);
             }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
-        }).RequirePermission(AccessRequest);
+        }).RequirePermission(AccessFulfill);
 
-        MapCaseAction("/api/v1/access/cases/{id:guid}/close", AccessFulfill, async (id, session, svc, _, ct) =>
-            Results.Ok(await svc.CloseAsync(id, session.Id, ct)));
+        endpoints.MapPost("/api/v1/access/cases/{id:guid}/verify", async (
+            Guid id, VerifyAccessCaseRequest req, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, AccessNotificationService notifications, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                IReadOnlyList<Guid> verifierIds = await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Verifier, ct);
+                if (string.Equals(req.Mode, "fallback", StringComparison.OrdinalIgnoreCase))
+                {
+                    AccessCaseDto updated = await svc.VerifyFallbackAsync(id, session.Id, req.FallbackReason ?? req.Comment ?? "", ct);
+                    await NotifyClosersForCaseAsync(updated, svc, notifications, ct);
+                    await notifications.ResolveStageNotificationsAsync(
+                        updated.Id, verifierIds.Concat(updated.SubjectUserId is Guid s ? [s] : []),
+                        [AccessNotificationService.TypeVerificationRequired], ct);
+                    return Results.Ok(updated);
+                }
+
+                AccessCaseDto verified = await svc.VerifyEmployeeAsync(id, session.Id, req.EverythingWorks != false, req.Comment, ct);
+                string category = AccessNotificationService.CategoryLabel(verified);
+                string typeLabel = AccessNotificationService.TypeLabel(verified);
+                string subject = AccessNotificationService.SubjectLabel(verified);
+
+                if (req.EverythingWorks == false)
+                {
+                    IReadOnlyList<Guid> fulfillerIds = await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Fulfiller, ct);
+                    await notifications.NotifyVerificationProblemAsync(
+                        verified.Id, verified.CaseNumber, category, typeLabel, subject,
+                        fulfillerIds, req.Comment ?? verified.VerificationComment, ct);
+                }
+                else
+                {
+                    await NotifyClosersForCaseAsync(verified, svc, notifications, ct);
+                }
+
+                await notifications.ResolveStageNotificationsAsync(
+                    verified.Id, verifierIds.Concat(verified.SubjectUserId is Guid sub ? [sub] : []),
+                    [AccessNotificationService.TypeVerificationRequired], ct);
+                return Results.Ok(verified);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequireAuthorization();
+
+        endpoints.MapPost("/api/v1/access/cases/{id:guid}/close", async (
+            Guid id, ClaimsPrincipal principal, ICurrentUserService currentUser,
+            AccessCaseService svc, AccessNotificationService notifications, CancellationToken ct) =>
+        {
+            CurrentUserDto? session = await currentUser.GetSessionAsync(principal, ct);
+            if (session is null) return SessionUnavailable();
+            try
+            {
+                IReadOnlyList<Guid> closerIds = await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Closer, ct);
+                AccessCaseDto updated = await svc.CloseAsync(id, session.Id, ct);
+                string category = AccessNotificationService.CategoryLabel(updated);
+                string typeLabel = AccessNotificationService.TypeLabel(updated);
+                string subject = AccessNotificationService.SubjectLabel(updated);
+                await notifications.NotifyCaseClosedAsync(
+                    updated.Id, updated.CaseNumber, category, typeLabel, subject,
+                    updated.RequesterUserId, updated.SubjectUserId, ct);
+                await notifications.ResolveStageNotificationsAsync(
+                    updated.Id, closerIds, [AccessNotificationService.TypeReadyToClose], ct);
+                IReadOnlyList<Guid> leftoverRecipients = closerIds
+                    .Concat(await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Approver, ct))
+                    .Concat(await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Fulfiller, ct))
+                    .Concat(await svc.GetRouteUserIdsAsync(id, AccessCategoryStage.Verifier, ct))
+                    .Append(updated.RequesterUserId)
+                    .Concat(updated.SubjectUserId is Guid s ? [s] : Array.Empty<Guid>())
+                    .Distinct()
+                    .ToList();
+                await notifications.ResolveStageNotificationsAsync(
+                    updated.Id,
+                    leftoverRecipients,
+                    [
+                        AccessNotificationService.TypeApprovalRequested,
+                        AccessNotificationService.TypeFulfillmentReady,
+                        AccessNotificationService.TypeVerificationRequired,
+                        AccessNotificationService.TypeVerificationProblem,
+                        AccessNotificationService.TypeReadyToClose,
+                    ],
+                    ct);
+                return Results.Ok(updated);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
+        }).RequirePermission(AccessFulfill);
 
         endpoints.MapPost("/api/v1/access/cases/{id:guid}/cancel", async (
             Guid id, OverrideReasonRequest? req, ClaimsPrincipal principal, ICurrentUserService currentUser,
@@ -412,6 +542,42 @@ public static class AccessEndpoints
                 catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { return FromEx(ex); }
             }).RequirePermission(permission);
         }
+    }
+
+    private static async Task NotifyApproversForCaseAsync(
+        AccessCaseDto accessCase,
+        AccessCaseService svc,
+        AccessNotificationService notifications,
+        CancellationToken ct)
+    {
+        IReadOnlyList<Guid> approverIds = await svc.GetRouteUserIdsAsync(
+            accessCase.Id, AccessCategoryStage.Approver, ct);
+        await notifications.NotifyApproversAsync(
+            accessCase.Id,
+            accessCase.CaseNumber,
+            AccessNotificationService.CategoryLabel(accessCase),
+            AccessNotificationService.TypeLabel(accessCase),
+            AccessNotificationService.SubjectLabel(accessCase),
+            approverIds,
+            ct);
+    }
+
+    private static async Task NotifyClosersForCaseAsync(
+        AccessCaseDto accessCase,
+        AccessCaseService svc,
+        AccessNotificationService notifications,
+        CancellationToken ct)
+    {
+        IReadOnlyList<Guid> closerIds = await svc.GetRouteUserIdsAsync(
+            accessCase.Id, AccessCategoryStage.Closer, ct);
+        await notifications.NotifyClosersAsync(
+            accessCase.Id,
+            accessCase.CaseNumber,
+            AccessNotificationService.CategoryLabel(accessCase),
+            AccessNotificationService.TypeLabel(accessCase),
+            AccessNotificationService.SubjectLabel(accessCase),
+            closerIds,
+            ct);
     }
 
     private static void MapReviews(IEndpointRouteBuilder endpoints)
@@ -573,58 +739,284 @@ public static class AccessEndpoints
         string.IsNullOrWhiteSpace(value) ? null : Enum.TryParse(value, true, out TEnum parsed) ? parsed : null;
 }
 
-public sealed class AccessNotificationService(INotificationService notifications)
+public sealed class AccessNotificationService(IUserNotificationPublisher notifications)
 {
     public const string ResourceType = "AccessCase";
 
-    public Task NotifyApprovalRequestedAsync(AccessCaseDto accessCase, Guid recipientUserId, CancellationToken ct) =>
-        notifications.CreateAsync(
-            recipientUserId, "access.approval_requested", NotificationSeverity.Warning,
-            $"Approval requested: {accessCase.CaseNumber}",
-            $"Please review access case \"{accessCase.CaseNumber}\".",
-            ResourceType, accessCase.Id, $"/it/access/{accessCase.Id}", ct);
+    public const string TypeApprovalRequested = "access.approval_requested";
+    public const string TypeApproved = "access.approved";
+    public const string TypeRejected = "access.rejected";
+    public const string TypeFulfillmentReady = "access.fulfillment_ready";
+    public const string TypeVerificationRequired = "access.verification_required";
+    public const string TypeVerificationProblem = "access.verification_problem";
+    public const string TypeReadyToClose = "access.ready_to_close";
+    public const string TypeClosed = "access.closed";
+    public const string TypeReviewAssigned = "access.review_assigned";
 
-    public Task NotifyApprovedAsync(AccessCaseDto accessCase, CancellationToken ct) =>
-        notifications.CreateAsync(
-            accessCase.RequesterUserId, "access.approved", NotificationSeverity.Info,
-            $"{accessCase.CaseNumber} approved",
-            "Access case approved and ready for fulfillment.",
-            ResourceType, accessCase.Id, $"/it/access/{accessCase.Id}", ct);
+    public async Task NotifyApproversAsync(
+        Guid caseId,
+        string caseNumber,
+        string categoryName,
+        string typeLabel,
+        string subjectLabel,
+        IEnumerable<Guid> approverIds,
+        CancellationToken ct)
+    {
+        foreach (Guid recipientUserId in Distinct(approverIds))
+        {
+            await notifications.PublishAsync(
+                recipientUserId,
+                TypeApprovalRequested,
+                "Warning",
+                $"Approval requested: {caseNumber}",
+                $"Please review {typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel}.",
+                ResourceType,
+                caseId,
+                CaseUrl(caseId),
+                ct);
+        }
+    }
 
-    public Task NotifyRejectedAsync(AccessCaseDto accessCase, CancellationToken ct) =>
-        notifications.CreateAsync(
-            accessCase.RequesterUserId, "access.rejected", NotificationSeverity.Warning,
-            $"{accessCase.CaseNumber} rejected",
-            "Access case was rejected.",
-            ResourceType, accessCase.Id, $"/it/access/{accessCase.Id}", ct);
+    public async Task NotifyFulfillersAsync(
+        Guid caseId,
+        string caseNumber,
+        string categoryName,
+        string typeLabel,
+        string subjectLabel,
+        IEnumerable<Guid> fulfillerIds,
+        CancellationToken ct)
+    {
+        foreach (Guid recipientUserId in Distinct(fulfillerIds))
+        {
+            await notifications.PublishAsync(
+                recipientUserId,
+                TypeFulfillmentReady,
+                "Info",
+                $"Fulfillment ready: {caseNumber}",
+                $"{typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel} is ready for checklist fulfillment.",
+                ResourceType,
+                caseId,
+                CaseUrl(caseId),
+                ct);
+        }
+    }
 
-    public Task NotifyFulfillmentReadyAsync(AccessCaseDto accessCase, Guid recipientUserId, CancellationToken ct) =>
-        notifications.CreateAsync(
-            recipientUserId, "access.fulfillment_ready", NotificationSeverity.Info,
-            $"Fulfillment ready: {accessCase.CaseNumber}",
-            "Access case is ready for checklist fulfillment.",
-            ResourceType, accessCase.Id, $"/it/access/{accessCase.Id}", ct);
+    public Task NotifyRequesterApprovedAsync(
+        Guid caseId,
+        string caseNumber,
+        string categoryName,
+        string typeLabel,
+        string subjectLabel,
+        Guid requesterId,
+        CancellationToken ct) =>
+        notifications.PublishAsync(
+            requesterId,
+            TypeApproved,
+            "Info",
+            $"{caseNumber} approved",
+            $"Your {typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel} was approved and is ready for fulfillment.",
+            ResourceType,
+            caseId,
+            CaseUrl(caseId),
+            ct);
 
-    public Task NotifyVerificationRequiredAsync(AccessCaseDto accessCase, CancellationToken ct) =>
-        notifications.CreateAsync(
-            accessCase.RequesterUserId, "access.verification_required", NotificationSeverity.Info,
-            $"Verification: {accessCase.CaseNumber}",
-            "Please verify completed access work.",
-            ResourceType, accessCase.Id, $"/it/access/{accessCase.Id}", ct);
+    public Task NotifyRequesterRejectedAsync(
+        Guid caseId,
+        string caseNumber,
+        string categoryName,
+        string typeLabel,
+        string subjectLabel,
+        Guid requesterId,
+        CancellationToken ct) =>
+        notifications.PublishAsync(
+            requesterId,
+            TypeRejected,
+            "Warning",
+            $"{caseNumber} rejected",
+            $"Your {typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel} was rejected.",
+            ResourceType,
+            caseId,
+            CaseUrl(caseId),
+            ct);
+
+    public async Task NotifyVerificationToSubjectOrFallbacksAsync(
+        Guid caseId,
+        string caseNumber,
+        string categoryName,
+        string typeLabel,
+        string subjectLabel,
+        Guid? subjectUserId,
+        IEnumerable<Guid> fallbackVerifierIds,
+        bool isLeaver,
+        CancellationToken ct)
+    {
+        if (!isLeaver && subjectUserId is Guid subject && subject != Guid.Empty)
+        {
+            await notifications.PublishAsync(
+                subject,
+                TypeVerificationRequired,
+                "Info",
+                $"Verification: {caseNumber}",
+                $"Please verify that your {typeLabel} access changes for {caseNumber} ({categoryName}) are working.",
+                ResourceType,
+                caseId,
+                CaseUrl(caseId),
+                ct);
+            return;
+        }
+
+        foreach (Guid recipientUserId in Distinct(fallbackVerifierIds))
+        {
+            await notifications.PublishAsync(
+                recipientUserId,
+                TypeVerificationRequired,
+                "Info",
+                $"Verification: {caseNumber}",
+                $"Please complete fallback verification for {typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel}.",
+                ResourceType,
+                caseId,
+                CaseUrl(caseId),
+                ct);
+        }
+    }
+
+    public async Task NotifyVerificationProblemAsync(
+        Guid caseId,
+        string caseNumber,
+        string categoryName,
+        string typeLabel,
+        string subjectLabel,
+        IEnumerable<Guid> fulfillerIds,
+        string? comment,
+        CancellationToken ct)
+    {
+        string detail = string.IsNullOrWhiteSpace(comment)
+            ? "The employee reported a problem during verification."
+            : comment.Trim();
+        foreach (Guid recipientUserId in Distinct(fulfillerIds))
+        {
+            await notifications.PublishAsync(
+                recipientUserId,
+                TypeVerificationProblem,
+                "Warning",
+                $"Verification problem: {caseNumber}",
+                $"{typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel} returned to fulfillment. {detail}",
+                ResourceType,
+                caseId,
+                CaseUrl(caseId),
+                ct);
+        }
+    }
+
+    public async Task NotifyClosersAsync(
+        Guid caseId,
+        string caseNumber,
+        string categoryName,
+        string typeLabel,
+        string subjectLabel,
+        IEnumerable<Guid> closerIds,
+        CancellationToken ct)
+    {
+        foreach (Guid recipientUserId in Distinct(closerIds))
+        {
+            await notifications.PublishAsync(
+                recipientUserId,
+                TypeReadyToClose,
+                "Info",
+                $"Ready to close: {caseNumber}",
+                $"{typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel} is verified and ready to close.",
+                ResourceType,
+                caseId,
+                CaseUrl(caseId),
+                ct);
+        }
+    }
+
+    public async Task NotifyCaseClosedAsync(
+        Guid caseId,
+        string caseNumber,
+        string categoryName,
+        string typeLabel,
+        string subjectLabel,
+        Guid requesterId,
+        Guid? subjectUserId,
+        CancellationToken ct)
+    {
+        HashSet<Guid> recipients = [requesterId];
+        if (subjectUserId is Guid subject && subject != Guid.Empty)
+            recipients.Add(subject);
+
+        foreach (Guid recipientUserId in recipients)
+        {
+            await notifications.PublishAsync(
+                recipientUserId,
+                TypeClosed,
+                "Info",
+                $"{caseNumber} closed",
+                $"{typeLabel} access case {caseNumber} ({categoryName}) for {subjectLabel} has been closed.",
+                ResourceType,
+                caseId,
+                CaseUrl(caseId),
+                ct);
+        }
+    }
+
+    public async Task ResolveStageNotificationsAsync(
+        Guid caseId,
+        IEnumerable<Guid> recipientUserIds,
+        IEnumerable<string> types,
+        CancellationToken ct)
+    {
+        List<string> typeList = types.Where(t => !string.IsNullOrWhiteSpace(t)).Distinct(StringComparer.Ordinal).ToList();
+        if (typeList.Count == 0) return;
+
+        foreach (Guid recipientUserId in Distinct(recipientUserIds))
+        {
+            foreach (string type in typeList)
+            {
+                await notifications.MarkResourceNotificationsReadAsync(
+                    recipientUserId, type, ResourceType, caseId, ct);
+            }
+        }
+    }
 
     public Task NotifyReviewAssignedAsync(AccessReviewCampaignDto campaign, CancellationToken ct) =>
-        notifications.CreateAsync(
-            campaign.ReviewerUserId, "access.review_assigned", NotificationSeverity.Info,
+        notifications.PublishAsync(
+            campaign.ReviewerUserId,
+            TypeReviewAssigned,
+            "Info",
             $"Review assigned: {campaign.Name}",
             $"Due {campaign.DueAtUtc:u}.",
-            "AccessReview", campaign.Id, "/it/access/reviews", ct);
+            "AccessReview",
+            campaign.Id,
+            "/it/access/reviews",
+            ct);
+
+    public static string CategoryLabel(AccessCaseDto accessCase) =>
+        accessCase.AccessCategoryDisplayName
+        ?? accessCase.AccessCategoryNameSnapshot
+        ?? "access category";
+
+    public static string SubjectLabel(AccessCaseDto accessCase) =>
+        !string.IsNullOrWhiteSpace(accessCase.SubjectName) ? accessCase.SubjectName!
+        : !string.IsNullOrWhiteSpace(accessCase.SubjectEmail) ? accessCase.SubjectEmail!
+        : "employee";
+
+    public static string TypeLabel(AccessCaseDto accessCase) =>
+        string.IsNullOrWhiteSpace(accessCase.Type) ? "Access" : accessCase.Type;
+
+    private static string CaseUrl(Guid caseId) => $"/it/access/{caseId}";
+
+    private static IEnumerable<Guid> Distinct(IEnumerable<Guid> ids) =>
+        ids.Where(id => id != Guid.Empty).Distinct();
 }
 
 public sealed record CreateAccessCaseRequest(
     string Type, string Reason, Guid? SubjectUserId, string? SubjectName, string? SubjectEmail,
     Guid? DepartmentId, Guid? ManagerUserId, Guid? DesignatedApproverUserId, DateTimeOffset? EffectiveAtUtc,
     Guid? AccessCategoryId = null,
-    IReadOnlyList<CreateAccessCaseItemRequest>? Items = null);
+    IReadOnlyList<CreateAccessCaseItemRequest>? Items = null,
+    bool? SubmitForApproval = null);
 
 public sealed record CreateAccessCaseItemRequest(
     Guid? AccessEntitlementId,

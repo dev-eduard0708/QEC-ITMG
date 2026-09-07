@@ -7,6 +7,7 @@ using Qec.Itmg.BuildingBlocks.Time;
 using Qec.Itmg.Contracts.Audit;
 using Qec.Itmg.Contracts.Integrations;
 using Qec.Itmg.Contracts.Modules;
+using Qec.Itmg.Contracts.Notifications;
 using Qec.Itmg.Contracts.Numbering;
 using Qec.Itmg.Contracts.Secrets;
 using Qec.Itmg.Contracts.Security;
@@ -99,5 +100,6 @@ public sealed class PlatformModule : IModule
         services.AddScoped<ICommentService, CommentService>();
         services.AddScoped<IWorkflowService, WorkflowService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IUserNotificationPublisher, UserNotificationPublisher>();
     }
 }

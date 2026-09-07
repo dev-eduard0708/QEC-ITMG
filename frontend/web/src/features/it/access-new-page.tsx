@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from '@/components/ui/toast-store'
 import { AccessNavTabs } from '@/features/it/access-nav'
 import { useAccessUsers } from '@/features/it/access-users'
 import { isAppLanguage } from '@/i18n'
@@ -426,7 +427,7 @@ export function AccessNewPage() {
   }, [grants, currentItems, extraRevokes, type])
 
   const createMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (submitForApproval: boolean) =>
       accessApi.createCase({
         type,
         reason,
@@ -435,8 +436,16 @@ export function AccessNewPage() {
         subjectName: externalSubject ? subjectName || null : null,
         subjectEmail: externalSubject ? subjectEmail || null : null,
         items: buildItems(),
+        submitForApproval,
       }),
-    onSuccess: (created) => navigate(`/it/access/${created.id}`),
+    onSuccess: (created, submitForApproval) => {
+      toast.success(
+        submitForApproval
+          ? t('access.success.submittedForApproval')
+          : t('access.success.draftSaved'),
+      )
+      navigate(`/it/access/${created.id}`)
+    },
     onError: (err) => setError(err instanceof ApiError ? err.message : t('access.error.generic')),
   })
 
@@ -834,9 +843,23 @@ export function AccessNewPage() {
         </div>
 
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button type="button" disabled={!canSubmit} onClick={() => createMutation.mutate()}>
-          {t('access.create')}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!canSubmit}
+            onClick={() => createMutation.mutate(false)}
+          >
+            {t('access.saveAsDraft')}
+          </Button>
+          <Button
+            type="button"
+            disabled={!canSubmit}
+            onClick={() => createMutation.mutate(true)}
+          >
+            {t('access.createAndSubmit')}
+          </Button>
+        </div>
       </div>
     </div>
   )

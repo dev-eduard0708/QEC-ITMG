@@ -160,10 +160,26 @@ export function AppRouter() {
           <Route element={<RequirePermission permission="sod.manage" />}>
             <Route path="it/access/sod" element={<AccessSodPage />} />
           </Route>
-          <Route element={<RequirePermission permission="access.request" />}>
+          <Route
+            element={
+              <RequireAnyPermission
+                permissions={[
+                  'access.request',
+                  'access.approve',
+                  'access.fulfill',
+                  'access.configure',
+                  'access.review',
+                  'access.privileged.manage',
+                  'sod.manage',
+                ]}
+              />
+            }
+          >
             <Route path="it/access" element={<AccessPage />} />
-            <Route path="it/access/new" element={<AccessNewPage />} />
             <Route path="it/access/:id" element={<AccessDetailPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="access.request" />}>
+            <Route path="it/access/new" element={<AccessNewPage />} />
           </Route>
           <Route element={<RequirePermission permission="doc.read" />}>
             <Route path="it/documents" element={<DocumentsPage />} />

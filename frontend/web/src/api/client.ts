@@ -1299,6 +1299,7 @@ export type AccessCase = {
   accessCategoryId?: string | null
   accessCategoryKeySnapshot?: string | null
   accessCategoryNameSnapshot?: string | null
+  accessCategoryDisplayName?: string | null
   preferSubjectEmployeeVerificationSnapshot?: boolean
   approvedByUserId?: string | null
   approvedAtUtc?: string | null
@@ -1517,6 +1518,7 @@ export const accessApi = {
     effectiveAtUtc?: string | null
     accessCategoryId?: string | null
     items?: AccessCaseItemCreate[] | null
+    submitForApproval?: boolean | null
   }) =>
     apiFetch<AccessCase>('/api/v1/access/cases', { method: 'POST', body: JSON.stringify(payload) }),
   listCategories: (params?: { activeOnly?: boolean }) =>

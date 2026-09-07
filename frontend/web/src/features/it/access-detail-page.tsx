@@ -90,8 +90,11 @@ export function AccessDetailPage() {
   })
 
   const invalidate = async () => {
-    await qc.invalidateQueries({ queryKey: ['access', 'case', id] })
-    await qc.invalidateQueries({ queryKey: ['access', 'cases'] })
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['access', 'case', id] }),
+      qc.invalidateQueries({ queryKey: ['access', 'cases'] }),
+      qc.invalidateQueries({ queryKey: ['me', 'notifications'] }),
+    ])
   }
 
   const run = useMutation({
@@ -219,14 +222,23 @@ export function AccessDetailPage() {
   if (!accessCase) return <p className="text-sm text-destructive">{t('access.notFound')}</p>
 
   const isSubject = Boolean(user?.id && accessCase.subjectUserId === user.id)
+  const approvers = participantsFor(routes, 'Approver')
+  const isRouteApprover =
+    approvers.length === 0 ||
+    Boolean(user?.id && approvers.some((item) => item.userId === user.id))
+  const showApproveReject =
+    accessCase.status === 'Approval' && can('access.approve') && isRouteApprover
   const canVerifyEmployee =
     accessCase.status === 'Verification' && isSubject && accessCase.type !== 'Leaver' && !accessCase.isReadyToClose
   const canFallbackVerify =
+    accessCase.status === 'Verification' && !accessCase.isReadyToClose && !isSubject
+  const showClose =
+    can('access.fulfill') &&
     accessCase.status === 'Verification' &&
-    !accessCase.isReadyToClose &&
-    can('access.request') &&
-    !isSubject
-  const showClose = Boolean(accessCase.isReadyToClose) && accessCase.status !== 'Closed' && can('access.fulfill')
+    Boolean(accessCase.isReadyToClose)
+  const categoryLabel =
+    accessCase.accessCategoryDisplayName ?? accessCase.accessCategoryNameSnapshot ?? null
+  const waitingApproverNames = approvers.map((item) => nameFor(item.userId)).filter(Boolean)
 
   const renderItemRow = (item: AccessCaseItem) => (
     <li key={item.id} className="flex flex-wrap items-center gap-2">
@@ -274,8 +286,12 @@ export function AccessDetailPage() {
       <div className="flex flex-wrap gap-2">
         <Badge variant="outline">{accessCase.type}</Badge>
         <Badge variant="secondary">{accessCase.status}</Badge>
-        {accessCase.accessCategoryNameSnapshot ? (
-          <Badge variant="outline">{accessCase.accessCategoryNameSnapshot}</Badge>
+        {categoryLabel ? <Badge variant="outline">{categoryLabel}</Badge> : null}
+        {accessCase.status === 'Draft' ? (
+          <Badge variant="warning">{t('access.draftNotYetSent')}</Badge>
+        ) : null}
+        {accessCase.status === 'Approval' ? (
+          <Badge variant="outline">{t('access.waitingForApproval')}</Badge>
         ) : null}
         {accessCase.isReadyToClose ? (
           <Badge variant="success">{t('access.status.readyToClose')}</Badge>
@@ -286,6 +302,20 @@ export function AccessDetailPage() {
         ) : null}
       </div>
       <p className="text-sm">{accessCase.reason}</p>
+      {accessCase.status === 'Draft' ? (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
+          {t('access.draftNotYetSent')}
+        </p>
+      ) : null}
+      {accessCase.status === 'Approval' ? (
+        <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+          {waitingApproverNames.length > 0
+            ? t('access.waitingForApprovalWithApprovers', {
+                names: waitingApproverNames.join(' / '),
+              })
+            : t('access.waitingForApproval')}
+        </p>
+      ) : null}
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <Card>
@@ -313,7 +343,7 @@ export function AccessDetailPage() {
             {t('access.actions.submitForApproval')}
           </Button>
         ) : null}
-        {accessCase.status === 'Approval' && can('access.approve') ? (
+        {showApproveReject ? (
           <>
             <Button type="button" onClick={() => run.mutate(() => accessApi.approve(id))}>
               {t('access.actions.approve')}

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { ApiError, apiFetch } from '@/api/client'
@@ -30,8 +30,8 @@ export type NotificationItem = {
 }
 
 const notificationKeys = {
-  list: ['me', 'notifications'] as const,
-  unread: ['me', 'notifications', 'unread-count'] as const,
+  list: (userId?: string | null) => ['me', 'notifications', userId ?? 'anon'] as const,
+  unread: (userId?: string | null) => ['me', 'notifications', 'unread-count', userId ?? 'anon'] as const,
 }
 
 async function fetchNotifications() {
@@ -49,23 +49,34 @@ async function markNotificationRead(id: string) {
 
 export function NotificationBell() {
   const { t } = useTranslation()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
+  const userId = user?.id
+
+  useEffect(() => {
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['me', 'notifications'] }),
+    ])
+  }, [queryClient, userId])
 
   const listQuery = useQuery({
-    queryKey: notificationKeys.list,
+    queryKey: notificationKeys.list(userId),
     queryFn: fetchNotifications,
     enabled: isAuthenticated,
     staleTime: 15_000,
+    refetchInterval: 12_000,
+    refetchOnWindowFocus: true,
     retry: false,
   })
 
   const unreadQuery = useQuery({
-    queryKey: notificationKeys.unread,
+    queryKey: notificationKeys.unread(userId),
     queryFn: fetchUnreadCount,
     enabled: isAuthenticated,
     staleTime: 15_000,
+    refetchInterval: 12_000,
+    refetchOnWindowFocus: true,
     retry: false,
   })
 
@@ -73,8 +84,7 @@ export function NotificationBell() {
     mutationFn: markNotificationRead,
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: notificationKeys.list }),
-        queryClient.invalidateQueries({ queryKey: notificationKeys.unread }),
+        queryClient.invalidateQueries({ queryKey: ['me', 'notifications'] }),
       ])
     },
   })

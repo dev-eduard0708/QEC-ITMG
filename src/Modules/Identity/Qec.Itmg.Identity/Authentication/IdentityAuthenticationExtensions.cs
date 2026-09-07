@@ -179,6 +179,7 @@ public static class IdentityAuthenticationExtensions
         services.AddSingleton<IAuthorizationPolicyProvider, PermissionAuthorizationPolicyProvider>();
         services.AddScoped<IUserPermissionEvaluator, SqlUserPermissionEvaluator>();
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, AnyPermissionAuthorizationHandler>();
         services.AddAuthorization();
         services.AddIdentityAdminServices();
         services.AddCurrentUserServices();
