@@ -18,7 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { AccessNavTabs } from '@/features/it/access-nav'
+import { AccessStatusBadge } from '@/features/it/access-ux'
+import { useAccessUsers } from '@/features/it/access-users'
 import { cn } from '@/lib/utils'
 
 const types = ['Joiner', 'Mover', 'Leaver', 'AccessRequest'] as const
@@ -48,13 +51,38 @@ const queueTabs: QueueTab[] = [
   { id: 'all', labelKey: 'access.queue.all', configureOnly: true },
 ]
 
+const queueSubheadingKeys: Partial<Record<AccessWorkQueue, string>> = {
+  'for-approval': 'access.queueSub.forApproval',
+  'for-fulfillment': 'access.queueSub.forFulfillment',
+  'for-verification': 'access.queueSub.forVerification',
+  'for-closure': 'access.queueSub.forClosure',
+  'my-requests': 'access.queueSub.myRequests',
+  all: 'access.queueSub.all',
+}
+
+const queueEmptyKeys: Partial<Record<AccessWorkQueue, string>> = {
+  'for-approval': 'access.emptyQueue.forApproval',
+  'for-fulfillment': 'access.emptyQueue.forFulfillment',
+  'for-verification': 'access.emptyQueue.forVerification',
+  'for-closure': 'access.emptyQueue.forClosure',
+  'my-requests': 'access.emptyQueue.myRequests',
+  all: 'access.empty',
+}
+
 function categoryLabel(row: AccessCase): string {
   return row.accessCategoryDisplayName ?? row.accessCategoryNameSnapshot ?? '—'
+}
+
+function employeeLabel(row: AccessCase): string {
+  if (row.subjectName?.trim()) return row.subjectName.trim()
+  if (row.subjectEmail?.trim()) return row.subjectEmail.trim()
+  return '—'
 }
 
 export function AccessPage() {
   const { t } = useTranslation()
   const { can, user } = useAuth()
+  const { nameFor } = useAccessUsers()
   const navigate = useNavigate()
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
@@ -62,7 +90,6 @@ export function AccessPage() {
   const [status, setStatus] = useState('all')
   const [queue, setQueue] = useState<AccessWorkQueue>('my-requests')
 
-  // Anyone who can open the access list sees workflow queues; All stays configure-only.
   const visibleQueues = queueTabs.filter((tab) => !tab.configureOnly || can('access.configure'))
 
   const listQuery = useQuery({
@@ -99,41 +126,77 @@ export function AccessPage() {
 
   const columns = useMemo<ColumnDef<AccessCase, unknown>[]>(
     () => [
-      { accessorKey: 'caseNumber', header: t('access.columns.number') },
+      {
+        id: 'case',
+        header: t('access.columns.case'),
+        cell: ({ row }) => (
+          <div className="min-w-0 max-w-[220px]">
+            <p className="truncate font-medium">{row.original.caseNumber}</p>
+            <p className="truncate text-xs text-muted-foreground">{row.original.reason}</p>
+          </div>
+        ),
+      },
+      {
+        id: 'employee',
+        header: t('access.columns.employee'),
+        cell: ({ row }) => (
+          <div className="min-w-0 max-w-[160px]">
+            <p className="truncate text-sm">{employeeLabel(row.original)}</p>
+            {row.original.subjectEmail && row.original.subjectName ? (
+              <p className="truncate text-xs text-muted-foreground">{row.original.subjectEmail}</p>
+            ) : null}
+          </div>
+        ),
+      },
       {
         id: 'category',
         header: t('access.columns.category'),
-        cell: ({ row }) => categoryLabel(row.original),
+        cell: ({ row }) => (
+          <span className="text-sm">{categoryLabel(row.original)}</span>
+        ),
       },
       {
         accessorKey: 'type',
         header: t('access.columns.type'),
-        cell: ({ row }) => <Badge variant="outline">{row.original.type}</Badge>,
+        cell: ({ row }) => (
+          <Badge variant="outline" className="font-normal">
+            {t(`access.types.${row.original.type}`, { defaultValue: row.original.type })}
+          </Badge>
+        ),
       },
       {
-        accessorKey: 'status',
-        header: t('access.columns.status'),
+        id: 'currentStep',
+        header: t('access.columns.currentStep'),
+        cell: ({ row }) => <AccessStatusBadge accessCase={row.original} />,
+      },
+      {
+        id: 'requestedBy',
+        header: t('access.columns.requestedBy'),
         cell: ({ row }) => (
-          <span className="inline-flex flex-wrap items-center gap-1">
-            <Badge variant="secondary">{row.original.status}</Badge>
-            {row.original.isReadyToClose ? (
-              <Badge variant="success">{t('access.status.readyToClose')}</Badge>
-            ) : null}
+          <span className="text-sm text-muted-foreground">
+            {nameFor(row.original.requesterUserId)}
           </span>
         ),
       },
-      { accessorKey: 'reason', header: t('access.columns.reason') },
       {
         id: 'updated',
         header: t('access.columns.updated'),
-        cell: ({ row }) => new Date(row.original.updatedAtUtc).toLocaleString(),
+        cell: ({ row }) => (
+          <span className="whitespace-nowrap text-xs text-muted-foreground">
+            {new Date(row.original.updatedAtUtc).toLocaleString()}
+          </span>
+        ),
       },
     ],
-    [t],
+    [nameFor, t],
   )
 
+  const subheadingKey = queueSubheadingKeys[queue]
+  const emptyKey = queueEmptyKeys[queue] ?? 'access.empty'
+  const countsLoading = countQueries.some((q) => q.isLoading)
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={t('access.title')}
         description={t('access.description')}
@@ -147,30 +210,43 @@ export function AccessPage() {
       />
       <AccessNavTabs />
 
-      <div className="flex flex-wrap gap-2">
-        {visibleQueues.map((tab) => {
-          const count = queueCounts.get(tab.id)
-          return (
-            <Button
-              key={tab.id}
-              type="button"
-              size="sm"
-              variant={queue === tab.id ? 'default' : 'outline'}
-              className={cn(queue === tab.id && 'shadow-sm')}
-              onClick={() => setQueue(tab.id)}
-            >
-              {t(tab.labelKey)}
-              {typeof count === 'number' ? (
-                <Badge
-                  variant={queue === tab.id ? 'secondary' : 'outline'}
-                  className="ms-1.5 h-5 min-w-5 justify-center px-1.5 text-[10px]"
-                >
-                  {count}
-                </Badge>
-              ) : null}
-            </Button>
-          )
-        })}
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-1.5 rounded-lg border bg-muted/20 p-1.5">
+          {visibleQueues.map((tab) => {
+            const count = queueCounts.get(tab.id)
+            const active = queue === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setQueue(tab.id)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors',
+                  active
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:bg-background/60 hover:text-foreground',
+                )}
+              >
+                {t(tab.labelKey)}
+                {countsLoading && typeof count !== 'number' ? (
+                  <Skeleton className="h-4 w-5 rounded-sm" />
+                ) : typeof count === 'number' ? (
+                  <span
+                    className={cn(
+                      'inline-flex h-5 min-w-5 items-center justify-center rounded-sm px-1 text-[10px] tabular-nums',
+                      active ? 'bg-muted text-foreground' : 'bg-muted/80 text-muted-foreground',
+                    )}
+                  >
+                    {count}
+                  </span>
+                ) : null}
+              </button>
+            )
+          })}
+        </div>
+        {subheadingKey ? (
+          <p className="text-sm text-muted-foreground">{t(subheadingKey)}</p>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -194,7 +270,7 @@ export function AccessPage() {
             <SelectItem value="all">{t('access.filters.all')}</SelectItem>
             {types.map((item) => (
               <SelectItem key={item} value={item}>
-                {item}
+                {t(`access.types.${item}`)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -216,10 +292,11 @@ export function AccessPage() {
           {t('access.search')}
         </Button>
       </div>
+
       <DataTable
         columns={columns}
         data={listQuery.data?.items ?? []}
-        emptyMessage={t('access.empty')}
+        emptyMessage={t(emptyKey)}
         isLoading={listQuery.isLoading}
         onRowClick={(row) => navigate(`/it/access/${row.id}`)}
         getRowId={(row) => row.id}

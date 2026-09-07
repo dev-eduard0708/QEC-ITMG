@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { ChevronDown } from 'lucide-react'
 import {
   ApiError,
   accessApi,
@@ -35,6 +36,7 @@ import { AccessStageDualList } from '@/features/it/access-stage-dual-list'
 import { useAccessUsers } from '@/features/it/access-users'
 import { isAppLanguage } from '@/i18n'
 import { toast } from '@/components/ui/toast-store'
+import { cn } from '@/lib/utils'
 
 type DraftCategoryEntitlement = {
   accessEntitlementId: string
@@ -46,6 +48,14 @@ type DraftCategoryEntitlement = {
   isDefaultForJoiner: boolean
   sortOrder: number
   isActive: boolean
+}
+
+type RoutingStage = {
+  id: 'requester' | 'approver' | 'fulfiller' | 'verifier' | 'closer'
+  titleKey: string
+  ids: string[]
+  setIds: (ids: string[]) => void
+  hintKey?: string
 }
 
 function stageIds(participantsByStage: Record<string, string[]> | undefined, stage: string): string[] {
@@ -66,7 +76,10 @@ function toDraft(item: AccessCategoryEntitlement): DraftCategoryEntitlement {
   }
 }
 
-function entitlementLabel(item: { nameEn: string; nameAr: string; entitlementKey?: string; key?: string }, language: string) {
+function entitlementLabel(
+  item: { nameEn: string; nameAr: string; entitlementKey?: string; key?: string },
+  language: string,
+) {
   const name = language === 'ar' ? item.nameAr || item.nameEn : item.nameEn || item.nameAr
   return name || item.entitlementKey || item.key || '—'
 }
@@ -104,6 +117,7 @@ export function AccessCategoryDetailPage() {
   const [newPrivileged, setNewPrivileged] = useState(false)
   const [newDefaultJoiner, setNewDefaultJoiner] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [openStage, setOpenStage] = useState<RoutingStage['id'] | null>(null)
 
   const categoryQuery = useQuery({
     queryKey: ['access', 'categories', id],
@@ -292,13 +306,47 @@ export function AccessCategoryDetailPage() {
     setAddAsDefaultJoiner(false)
   }
 
+  const routingStages: RoutingStage[] = [
+    {
+      id: 'requester',
+      titleKey: 'access.stages.requesters',
+      ids: requesters,
+      setIds: setRequesters,
+    },
+    {
+      id: 'approver',
+      titleKey: 'access.stages.approvers',
+      ids: approvers,
+      setIds: setApprovers,
+    },
+    {
+      id: 'fulfiller',
+      titleKey: 'access.stages.fulfillers',
+      ids: fulfillers,
+      setIds: setFulfillers,
+    },
+    {
+      id: 'verifier',
+      titleKey: 'access.stages.verifiers',
+      ids: verifiers,
+      setIds: setVerifiers,
+      hintKey: 'access.categories.fallbackHint',
+    },
+    {
+      id: 'closer',
+      titleKey: 'access.stages.closers',
+      ids: closers,
+      setIds: setClosers,
+    },
+  ]
+
   if (categoryQuery.isLoading) return <p className="text-sm text-muted-foreground">{t('access.loading')}</p>
   if (!categoryQuery.data) return <p className="text-sm text-destructive">{t('access.categories.notFound')}</p>
 
   const category = categoryQuery.data
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title={language === 'ar' ? category.nameAr || category.nameEn : category.nameEn}
         description={category.key}
@@ -324,7 +372,7 @@ export function AccessCategoryDetailPage() {
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="text-base">{t('access.categories.details')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -399,59 +447,7 @@ export function AccessCategoryDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('access.categories.routing')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!isDirectoryAvailable && !usersLoading ? (
-            <p className="text-sm text-muted-foreground">{t('access.directoryUnavailable')}</p>
-          ) : null}
-          <AccessStageDualList
-            title={t('access.stages.requesters')}
-            users={activeUsers}
-            selectedIds={requesters}
-            onChange={setRequesters}
-            disabled={usersLoading || !canConfigure}
-          />
-          <AccessStageDualList
-            title={t('access.stages.approvers')}
-            users={activeUsers}
-            selectedIds={approvers}
-            onChange={setApprovers}
-            disabled={usersLoading || !canConfigure}
-          />
-          <AccessStageDualList
-            title={t('access.stages.fulfillers')}
-            users={activeUsers}
-            selectedIds={fulfillers}
-            onChange={setFulfillers}
-            disabled={usersLoading || !canConfigure}
-          />
-          <AccessStageDualList
-            title={t('access.stages.verifiers')}
-            users={activeUsers}
-            selectedIds={verifiers}
-            onChange={setVerifiers}
-            disabled={usersLoading || !canConfigure}
-          />
-          <p className="text-xs text-muted-foreground">{t('access.categories.fallbackHint')}</p>
-          <AccessStageDualList
-            title={t('access.stages.closers')}
-            users={activeUsers}
-            selectedIds={closers}
-            onChange={setClosers}
-            disabled={usersLoading || !canConfigure}
-          />
-          {canConfigure ? (
-            <Button type="button" disabled={saveRouting.isPending} onClick={() => saveRouting.mutate()}>
-              {t('access.categories.saveRouting')}
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
+        <CardHeader className="pb-3">
           <CardTitle className="text-base">{t('access.categories.accessItems')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -460,70 +456,99 @@ export function AccessCategoryDetailPage() {
           ) : draftItems.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('access.categories.accessItemsEmpty')}</p>
           ) : (
-            <ul className="space-y-2">
-              {draftItems.map((item) => (
-                <li
-                  key={item.accessEntitlementId}
-                  className="flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm"
-                >
-                  <span className="min-w-[140px] font-medium">
-                    {entitlementLabel(item, language)}
-                  </span>
-                  <Badge variant="outline">{item.entitlementKey}</Badge>
-                  <Badge variant="secondary">{item.defaultRevokeAction}</Badge>
-                  {item.isPrivileged ? <Badge variant="outline">{t('access.privileged')}</Badge> : null}
-                  {item.isDefaultForJoiner ? (
-                    <Badge variant="success">{t('access.defaultForJoiner')}</Badge>
-                  ) : null}
-                  {canConfigure ? (
-                    <>
-                      <label className="ms-auto flex items-center gap-2 text-xs">
-                        <Checkbox
-                          checked={item.isDefaultForJoiner}
-                          onCheckedChange={(v) =>
-                            setDraftItems((prev) =>
-                              prev.map((row) =>
-                                row.accessEntitlementId === item.accessEntitlementId
-                                  ? { ...row, isDefaultForJoiner: v === true }
-                                  : row,
-                              ),
-                            )
-                          }
-                        />
-                        {t('access.defaultForJoiner')}
-                      </label>
-                      <label className="flex items-center gap-2 text-xs">
-                        <Checkbox
-                          checked={item.isActive}
-                          onCheckedChange={(v) =>
-                            setDraftItems((prev) =>
-                              prev.map((row) =>
-                                row.accessEntitlementId === item.accessEntitlementId
-                                  ? { ...row, isActive: v === true }
-                                  : row,
-                              ),
-                            )
-                          }
-                        />
-                        {t('access.categories.active')}
-                      </label>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        onClick={() =>
-                          setDraftItems((prev) =>
-                            prev.filter((row) => row.accessEntitlementId !== item.accessEntitlementId),
-                          )
-                        }
-                      >
-                        {t('access.remove')}
-                      </Button>
-                    </>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full min-w-[520px] text-sm">
+                <thead className="border-b bg-muted/40 text-start text-xs text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">{t('access.categories.colItem')}</th>
+                    <th className="px-3 py-2 font-medium">{t('access.categories.colJoinerDefault')}</th>
+                    <th className="px-3 py-2 font-medium">{t('access.categories.colRevoke')}</th>
+                    {canConfigure ? (
+                      <th className="px-3 py-2 font-medium">{t('access.categories.colActions')}</th>
+                    ) : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {draftItems.map((item) => (
+                    <tr key={item.accessEntitlementId} className="border-b last:border-0">
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-medium">{entitlementLabel(item, language)}</span>
+                          {item.isPrivileged ? (
+                            <Badge variant="outline" className="text-[10px]">
+                              {t('access.privileged')}
+                            </Badge>
+                          ) : null}
+                          {!item.isActive ? (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {t('access.categories.inactive')}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{item.entitlementKey}</p>
+                      </td>
+                      <td className="px-3 py-2">
+                        {canConfigure ? (
+                          <Checkbox
+                            checked={item.isDefaultForJoiner}
+                            onCheckedChange={(v) =>
+                              setDraftItems((prev) =>
+                                prev.map((row) =>
+                                  row.accessEntitlementId === item.accessEntitlementId
+                                    ? { ...row, isDefaultForJoiner: v === true }
+                                    : row,
+                                ),
+                              )
+                            }
+                            aria-label={t('access.categories.colJoinerDefault')}
+                          />
+                        ) : item.isDefaultForJoiner ? (
+                          <Badge variant="success">{t('access.default')}</Badge>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{item.defaultRevokeAction}</td>
+                      {canConfigure ? (
+                        <td className="px-3 py-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                              <Checkbox
+                                checked={item.isActive}
+                                onCheckedChange={(v) =>
+                                  setDraftItems((prev) =>
+                                    prev.map((row) =>
+                                      row.accessEntitlementId === item.accessEntitlementId
+                                        ? { ...row, isActive: v === true }
+                                        : row,
+                                    ),
+                                  )
+                                }
+                              />
+                              {t('access.categories.active')}
+                            </label>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              onClick={() =>
+                                setDraftItems((prev) =>
+                                  prev.filter(
+                                    (row) => row.accessEntitlementId !== item.accessEntitlementId,
+                                  ),
+                                )
+                              }
+                            >
+                              {t('access.remove')}
+                            </Button>
+                          </div>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {canConfigure ? (
@@ -578,6 +603,73 @@ export function AccessCategoryDetailPage() {
                 {t('access.categories.saveAccessItems')}
               </Button>
             </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">{t('access.categories.workflowRouting')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!isDirectoryAvailable && !usersLoading ? (
+            <p className="text-sm text-muted-foreground">{t('access.directoryUnavailable')}</p>
+          ) : null}
+
+          {routingStages.map((stage) => {
+            const expanded = openStage === stage.id
+            return (
+              <div key={stage.id} className="rounded-lg border">
+                <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+                  <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-2 text-start"
+                    onClick={() => setOpenStage(expanded ? null : stage.id)}
+                  >
+                    <ChevronDown
+                      className={cn(
+                        'h-4 w-4 shrink-0 text-muted-foreground transition-transform',
+                        expanded && 'rotate-180',
+                      )}
+                    />
+                    <span className="truncate text-sm font-medium">{t(stage.titleKey)}</span>
+                    <Badge variant="secondary" className="ms-1 tabular-nums">
+                      {stage.ids.length}
+                    </Badge>
+                  </button>
+                  {canConfigure ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setOpenStage(expanded ? null : stage.id)}
+                    >
+                      {t('access.manage')}
+                    </Button>
+                  ) : null}
+                </div>
+                {stage.hintKey && expanded ? (
+                  <p className="border-t px-3 py-2 text-xs text-muted-foreground">{t(stage.hintKey)}</p>
+                ) : null}
+                {expanded ? (
+                  <div className="border-t p-3">
+                    <AccessStageDualList
+                      title={t(stage.titleKey)}
+                      users={activeUsers}
+                      selectedIds={stage.ids}
+                      onChange={stage.setIds}
+                      disabled={usersLoading || !canConfigure}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            )
+          })}
+
+          {canConfigure ? (
+            <Button type="button" disabled={saveRouting.isPending} onClick={() => saveRouting.mutate()}>
+              {t('access.categories.saveRouting')}
+            </Button>
           ) : null}
         </CardContent>
       </Card>
