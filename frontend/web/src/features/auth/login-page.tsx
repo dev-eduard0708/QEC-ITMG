@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertCircle,
   ChevronDown,
+  Hammer,
   Languages,
   Moon,
   RefreshCw,
@@ -113,7 +114,9 @@ export function LoginPage() {
   const [apiStatus, setApiStatus] = useState<ApiHealthStatus>('checking')
   const [healthBusy, setHealthBusy] = useState(false)
   const [restartBusy, setRestartBusy] = useState(false)
+  const [rebuildBusy, setRebuildBusy] = useState(false)
   const [restartMessage, setRestartMessage] = useState<string | null>(null)
+  const apiActionBusy = restartBusy || rebuildBusy
 
   async function refreshApiHealth() {
     setHealthBusy(true)
@@ -127,46 +130,61 @@ export function LoginPage() {
     }
   }
 
-  async function restartLocalApi() {
-    if (!import.meta.env.DEV || restartBusy) return
-    setRestartBusy(true)
+  async function runLocalApiAction(kind: 'restart' | 'rebuild') {
+    if (!import.meta.env.DEV || apiActionBusy) return
+    const setBusy = kind === 'rebuild' ? setRebuildBusy : setRestartBusy
+    setBusy(true)
     setRestartMessage(null)
     setQuickLoginError(null)
     try {
-      const response = await fetch('/__dev/restart-api', { method: 'POST' })
+      const response = await fetch(kind === 'rebuild' ? '/__dev/rebuild-api' : '/__dev/restart-api', {
+        method: 'POST',
+      })
       if (response.status === 404) {
         setApiStatus(await probeApiHealth())
-        setRestartMessage(t('login.server.restartNeedsUiReload'))
+        setRestartMessage(
+          t(kind === 'rebuild' ? 'login.server.rebuildNeedsUiReload' : 'login.server.restartNeedsUiReload'),
+        )
         return
       }
       const body = (await response.json().catch(() => null)) as { message?: string; ok?: boolean } | null
       if (!response.ok) {
-        throw new Error(body?.message || t('login.server.restartFailed'))
+        throw new Error(
+          body?.message ||
+            t(kind === 'rebuild' ? 'login.server.rebuildFailed' : 'login.server.restartFailed'),
+        )
       }
-      setRestartMessage(t('login.server.restarting'))
+      setRestartMessage(
+        t(kind === 'rebuild' ? 'login.server.rebuilding' : 'login.server.restarting'),
+      )
       setApiStatus('checking')
 
-      // Poll until the API is back (dotnet run can take a bit).
-      for (let attempt = 0; attempt < 40; attempt += 1) {
+      // Rebuild includes compile time; allow a longer poll window than restart.
+      const maxAttempts = kind === 'rebuild' ? 80 : 40
+      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         await new Promise((resolve) => window.setTimeout(resolve, 1500))
         const next = await probeApiHealth()
         if (next === 'up') {
           setApiStatus('up')
-          setRestartMessage(t('login.server.restartSuccess'))
+          setRestartMessage(
+            t(kind === 'rebuild' ? 'login.server.rebuildSuccess' : 'login.server.restartSuccess'),
+          )
           return
         }
       }
       setApiStatus('down')
-      setRestartMessage(t('login.server.restartTimeout'))
+      setRestartMessage(
+        t(kind === 'rebuild' ? 'login.server.rebuildTimeout' : 'login.server.restartTimeout'),
+      )
     } catch (caught) {
       setApiStatus('down')
       setRestartMessage(
         caught instanceof Error && caught.message
           ? caught.message
-          : t('login.server.restartFailed'),
+          : t(kind === 'rebuild' ? 'login.server.rebuildFailed' : 'login.server.restartFailed'),
       )
     } finally {
-      setRestartBusy(false)
+      setBusy(false)
     }
   }
 
@@ -513,29 +531,44 @@ export function LoginPage() {
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={healthBusy || restartBusy}
+                    disabled={healthBusy || apiActionBusy}
                     onClick={() => void refreshApiHealth()}
                   >
                     <RefreshCw
-                      className={cn('h-3.5 w-3.5', (healthBusy || restartBusy) && 'animate-spin')}
+                      className={cn('h-3.5 w-3.5', (healthBusy || apiActionBusy) && 'animate-spin')}
                       aria-hidden
                     />
                     {t('login.server.checkAgain')}
                   </Button>
                   {import.meta.env.DEV ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant={apiStatus === 'down' ? 'default' : 'secondary'}
-                      disabled={restartBusy}
-                      onClick={() => void restartLocalApi()}
-                    >
-                      <RotateCcw
-                        className={cn('h-3.5 w-3.5', restartBusy && 'animate-spin')}
-                        aria-hidden
-                      />
-                      {restartBusy ? t('login.server.restartBusy') : t('login.server.restart')}
-                    </Button>
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={apiStatus === 'down' ? 'default' : 'secondary'}
+                        disabled={apiActionBusy}
+                        onClick={() => void runLocalApiAction('restart')}
+                      >
+                        <RotateCcw
+                          className={cn('h-3.5 w-3.5', restartBusy && 'animate-spin')}
+                          aria-hidden
+                        />
+                        {restartBusy ? t('login.server.restartBusy') : t('login.server.restart')}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        disabled={apiActionBusy}
+                        onClick={() => void runLocalApiAction('rebuild')}
+                      >
+                        <Hammer
+                          className={cn('h-3.5 w-3.5', rebuildBusy && 'animate-spin')}
+                          aria-hidden
+                        />
+                        {rebuildBusy ? t('login.server.rebuildBusy') : t('login.server.rebuild')}
+                      </Button>
+                    </>
                   ) : null}
                 </div>
               </div>

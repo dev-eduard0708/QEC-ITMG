@@ -27,8 +27,9 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
 
 /**
  * Development-only helpers used by the login page:
- * - GET  /__dev/api-health  → { status: 'up' | 'down' }
- * - POST /__dev/restart-api → launches scripts/restart-local-api.ps1
+ * - GET  /__dev/api-health   → { status: 'up' | 'down' }
+ * - POST /__dev/restart-api  → launches scripts/restart-local-api.ps1
+ * - POST /__dev/rebuild-api  → launches scripts/rebuild-local-api.ps1
  */
 function localApiControlPlugin(): Plugin {
   return {
@@ -36,7 +37,7 @@ function localApiControlPlugin(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (req: IncomingMessage, res: ServerResponse, next) => {
         const url = req.url?.split('?')[0] ?? ''
-        if (url !== '/__dev/api-health' && url !== '/__dev/restart-api') {
+        if (url !== '/__dev/api-health' && url !== '/__dev/restart-api' && url !== '/__dev/rebuild-api') {
           next()
           return
         }
@@ -56,8 +57,16 @@ function localApiControlPlugin(): Plugin {
           return
         }
 
-        if (url === '/__dev/restart-api' && req.method === 'POST') {
-          const script = path.join(repoRoot, 'scripts', 'restart-local-api.ps1')
+        if (
+          (url === '/__dev/restart-api' || url === '/__dev/rebuild-api') &&
+          req.method === 'POST'
+        ) {
+          const isRebuild = url === '/__dev/rebuild-api'
+          const script = path.join(
+            repoRoot,
+            'scripts',
+            isRebuild ? 'rebuild-local-api.ps1' : 'restart-local-api.ps1',
+          )
           try {
             const child = spawn(
               'powershell.exe',
@@ -72,12 +81,19 @@ function localApiControlPlugin(): Plugin {
             child.unref()
             sendJson(res, 202, {
               ok: true,
-              message: 'API restart launched. Waiting for health…',
+              message: isRebuild
+                ? 'API rebuild launched. Waiting for health…'
+                : 'API restart launched. Waiting for health…',
             })
           } catch (error) {
             sendJson(res, 500, {
               ok: false,
-              message: error instanceof Error ? error.message : 'Failed to launch API restart.',
+              message:
+                error instanceof Error
+                  ? error.message
+                  : isRebuild
+                    ? 'Failed to launch API rebuild.'
+                    : 'Failed to launch API restart.',
             })
           }
           return
