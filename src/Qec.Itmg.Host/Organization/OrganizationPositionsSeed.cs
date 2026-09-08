@@ -492,7 +492,7 @@ public sealed class OrganizationPositionsSeedRunner(
             foreach (Position position in matches)
             {
                 bool hasAssignments = await db.PositionAssignments
-                    .AnyAsync(a => a.PositionId == position.Id, ct);
+                    .AnyAsync(a => a.PositionId == position.Id && a.EffectiveTo == null, ct);
                 if (hasAssignments)
                 {
                     logger.LogInformation(

@@ -158,7 +158,7 @@ public sealed class PositionService(
         }
 
         List<Position> positions = await db.Positions.AsNoTracking()
-            .Where(x => x.DepartmentId == department.Id)
+            .Where(x => x.DepartmentId == department.Id && x.IsActive)
             .OrderBy(x => x.SortOrder)
             .ThenBy(x => x.NameEn)
             .ToListAsync(ct);
