@@ -36,6 +36,14 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
 
         builder.Property(department => department.ParentDepartmentId);
 
+        builder.Property(department => department.UnitType)
+            .IsRequired()
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .HasColumnType("nvarchar(32)");
+        // Do not use HasDefaultValue on the enum: Company = 0 would be omitted from INSERTs
+        // and the SQL default "Department" would overwrite Company roots.
+
         builder.Property(department => department.IsActive).IsRequired();
         builder.Property(department => department.SortOrder).IsRequired();
         builder.Property(department => department.CreatedAtUtc).IsRequired();

@@ -15,6 +15,7 @@ public sealed class DepartmentLocationDomainTests
         Assert.NotEqual(Guid.Empty, department.Id);
         Assert.Equal("IT", department.Name);
         Assert.Equal("Information Technology", department.Description);
+        Assert.Equal(DepartmentUnitType.Department, department.UnitType);
         Assert.True(department.IsActive);
         Assert.Equal(Now, department.CreatedAtUtc);
         Assert.Equal(Now, department.UpdatedAtUtc);

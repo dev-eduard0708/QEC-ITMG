@@ -15,6 +15,7 @@ public sealed record DepartmentDetailDto(
     string? DescriptionEn,
     string? DescriptionAr,
     Guid? ParentDepartmentId,
+    DepartmentUnitType UnitType,
     bool IsActive,
     int SortOrder,
     int MemberCount,
@@ -29,9 +30,11 @@ public sealed record CompanyDepartmentCardDto(
     string? NameAr,
     string Code,
     Guid? ParentDepartmentId,
+    DepartmentUnitType UnitType,
     bool IsActive,
     int PeopleCount,
     int PositionCount,
+    int MemberCount,
     int SortOrder);
 
 public sealed record DepartmentMemberDto(
@@ -53,6 +56,8 @@ public sealed record PeopleRowDto(
     Guid? PrimaryDepartmentId,
     string? PrimaryDepartmentName,
     int AdditionalDepartmentCount,
+    string? PrimaryPositionName,
+    int AdditionalPositionCount,
     IReadOnlyList<string> PositionNames);
 
 public sealed record UserOrgProfileDto(
@@ -99,7 +104,8 @@ public sealed class DepartmentService(
 
     public async Task<IReadOnlyList<CompanyDepartmentCardDto>> CompanyViewAsync(CancellationToken ct)
     {
-        IReadOnlyList<DepartmentDetailDto> details = await ListDetailedAsync(activeOnly: true, ct);
+        // Include inactive units so administrators can reactivate from Company View.
+        IReadOnlyList<DepartmentDetailDto> details = await ListDetailedAsync(activeOnly: false, ct);
         return details
             .Select(d => new CompanyDepartmentCardDto(
                 d.Id,
@@ -107,9 +113,11 @@ public sealed class DepartmentService(
                 d.NameAr,
                 d.Code,
                 d.ParentDepartmentId,
+                d.UnitType,
                 d.IsActive,
                 d.MemberCount,
                 d.PositionCount,
+                d.MemberCount,
                 d.SortOrder))
             .ToList();
     }
@@ -134,6 +142,7 @@ public sealed class DepartmentService(
         string? descriptionAr,
         Guid? parentDepartmentId,
         int sortOrder,
+        DepartmentUnitType unitType,
         CancellationToken ct)
     {
         string normalizedCode = Department.NormalizeCode(code);
@@ -164,7 +173,8 @@ public sealed class DepartmentService(
             nameAr,
             descriptionAr,
             parentDepartmentId,
-            sortOrder);
+            sortOrder,
+            unitType);
 
         await sharedDbTransaction.ExecuteAsync(async innerCt =>
         {
@@ -185,6 +195,7 @@ public sealed class DepartmentService(
         Guid? parentDepartmentId,
         int sortOrder,
         bool isActive,
+        DepartmentUnitType unitType,
         CancellationToken ct)
     {
         Department entity = await db.Departments.FirstOrDefaultAsync(x => x.Id == id, ct)
@@ -217,6 +228,10 @@ public sealed class DepartmentService(
             await EnsureNoDepartmentParentCycleAsync(id, parentId, ct);
         }
 
+        Guid? previousParent = entity.ParentDepartmentId;
+        bool parentChanged = previousParent != parentDepartmentId
+            && !(previousParent is null && parentDepartmentId is null);
+
         await sharedDbTransaction.ExecuteAsync(async innerCt =>
         {
             entity.UpdateDetails(
@@ -228,8 +243,61 @@ public sealed class DepartmentService(
                 parentDepartmentId,
                 sortOrder,
                 isActive,
-                clock.UtcNow);
+                clock.UtcNow,
+                unitType);
             await businessAudit.AppendAsync(DepartmentAudit.Updated(entity), innerCt);
+            if (parentChanged)
+            {
+                await businessAudit.AppendAsync(
+                    DepartmentAudit.Moved(entity, previousParent, parentDepartmentId),
+                    innerCt);
+            }
+        }, ct);
+
+        return (await GetAsync(id, ct))!;
+    }
+
+    public async Task<DepartmentDetailDto> MoveAsync(
+        Guid id,
+        Guid? parentDepartmentId,
+        CancellationToken ct)
+    {
+        Department entity = await db.Departments.FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new InvalidOperationException("Department was not found.");
+
+        if (parentDepartmentId == Guid.Empty)
+        {
+            parentDepartmentId = null;
+        }
+
+        if (parentDepartmentId is Guid parentId)
+        {
+            if (parentId == id)
+            {
+                throw new InvalidOperationException("A department cannot be its own parent.");
+            }
+
+            bool parentExists = await db.Departments.AnyAsync(x => x.Id == parentId, ct);
+            if (!parentExists)
+            {
+                throw new InvalidOperationException("Parent department was not found.");
+            }
+
+            await EnsureNoDepartmentParentCycleAsync(id, parentId, ct);
+        }
+
+        Guid? previousParent = entity.ParentDepartmentId;
+        if (previousParent == parentDepartmentId)
+        {
+            return (await GetAsync(id, ct))!;
+        }
+
+        await sharedDbTransaction.ExecuteAsync(async innerCt =>
+        {
+            entity.SetParent(parentDepartmentId, clock.UtcNow);
+            await businessAudit.AppendAsync(
+                DepartmentAudit.Moved(entity, previousParent, parentDepartmentId),
+                innerCt);
         }, ct);
 
         return (await GetAsync(id, ct))!;
@@ -240,10 +308,52 @@ public sealed class DepartmentService(
         Department entity = await db.Departments.FirstOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new InvalidOperationException("Department was not found.");
 
+        if (!entity.IsActive)
+        {
+            return (await GetAsync(id, ct))!;
+        }
+
+        int activeChildren = await db.Departments.CountAsync(
+            x => x.ParentDepartmentId == id && x.IsActive,
+            ct);
+        if (activeChildren > 0)
+        {
+            throw new InvalidOperationException(
+                $"Cannot deactivate '{entity.Name}' while it has {activeChildren} active child organizational unit(s). Deactivate or reparent children first.");
+        }
+
+        int activeMemberships = await db.DepartmentMemberships.CountAsync(
+            x => x.DepartmentId == id && x.EffectiveTo == null,
+            ct);
+        if (activeMemberships > 0)
+        {
+            throw new InvalidOperationException(
+                $"Cannot deactivate '{entity.Name}' while it has {activeMemberships} active membership(s). Remove or reassign members first.");
+        }
+
         await sharedDbTransaction.ExecuteAsync(async innerCt =>
         {
             entity.Deactivate(clock.UtcNow);
             await businessAudit.AppendAsync(DepartmentAudit.Deactivated(entity), innerCt);
+        }, ct);
+
+        return (await GetAsync(id, ct))!;
+    }
+
+    public async Task<DepartmentDetailDto> ReactivateAsync(Guid id, CancellationToken ct)
+    {
+        Department entity = await db.Departments.FirstOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new InvalidOperationException("Department was not found.");
+
+        if (entity.IsActive)
+        {
+            return (await GetAsync(id, ct))!;
+        }
+
+        await sharedDbTransaction.ExecuteAsync(async innerCt =>
+        {
+            entity.Activate(clock.UtcNow);
+            await businessAudit.AppendAsync(DepartmentAudit.Reactivated(entity), innerCt);
         }, ct);
 
         return (await GetAsync(id, ct))!;
@@ -325,6 +435,34 @@ public sealed class DepartmentService(
 
         IReadOnlyList<DepartmentMemberDto> members = await ListMembersAsync(departmentId, ct);
         return members.First(m => m.UserId == userId);
+    }
+
+    public async Task<IReadOnlyList<DepartmentMemberDto>> AddMembersBatchAsync(
+        Guid departmentId,
+        IReadOnlyList<Guid> userIds,
+        bool isPrimary,
+        CancellationToken ct)
+    {
+        if (userIds.Count == 0)
+        {
+            throw new InvalidOperationException("At least one user is required.");
+        }
+
+        List<DepartmentMemberDto> results = [];
+        foreach (Guid userId in userIds.Distinct())
+        {
+            bool already = await db.DepartmentMemberships.AnyAsync(
+                x => x.DepartmentId == departmentId && x.UserId == userId && x.EffectiveTo == null,
+                ct);
+            if (already)
+            {
+                continue;
+            }
+
+            results.Add(await AddMemberAsync(departmentId, userId, isPrimary, ct));
+        }
+
+        return results;
     }
 
     public async Task RemoveMemberAsync(Guid departmentId, Guid userId, CancellationToken ct)
@@ -462,8 +600,19 @@ public sealed class DepartmentService(
                 ? dept.Name
                 : null;
             int additional = Math.Max(0, userMemberships.Count - (primary is null ? 0 : 1));
-            List<string> positionNames = assignments
+
+            List<PositionAssignment> userAssignments = assignments
                 .Where(a => a.UserId == user.Id && positions.ContainsKey(a.PositionId))
+                .OrderByDescending(a => a.IsPrimary)
+                .ThenBy(a => positions[a.PositionId].SortOrder)
+                .ToList();
+            PositionAssignment? primaryAssignment =
+                userAssignments.FirstOrDefault(a => a.IsPrimary) ?? userAssignments.FirstOrDefault();
+            string? primaryPositionName = primaryAssignment is not null
+                ? positions[primaryAssignment.PositionId].NameEn
+                : null;
+            int additionalPositions = Math.Max(0, userAssignments.Count - (primaryAssignment is null ? 0 : 1));
+            List<string> positionNames = userAssignments
                 .Select(a => positions[a.PositionId].NameEn)
                 .Distinct()
                 .OrderBy(n => n)
@@ -478,6 +627,8 @@ public sealed class DepartmentService(
                 primary?.DepartmentId,
                 primaryName,
                 additional,
+                primaryPositionName,
+                additionalPositions,
                 positionNames);
         }).ToList();
     }
@@ -624,6 +775,7 @@ public sealed class DepartmentService(
             d.Description,
             d.DescriptionAr,
             d.ParentDepartmentId,
+            d.UnitType,
             d.IsActive,
             d.SortOrder,
             members.GetValueOrDefault(d.Id),
@@ -642,8 +794,22 @@ internal static class DepartmentAudit
     public static BusinessAuditEntry Updated(Department department) =>
         Field(department, "DepartmentUpdated", null, department.Name, BusinessAuditAction.Updated);
 
+    public static BusinessAuditEntry Moved(
+        Department department,
+        Guid? oldParentId,
+        Guid? newParentId) =>
+        Field(
+            department,
+            "DepartmentMoved",
+            oldParentId?.ToString(),
+            newParentId?.ToString(),
+            BusinessAuditAction.Updated);
+
     public static BusinessAuditEntry Deactivated(Department department) =>
         Field(department, "DepartmentDeactivated", "Active", "Inactive", BusinessAuditAction.StatusChanged);
+
+    public static BusinessAuditEntry Reactivated(Department department) =>
+        Field(department, "DepartmentReactivated", "Inactive", "Active", BusinessAuditAction.StatusChanged);
 
     public static BusinessAuditEntry MemberAdded(Department department, Guid userId) =>
         Field(department, "DepartmentMemberAdded", null, userId.ToString(), BusinessAuditAction.Assigned);

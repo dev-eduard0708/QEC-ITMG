@@ -12,9 +12,9 @@ public interface IOrganizationPositionsSeedRunner
 }
 
 /// <summary>
-/// Idempotent starter departments + position hierarchies.
-/// Does not seed user assignments and does not overwrite existing position names/parents
-/// or manually configured department parents.
+/// Idempotent HR-aligned organizational units + position hierarchies.
+/// Does not seed user assignments. Conservatively aligns known starter nodes;
+/// never overwrites admin-customized names/parents outside known starter patterns.
 /// </summary>
 public sealed class OrganizationPositionsSeedRunner(
     OrganizationDbContext db,
@@ -28,7 +28,9 @@ public sealed class OrganizationPositionsSeedRunner(
         string? DescriptionEn,
         string? DescriptionAr,
         int SortOrder,
-        string? ParentCode);
+        string? ParentCode,
+        DepartmentUnitType UnitType,
+        string[] KnownOldNames);
 
     private sealed record PositionSeed(
         string DepartmentCode,
@@ -44,21 +46,25 @@ public sealed class OrganizationPositionsSeedRunner(
     private static readonly DeptSeed[] Departments =
     [
         new(
+            "QEC",
+            "Quality Education Company",
+            "شركة جودة التعليم",
+            "QEC Head Office company root.",
+            "جذر شركة جودة التعليم للمكتب الرئيسي.",
+            0,
+            null,
+            DepartmentUnitType.Company,
+            []),
+        new(
             "EXEC",
-            "Executive",
+            "Executive Management",
             "الإدارة التنفيذية",
             "Corporate executive leadership and executive office support.",
             "القيادة التنفيذية للشركة ودعم المكتب التنفيذي.",
-            1,
-            null),
-        new(
-            "PM",
-            "Project Management",
-            "إدارة المشاريع",
-            "Identifies project opportunities, coordinates project delivery and staffing requirements, selects or recommends project personnel, and endorses selected candidates to Human Resources for formal employment and onboarding processing.",
-            "تتولى إدارة المشاريع تحديد فرص المشاريع وتنسيق تنفيذها واحتياجاتها من القوى العاملة واختيار أو ترشيح الكوادر المطلوبة للمشاريع وإحالة المرشحين المختارين إلى الموارد البشرية لاستكمال إجراءات التوظيف والانضمام الرسمية.",
             10,
-            "EXEC"),
+            "QEC",
+            DepartmentUnitType.Department,
+            ["Executive"]),
         new(
             "HR",
             "Human Resources",
@@ -66,7 +72,79 @@ public sealed class OrganizationPositionsSeedRunner(
             "Human Resources",
             null,
             20,
-            "EXEC"),
+            "QEC",
+            DepartmentUnitType.Department,
+            ["Human Resources"]),
+        new(
+            "HR-PAYROLL",
+            "Payroll",
+            "الرواتب",
+            null,
+            null,
+            21,
+            "HR",
+            DepartmentUnitType.Section,
+            []),
+        new(
+            "HR-ADMIN",
+            "Admin & Support",
+            "الإدارة والدعم",
+            null,
+            null,
+            22,
+            "HR",
+            DepartmentUnitType.Section,
+            []),
+        new(
+            "HR-GOVREL",
+            "Government Relations",
+            "العلاقات الحكومية",
+            null,
+            null,
+            23,
+            "HR",
+            DepartmentUnitType.Section,
+            []),
+        new(
+            "HR-PERSONNEL",
+            "Personnel Administration",
+            "إدارة شؤون الموظفين",
+            null,
+            null,
+            24,
+            "HR",
+            DepartmentUnitType.Section,
+            []),
+        new(
+            "HR-COMPBEN",
+            "Compensation and Benefits",
+            "التعويضات والمزايا",
+            null,
+            null,
+            25,
+            "HR",
+            DepartmentUnitType.Section,
+            []),
+        new(
+            "HR-OPS",
+            "HR Operations",
+            "عمليات الموارد البشرية",
+            null,
+            null,
+            26,
+            "HR",
+            DepartmentUnitType.Section,
+            []),
+        new(
+            "HR-RECRUIT",
+            "Recruitment",
+            "التوظيف",
+            null,
+            null,
+            27,
+            "HR",
+            DepartmentUnitType.Section,
+            []),
         new(
             "FINANCE",
             "Finance",
@@ -74,16 +152,93 @@ public sealed class OrganizationPositionsSeedRunner(
             "Finance",
             null,
             30,
-            "EXEC"),
+            "QEC",
+            DepartmentUnitType.Department,
+            ["Finance"]),
         new(
             "IT",
-            "IT",
+            "Information Technology",
             "تقنية المعلومات",
             "Information Technology",
             null,
             40,
-            "EXEC"),
+            "QEC",
+            DepartmentUnitType.Department,
+            ["IT"]),
+        new(
+            "LEGAL",
+            "Legal Affairs",
+            "الشؤون القانونية",
+            null,
+            null,
+            50,
+            "QEC",
+            DepartmentUnitType.Department,
+            []),
+        new(
+            "PM",
+            "PMO",
+            "مكتب إدارة المشاريع",
+            "Identifies project opportunities, coordinates project delivery and staffing requirements, selects or recommends project personnel, and endorses selected candidates to Human Resources for formal employment and onboarding processing.",
+            "تتولى إدارة المشاريع تحديد فرص المشاريع وتنسيق تنفيذها واحتياجاتها من القوى العاملة واختيار أو ترشيح الكوادر المطلوبة للمشاريع وإحالة المرشحين المختارين إلى الموارد البشرية لاستكمال إجراءات التوظيف والانضمام الرسمية.",
+            60,
+            "QEC",
+            DepartmentUnitType.Department,
+            ["Project Management", "Project"]),
+        new(
+            "PM-STAFF",
+            "PM Staff",
+            "فريق إدارة المشاريع",
+            null,
+            null,
+            61,
+            "PM",
+            DepartmentUnitType.Team,
+            []),
+        new(
+            "PM-OPS",
+            "Operations and International Coordination",
+            "العمليات والتنسيق الدولي",
+            null,
+            null,
+            62,
+            "PM",
+            DepartmentUnitType.Section,
+            []),
+        new(
+            "PM-PM",
+            "PM",
+            "إدارة المشاريع",
+            null,
+            null,
+            63,
+            "PM",
+            DepartmentUnitType.Section,
+            []),
+        new(
+            "PM-OFFICE",
+            "PM Office",
+            "مكتب المشاريع",
+            null,
+            null,
+            64,
+            "PM",
+            DepartmentUnitType.Office,
+            []),
+        new(
+            "MARKETING",
+            "Marketing",
+            "التسويق",
+            null,
+            null,
+            70,
+            "QEC",
+            DepartmentUnitType.Department,
+            []),
     ];
+
+    private static readonly HashSet<string> StarterCodesUnderQec =
+        new(StringComparer.OrdinalIgnoreCase) { "EXEC", "HR", "FINANCE", "IT", "PM", "LEGAL", "MARKETING" };
 
     private static readonly PositionSeed[] Positions =
     [
@@ -105,6 +260,11 @@ public sealed class OrganizationPositionsSeedRunner(
             "EXEC-VP", false, 40,
             "Provides executive office support to the Vice President.",
             "يقدم الدعم للمكتب التنفيذي لنائب الرئيس."),
+
+        new(
+            "HR", "HR_MANAGER", "HR Manager", "مدير الموارد البشرية", null, true, 10,
+            "Leads Human Resources for QEC Head Office.",
+            "يقود الموارد البشرية لمكتب QEC الرئيسي."),
 
         new(
             "PM", "PM-HEAD", "Head of Project Management", "مدير إدارة المشاريع", null, true, 10,
@@ -140,13 +300,16 @@ public sealed class OrganizationPositionsSeedRunner(
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
-        // Ensure Executive first so child parents resolve.
-        foreach (DeptSeed dept in Departments.OrderBy(d => d.ParentCode is null ? 0 : 1).ThenBy(d => d.SortOrder))
+        // Parents before children (null parent first, then by SortOrder).
+        foreach (DeptSeed dept in Departments
+                     .OrderBy(d => d.ParentCode is null ? 0 : 1)
+                     .ThenBy(d => d.SortOrder))
         {
             await EnsureDepartmentAsync(dept, cancellationToken);
         }
 
-        await AttachOrphanStarterDepartmentsToExecutiveAsync(cancellationToken);
+        await AttachOrphanStarterDepartmentsToQecAsync(cancellationToken);
+        await AlignStarterParentsUnderQecAsync(cancellationToken);
 
         Dictionary<string, Guid> departmentIds = await db.Departments.AsNoTracking()
             .Where(d => d.Code != null)
@@ -169,15 +332,15 @@ public sealed class OrganizationPositionsSeedRunner(
             created);
     }
 
-    private async Task AttachOrphanStarterDepartmentsToExecutiveAsync(CancellationToken ct)
+    private async Task AttachOrphanStarterDepartmentsToQecAsync(CancellationToken ct)
     {
-        Department? exec = await db.Departments.FirstOrDefaultAsync(x => x.Code == "EXEC", ct);
-        if (exec is null)
+        Department? qec = await db.Departments.FirstOrDefaultAsync(x => x.Code == "QEC", ct);
+        if (qec is null)
         {
             return;
         }
 
-        string[] attachCodes = ["PM", "HR", "FINANCE", "IT"];
+        string[] attachCodes = ["EXEC", "PM", "HR", "FINANCE", "IT", "LEGAL", "MARKETING"];
         foreach (string code in attachCodes)
         {
             Department? dept = await db.Departments.FirstOrDefaultAsync(x => x.Code == code, ct);
@@ -186,11 +349,56 @@ public sealed class OrganizationPositionsSeedRunner(
                 continue;
             }
 
-            dept.SetParent(exec.Id, clock.UtcNow);
+            dept.SetParent(qec.Id, clock.UtcNow);
             await db.SaveChangesAsync(ct);
             logger.LogInformation(
-                "Attached orphan starter department {Code} under Executive.",
+                "Attached orphan starter department {Code} under QEC.",
                 code);
+        }
+    }
+
+    private async Task AlignStarterParentsUnderQecAsync(CancellationToken ct)
+    {
+        Department? qec = await db.Departments.AsNoTracking().FirstOrDefaultAsync(x => x.Code == "QEC", ct);
+        Department? exec = await db.Departments.AsNoTracking().FirstOrDefaultAsync(x => x.Code == "EXEC", ct);
+        if (qec is null)
+        {
+            return;
+        }
+
+        foreach (string code in StarterCodesUnderQec)
+        {
+            if (string.Equals(code, "EXEC", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            DeptSeed? seed = Departments.FirstOrDefault(d =>
+                string.Equals(d.Code, code, StringComparison.OrdinalIgnoreCase));
+            if (seed is null)
+            {
+                continue;
+            }
+
+            Department? dept = await db.Departments.FirstOrDefaultAsync(x => x.Code == code, ct);
+            if (dept is null)
+            {
+                continue;
+            }
+
+            bool underExec = exec is not null && dept.ParentDepartmentId == exec.Id;
+            bool orphan = dept.ParentDepartmentId is null;
+            bool knownName = seed.KnownOldNames.Any(n =>
+                string.Equals(n, dept.Name, StringComparison.Ordinal))
+                || string.Equals(dept.Name, seed.NameEn, StringComparison.Ordinal);
+
+            // Reparent to QEC only for known starter pattern (orphan or still under EXEC with known name).
+            if ((orphan || underExec) && knownName && dept.ParentDepartmentId != qec.Id)
+            {
+                dept.SetParent(qec.Id, clock.UtcNow);
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation("Reparented starter department {Code} under QEC.", code);
+            }
         }
     }
 
@@ -264,9 +472,22 @@ public sealed class OrganizationPositionsSeedRunner(
         }
 
         Department? existing = await db.Departments
-            .FirstOrDefaultAsync(x => x.Code == normalized || x.Name == seed.NameEn, ct);
+            .FirstOrDefaultAsync(x => x.Code == normalized, ct);
+
+        // Avoid matching by display name alone — codes are the stable identity; never duplicate codes.
         if (existing is null)
         {
+            // Name uniqueness: if another row already uses this English name under a different code, skip create.
+            bool nameTaken = await db.Departments.AnyAsync(x => x.Name == seed.NameEn, ct);
+            if (nameTaken)
+            {
+                logger.LogWarning(
+                    "Skipping create for department {Code}: name '{Name}' already used by another unit.",
+                    normalized,
+                    seed.NameEn);
+                return;
+            }
+
             db.Departments.Add(Department.Create(
                 seed.NameEn,
                 clock.UtcNow,
@@ -275,42 +496,124 @@ public sealed class OrganizationPositionsSeedRunner(
                 seed.NameAr,
                 seed.DescriptionAr,
                 parentId,
-                seed.SortOrder));
+                seed.SortOrder,
+                seed.UnitType));
             await db.SaveChangesAsync(ct);
             logger.LogInformation("Created department {Code} ({Name}).", normalized, seed.NameEn);
             return;
         }
 
-        // Backfill code / bilingual / description without overwriting an existing parent.
-        bool needsBackfill = string.IsNullOrWhiteSpace(existing.Code)
-            || existing.Code != normalized
-            || (existing.NameAr is null && seed.NameAr is not null)
-            || (existing.Description is null && seed.DescriptionEn is not null)
-            || (existing.DescriptionAr is null && seed.DescriptionAr is not null)
-            || existing.SortOrder == 0;
+        await AlignExistingDepartmentAsync(existing, seed, parentId, ct);
+    }
 
-        if (needsBackfill)
+    private async Task AlignExistingDepartmentAsync(
+        Department existing,
+        DeptSeed seed,
+        Guid? desiredParentId,
+        CancellationToken ct)
+    {
+        bool changed = false;
+        bool isKnownOldName = seed.KnownOldNames.Any(n =>
+            string.Equals(n, existing.Name, StringComparison.Ordinal));
+        bool alreadyTargetName = string.Equals(existing.Name, seed.NameEn, StringComparison.Ordinal);
+
+        // Safe rename only when still on a known old starter name.
+        string nameEn = existing.Name;
+        string? nameAr = existing.NameAr;
+        if (isKnownOldName && !alreadyTargetName)
         {
-            existing.UpdateDetails(
-                existing.Name,
-                existing.NameAr ?? seed.NameAr,
-                normalized,
-                existing.Description ?? seed.DescriptionEn,
-                existing.DescriptionAr ?? seed.DescriptionAr,
-                existing.ParentDepartmentId,
-                existing.SortOrder == 0 ? seed.SortOrder : existing.SortOrder,
-                existing.IsActive,
-                clock.UtcNow);
-            await db.SaveChangesAsync(ct);
+            nameEn = seed.NameEn;
+            nameAr = existing.NameAr ?? seed.NameAr;
+            changed = true;
+        }
+        else if (alreadyTargetName && existing.NameAr is null && seed.NameAr is not null)
+        {
+            nameAr = seed.NameAr;
+            changed = true;
         }
 
-        // Attach starter PM to Executive only when it still has no parent.
-        if (normalized == "PM"
-            && existing.ParentDepartmentId is null
-            && parentId is Guid execId)
+        // UnitType: set when aligning known starter nodes (old name or already target name).
+        // Also always correct the QEC company root type if still the SQL/migration default.
+        DepartmentUnitType unitType = existing.UnitType;
+        if ((isKnownOldName || alreadyTargetName || string.Equals(seed.Code, "QEC", StringComparison.OrdinalIgnoreCase))
+            && existing.UnitType != seed.UnitType)
         {
-            existing.SetParent(execId, clock.UtcNow);
-            await db.SaveChangesAsync(ct);
+            unitType = seed.UnitType;
+            changed = true;
         }
+
+        // Parent: only when still on known starter pattern.
+        Guid? parentId = existing.ParentDepartmentId;
+        Department? exec = null;
+        if (desiredParentId is Guid desired)
+        {
+            bool parentIsNull = existing.ParentDepartmentId is null;
+            bool parentIsExec = false;
+            if (StarterCodesUnderQec.Contains(seed.Code)
+                && !string.Equals(seed.Code, "EXEC", StringComparison.OrdinalIgnoreCase))
+            {
+                exec = await db.Departments.AsNoTracking().FirstOrDefaultAsync(x => x.Code == "EXEC", ct);
+                parentIsExec = exec is not null && existing.ParentDepartmentId == exec.Id;
+            }
+
+            bool safeToReparent = (isKnownOldName || alreadyTargetName)
+                && (parentIsNull || parentIsExec || existing.ParentDepartmentId == desired);
+
+            // EXEC special: parent null (old root) → QEC; do not overwrite other custom parents.
+            if (string.Equals(seed.Code, "EXEC", StringComparison.OrdinalIgnoreCase))
+            {
+                safeToReparent = (isKnownOldName || alreadyTargetName || parentIsNull)
+                    && (parentIsNull || existing.ParentDepartmentId == desired);
+            }
+
+            if (safeToReparent && existing.ParentDepartmentId != desired)
+            {
+                parentId = desired;
+                changed = true;
+            }
+        }
+
+        string? description = existing.Description ?? seed.DescriptionEn;
+        string? descriptionAr = existing.DescriptionAr ?? seed.DescriptionAr;
+        if ((existing.Description is null && seed.DescriptionEn is not null)
+            || (existing.DescriptionAr is null && seed.DescriptionAr is not null))
+        {
+            changed = true;
+        }
+
+        int sortOrder = existing.SortOrder == 0 ? seed.SortOrder : existing.SortOrder;
+        if (existing.SortOrder == 0 && seed.SortOrder != 0)
+        {
+            changed = true;
+        }
+
+        // One-time: restore inactive PM when still on a known starter name (children may already exist).
+        bool isActive = existing.IsActive;
+        if (!existing.IsActive
+            && string.Equals(seed.Code, "PM", StringComparison.OrdinalIgnoreCase)
+            && (isKnownOldName || alreadyTargetName))
+        {
+            isActive = true;
+            changed = true;
+        }
+
+        if (!changed && existing.Code == Department.NormalizeCode(seed.Code))
+        {
+            return;
+        }
+
+        existing.UpdateDetails(
+            nameEn,
+            nameAr,
+            Department.NormalizeCode(seed.Code),
+            description,
+            descriptionAr,
+            parentId,
+            sortOrder,
+            isActive,
+            clock.UtcNow,
+            unitType);
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation("Aligned starter department {Code}.", seed.Code);
     }
 }

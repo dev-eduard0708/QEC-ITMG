@@ -21,6 +21,8 @@ public sealed class Department
 
     public Guid? ParentDepartmentId { get; private set; }
 
+    public DepartmentUnitType UnitType { get; private set; }
+
     public bool IsActive { get; private set; }
 
     public int SortOrder { get; private set; }
@@ -39,7 +41,8 @@ public sealed class Department
         string? nameAr = null,
         string? descriptionAr = null,
         Guid? parentDepartmentId = null,
-        int sortOrder = 0)
+        int sortOrder = 0,
+        DepartmentUnitType unitType = DepartmentUnitType.Department)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(name);
         string trimmedName = name.Trim();
@@ -61,6 +64,7 @@ public sealed class Department
             Description = NormalizeOptional(description),
             DescriptionAr = NormalizeOptional(descriptionAr),
             ParentDepartmentId = parentDepartmentId,
+            UnitType = unitType,
             IsActive = true,
             SortOrder = sortOrder,
             CreatedAtUtc = utcNow,
@@ -90,7 +94,8 @@ public sealed class Department
         Guid? parentDepartmentId,
         int sortOrder,
         bool isActive,
-        DateTimeOffset utcNow)
+        DateTimeOffset utcNow,
+        DepartmentUnitType unitType = DepartmentUnitType.Department)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nameEn);
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
@@ -110,6 +115,7 @@ public sealed class Department
         Description = NormalizeOptional(descriptionEn);
         DescriptionAr = NormalizeOptional(descriptionAr);
         ParentDepartmentId = parentDepartmentId;
+        UnitType = unitType;
         SortOrder = sortOrder;
         IsActive = isActive;
         UpdatedAtUtc = utcNow;
@@ -128,6 +134,12 @@ public sealed class Department
         }
 
         ParentDepartmentId = parentDepartmentId;
+        UpdatedAtUtc = utcNow;
+    }
+
+    public void SetUnitType(DepartmentUnitType unitType, DateTimeOffset utcNow)
+    {
+        UnitType = unitType;
         UpdatedAtUtc = utcNow;
     }
 

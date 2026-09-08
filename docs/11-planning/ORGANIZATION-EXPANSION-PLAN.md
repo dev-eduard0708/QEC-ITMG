@@ -2,13 +2,13 @@
 
 **STATUS:** FUTURE / DEFERRED  
 **CURRENT SCOPE:** HEAD OFFICE  
-**IMPLEMENTATION:** NOT YET
+**IMPLEMENTATION:** NOT YET (operational project/site units)
 
 Related: [../03-modules/ORGANIZATION.md](../03-modules/ORGANIZATION.md) · [MASTER-ROADMAP.md](MASTER-ROADMAP.md)
 
 This document preserves the intended long-term architecture so future work does **not** incorrectly model every project, school, academy, branch, or site as a normal Head Office `Department`.
 
-Nothing in this plan is implemented. Do not treat examples below as seeded data, APIs, or enums.
+Head Office organizational units now use `Department.UnitType` (`Company`, `Department`, `Section`, `Office`, `Team`, `Other`) for HR-aligned structure. That does **not** implement project/site expansion. Do not treat examples below as seeded data for projects/schools.
 
 ---
 
@@ -17,7 +17,7 @@ Nothing in this plan is implemented. Do not treat examples below as seeded data,
 | | Current | Future (deferred) |
 | --- | --- | --- |
 | Scope | QEC Head Office | Head Office + projects / schools / branches / academies / sites / field employees |
-| Functional structure | `Department` + `Position` | Same Head Office model retained |
+| Functional structure | `Department` (+ `UnitType`) + `Position` | Same Head Office model retained |
 | Operational placement | Not modeled | Lightweight operational units (conceptual) |
 | Security Awareness | Planned V1 = Head Office only | Broader targeting dimensions |
 
@@ -29,11 +29,13 @@ Nothing in this plan is implemented. Do not treat examples below as seeded data,
 QEC
 │
 ├─ Head Office
-│  ├─ Executive
-│  ├─ Project Management
-│  ├─ Human Resources
+│  ├─ Executive Management
+│  ├─ Human Resources (+ sections)
 │  ├─ Finance
-│  └─ Information Technology
+│  ├─ Information Technology
+│  ├─ Legal Affairs
+│  ├─ PMO
+│  └─ Marketing
 │
 └─ Projects / Operations
    ├─ Project / School / Site A
@@ -49,7 +51,7 @@ QEC
    └─ Future projects/sites
 ```
 
-This diagram is **conceptual only**. Do not seed or implement these units now.
+This diagram is **conceptual only** for the Projects / Operations branch. Do not seed or implement those operational units now.
 
 ---
 
@@ -57,27 +59,29 @@ This diagram is **conceptual only**. Do not seed or implement these units now.
 
 **Do not** model every future QEC project, school, academy, site, or branch as a normal functional `Department`.
 
-Departments are primarily **functional** organizational structures such as:
+Head Office `DepartmentUnitType` deliberately excludes Project / School / Branch / Site / Academy. Departments are primarily **functional** organizational structures such as:
 
-- Executive
-- Project Management
-- Human Resources
+- Executive Management
+- Human Resources (with sections)
 - Finance
 - Information Technology (IT)
+- Legal Affairs
+- PMO
+- Marketing
 
 A future expansion should introduce or reuse an appropriate lightweight **operational** structure, conceptually something like:
 
 - `OrganizationalUnit`, or
 - `ProjectSite`
 
-Possible unit types (examples only — not a fixed catalog):
+Possible future operational unit types (examples only — not a fixed catalog; **not** added to Head Office enum):
 
 - Project
 - School
 - Academy
 - Branch
 - Site
-- Office
+- Office (operational)
 
 Do **not** lock the future implementation to an exact entity name yet. Evaluate the architecture when expansion begins.
 
@@ -131,7 +135,7 @@ Project / site employees may later include roles such as:
 - Site Coordinator
 - other project-specific positions
 
-These are **examples for future design**. Do not add them to current seed. Do not add database enums now.
+These are **examples for future design**. Do not add them to current seed. Do not add project/site database enums now.
 
 ---
 
@@ -139,7 +143,7 @@ These are **examples for future design**. Do not add them to current seed. Do no
 
 Preserve this business boundary in any future project-employee modeling:
 
-**Project Management**
+**Project Management (PMO)**
 
 - Identifies / follows project opportunities
 - Determines project staffing requirements
@@ -245,3 +249,4 @@ Before implementing project / site hierarchy:
 6. Keep identity, organization, RBAC, and Access routing separate.
 7. Ensure Head Office-only installations continue to work.
 8. Design migration without destructive restructuring.
+9. Do **not** extend Head Office `DepartmentUnitType` with Project/School/Branch/Site/Academy without an explicit expansion design.

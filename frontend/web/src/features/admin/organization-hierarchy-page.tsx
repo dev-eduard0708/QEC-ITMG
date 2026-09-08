@@ -13,6 +13,7 @@ import {
   type OrganizationPosition,
   type OrganizationPositionNode,
   type OrganizationPositionOccupant,
+  type OrganizationUnitType,
   type OrganizationUserPosition,
 } from '@/api/client'
 import { useAuth } from '@/auth/auth-provider'
@@ -20,6 +21,7 @@ import { PageHeader } from '@/components/page-header'
 import { UserAvatar } from '@/components/user-avatar'
 import {
   buildOrganizationDepartmentForest,
+  buildUnitBreadcrumb,
   OrganizationDepartmentTree,
 } from '@/features/admin/organization-department-tree'
 import { Badge } from '@/components/ui/badge'
@@ -168,7 +170,17 @@ type DepartmentFormState = {
   parentDepartmentId: string
   sortOrder: string
   isActive: boolean
+  unitType: OrganizationUnitType
 }
+
+const UNIT_TYPE_OPTIONS: OrganizationUnitType[] = [
+  'Company',
+  'Department',
+  'Section',
+  'Office',
+  'Team',
+  'Other',
+]
 
 const emptyDepartmentForm = (): DepartmentFormState => ({
   nameEn: '',
@@ -179,6 +191,7 @@ const emptyDepartmentForm = (): DepartmentFormState => ({
   parentDepartmentId: '',
   sortOrder: '100',
   isActive: true,
+  unitType: 'Department',
 })
 
 function collectDepartmentDescendantIds(
@@ -236,6 +249,17 @@ export function OrganizationHierarchyPage() {
   const [departmentFormError, setDepartmentFormError] = useState<string | null>(null)
   const [addMemberOpen, setAddMemberOpen] = useState(false)
   const [memberSearch, setMemberSearch] = useState('')
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([])
+  const [addMemberAsPrimary, setAddMemberAsPrimary] = useState(false)
+  const [memberActionError, setMemberActionError] = useState<string | null>(null)
+  const [moveDepartmentId, setMoveDepartmentId] = useState<string | null>(null)
+  const [moveParentId, setMoveParentId] = useState<string>('')
+  const [moveError, setMoveError] = useState<string | null>(null)
+  const [unitActionError, setUnitActionError] = useState<string | null>(null)
+  const [selectedCompanyUnitId, setSelectedCompanyUnitId] = useState<string | null>(null)
+  const [assignMemberPositionOpen, setAssignMemberPositionOpen] = useState(false)
+  const [assignMemberUserId, setAssignMemberUserId] = useState<string | null>(null)
+  const [assignMemberPositionId, setAssignMemberPositionId] = useState<string>('')
 
   const [peopleSearch, setPeopleSearch] = useState('')
   const [peopleDepartmentId, setPeopleDepartmentId] = useState<string>('__all__')
@@ -460,6 +484,7 @@ export function OrganizationHierarchyPage() {
         descriptionAr: departmentForm.descriptionAr || null,
         parentDepartmentId: departmentForm.parentDepartmentId || null,
         sortOrder: Number(departmentForm.sortOrder) || 0,
+        unitType: departmentForm.unitType,
       }),
     onSuccess: async () => {
       setDepartmentFormOpen(false)
@@ -486,6 +511,7 @@ export function OrganizationHierarchyPage() {
         parentDepartmentId: departmentForm.parentDepartmentId || null,
         sortOrder: Number(departmentForm.sortOrder) || 0,
         isActive: departmentForm.isActive,
+        unitType: departmentForm.unitType,
       }),
     onSuccess: async () => {
       setDepartmentFormOpen(false)
@@ -504,17 +530,56 @@ export function OrganizationHierarchyPage() {
   const deactivateDepartmentMutation = useMutation({
     mutationFn: (id: string) => organizationHierarchyApi.deactivateDepartment(id),
     onSuccess: async () => {
+      setUnitActionError(null)
       await invalidate()
+    },
+    onError: (error: unknown) => {
+      setUnitActionError(error instanceof ApiError ? error.message : t('admin.error.generic'))
+    },
+  })
+
+  const reactivateDepartmentMutation = useMutation({
+    mutationFn: (id: string) => organizationHierarchyApi.reactivateDepartment(id),
+    onSuccess: async () => {
+      setUnitActionError(null)
+      await invalidate()
+    },
+    onError: (error: unknown) => {
+      setUnitActionError(error instanceof ApiError ? error.message : t('admin.error.generic'))
+    },
+  })
+
+  const moveDepartmentMutation = useMutation({
+    mutationFn: () =>
+      organizationHierarchyApi.moveDepartment(moveDepartmentId!, moveParentId || null),
+    onSuccess: async () => {
+      setMoveDepartmentId(null)
+      setMoveParentId('')
+      setMoveError(null)
+      await invalidate()
+    },
+    onError: (error: unknown) => {
+      setMoveError(error instanceof ApiError ? error.message : t('admin.error.generic'))
     },
   })
 
   const addMemberMutation = useMutation({
-    mutationFn: (userId: string) =>
-      organizationHierarchyApi.addMember(membersDepartmentId!, userId),
+    mutationFn: () =>
+      organizationHierarchyApi.addMembersBatch(
+        membersDepartmentId!,
+        selectedMemberIds,
+        selectedMemberIds.length === 1 ? addMemberAsPrimary : addMemberAsPrimary,
+      ),
     onSuccess: async () => {
       setAddMemberOpen(false)
       setMemberSearch('')
+      setSelectedMemberIds([])
+      setAddMemberAsPrimary(false)
+      setMemberActionError(null)
       await invalidate()
+    },
+    onError: (error: unknown) => {
+      setMemberActionError(error instanceof ApiError ? error.message : t('admin.error.generic'))
     },
   })
 
@@ -522,7 +587,11 @@ export function OrganizationHierarchyPage() {
     mutationFn: (userId: string) =>
       organizationHierarchyApi.removeMember(membersDepartmentId!, userId),
     onSuccess: async () => {
+      setMemberActionError(null)
       await invalidate()
+    },
+    onError: (error: unknown) => {
+      setMemberActionError(error instanceof ApiError ? error.message : t('admin.error.generic'))
     },
   })
 
@@ -532,6 +601,29 @@ export function OrganizationHierarchyPage() {
     onSuccess: async () => {
       await invalidate()
     },
+  })
+
+  const assignMemberPositionMutation = useMutation({
+    mutationFn: () =>
+      organizationHierarchyApi.assignUser(assignMemberPositionId, assignMemberUserId!, {
+        addToDepartment: false,
+      }),
+    onSuccess: async () => {
+      setAssignMemberPositionOpen(false)
+      setAssignMemberUserId(null)
+      setAssignMemberPositionId('')
+      setMemberActionError(null)
+      await invalidate()
+    },
+    onError: (error: unknown) => {
+      setMemberActionError(error instanceof ApiError ? error.message : t('admin.error.generic'))
+    },
+  })
+
+  const memberPositionsQuery = useQuery({
+    queryKey: hierarchyKeys.positions(membersDepartmentId || undefined),
+    queryFn: () => organizationHierarchyApi.listPositions(membersDepartmentId || undefined, true),
+    enabled: assignMemberPositionOpen && Boolean(membersDepartmentId),
   })
 
   const openCreate = () => {
@@ -564,9 +656,12 @@ export function OrganizationHierarchyPage() {
     setParentOpen(true)
   }
 
-  const openCreateDepartment = () => {
+  const openCreateDepartment = (parentId?: string) => {
     setEditingDepartment(null)
-    setDepartmentForm(emptyDepartmentForm())
+    setDepartmentForm({
+      ...emptyDepartmentForm(),
+      parentDepartmentId: parentId ?? '',
+    })
     setDepartmentFormError(null)
     setDepartmentFormOpen(true)
   }
@@ -582,9 +677,22 @@ export function OrganizationHierarchyPage() {
       parentDepartmentId: dept.parentDepartmentId ?? '',
       sortOrder: String(dept.sortOrder ?? 0),
       isActive: dept.isActive,
+      unitType: dept.unitType ?? 'Department',
     })
     setDepartmentFormError(null)
     setDepartmentFormOpen(true)
+  }
+
+  const openMoveDepartment = (dept: OrganizationDepartmentSummary) => {
+    setMoveDepartmentId(dept.id)
+    setMoveParentId(dept.parentDepartmentId ?? '')
+    setMoveError(null)
+  }
+
+  const openManageEmployees = (departmentId: string) => {
+    setManageDepartmentsOpen(true)
+    setMembersDepartmentId(departmentId)
+    setMemberActionError(null)
   }
 
   const parentOptions = (() => {
@@ -615,9 +723,33 @@ export function OrganizationHierarchyPage() {
   }
 
   const openCompanyDepartment = (id: string) => {
+    setSelectedCompanyUnitId(id)
     setDepartmentId(id)
     setTab('departments')
   }
+
+  const findDepartmentById = (id: string) =>
+    (departmentsQuery.data ?? []).find((d) => d.id === id)
+
+  const companyForest = useMemo(
+    () => buildOrganizationDepartmentForest(companyViewQuery.data ?? []),
+    [companyViewQuery.data],
+  )
+
+  const selectedCompanyBreadcrumb = useMemo(() => {
+    if (!selectedCompanyUnitId) return []
+    return buildUnitBreadcrumb(companyForest, selectedCompanyUnitId)
+  }, [companyForest, selectedCompanyUnitId])
+
+  const moveParentChoices = useMemo(() => {
+    const departments = departmentsQuery.data ?? []
+    if (!moveDepartmentId) return departments
+    const exclude = collectDepartmentDescendantIds(departments, moveDepartmentId)
+    exclude.add(moveDepartmentId)
+    return departments
+      .filter((d) => !exclude.has(d.id))
+      .sort((a, b) => a.sortOrder - b.sortOrder || (a.nameEn || '').localeCompare(b.nameEn || ''))
+  }, [departmentsQuery.data, moveDepartmentId])
 
   const tabs: { id: HierarchyTab; labelKey: string }[] = [
     { id: 'company', labelKey: 'admin.hierarchy.tabs.companyView' },
@@ -673,12 +805,63 @@ export function OrganizationHierarchyPage() {
       </div>
 
       {tab === 'company' ? (
-        <CompanyViewTab
-          language={language}
-          isLoading={companyViewQuery.isLoading}
-          cards={companyViewQuery.data ?? []}
-          onSelect={openCompanyDepartment}
-        />
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold">{t('admin.hierarchy.organizationalUnits')}</h2>
+              <p className="text-sm text-muted-foreground">
+                {t('admin.hierarchy.organizationalUnitsHint')}
+              </p>
+            </div>
+            {canManage ? (
+              <Button onClick={() => openCreateDepartment(selectedCompanyUnitId ?? undefined)}>
+                <Plus className="me-1.5 h-4 w-4" />
+                {t('admin.hierarchy.addOrganizationalUnit')}
+              </Button>
+            ) : null}
+          </div>
+          {selectedCompanyBreadcrumb.length > 0 ? (
+            <nav aria-label={t('admin.hierarchy.breadcrumb')} className="text-sm text-muted-foreground">
+              {selectedCompanyBreadcrumb.map((node, index) => (
+                <span key={node.id}>
+                  {index > 0 ? <span className="mx-1">/</span> : null}
+                  <button
+                    type="button"
+                    className="hover:text-foreground hover:underline"
+                    onClick={() => setSelectedCompanyUnitId(node.id)}
+                  >
+                    {departmentLabel(language, node)}
+                  </button>
+                </span>
+              ))}
+            </nav>
+          ) : null}
+          {unitActionError ? (
+            <p className="text-sm text-destructive">{unitActionError}</p>
+          ) : null}
+          <CompanyViewTab
+            language={language}
+            isLoading={companyViewQuery.isLoading}
+            cards={companyViewQuery.data ?? []}
+            selectedId={selectedCompanyUnitId}
+            canManage={canManage}
+            onSelect={(id) => {
+              setSelectedCompanyUnitId(id)
+              openCompanyDepartment(id)
+            }}
+            onEdit={(id) => {
+              const dept = findDepartmentById(id)
+              if (dept) openEditDepartment(dept)
+            }}
+            onMove={(id) => {
+              const dept = findDepartmentById(id)
+              if (dept) openMoveDepartment(dept)
+            }}
+            onDeactivate={(id) => deactivateDepartmentMutation.mutate(id)}
+            onReactivate={(id) => reactivateDepartmentMutation.mutate(id)}
+            onManageEmployees={openManageEmployees}
+          />
+        </div>
       ) : null}
 
       {tab === 'departments' ? (
@@ -771,6 +954,8 @@ export function OrganizationHierarchyPage() {
           onStatusChange={setPeopleStatus}
           departments={departmentsQuery.data ?? []}
           isLoading={peopleQuery.isLoading}
+          canManage={canManage}
+          onManageOrganization={() => setManageDepartmentsOpen(true)}
           rows={
             peopleStatus === 'inactive'
               ? (peopleQuery.data ?? []).filter((row) => !row.isActive)
@@ -1033,15 +1218,15 @@ export function OrganizationHierarchyPage() {
           <div className="space-y-5 pe-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold">{t('admin.hierarchy.manageDepartments')}</h3>
+                <h3 className="text-lg font-semibold">{t('admin.hierarchy.organizationalUnits')}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {t('admin.hierarchy.manageDepartmentsHint')}
+                  {t('admin.hierarchy.organizationalUnitsHint')}
                 </p>
               </div>
               {canManage && !membersDepartmentId ? (
-                <Button size="sm" onClick={openCreateDepartment}>
+                <Button size="sm" onClick={() => openCreateDepartment()}>
                   <Plus className="me-1 h-3.5 w-3.5" />
-                  {t('admin.hierarchy.addDepartment')}
+                  {t('admin.hierarchy.addOrganizationalUnit')}
                 </Button>
               ) : null}
             </div>
@@ -1049,16 +1234,46 @@ export function OrganizationHierarchyPage() {
             {membersDepartmentId && membersDepartment ? (
               <MembersPanel
                 departmentName={departmentLabel(language, membersDepartment)}
+                breadcrumb={buildUnitBreadcrumb(
+                  buildOrganizationDepartmentForest(
+                    (departmentsQuery.data ?? []).map((d) => ({
+                      id: d.id,
+                      nameEn: d.nameEn || d.name || '',
+                      nameAr: d.nameAr,
+                      code: d.code,
+                      parentDepartmentId: d.parentDepartmentId,
+                      unitType: d.unitType ?? 'Department',
+                      peopleCount: d.memberCount,
+                      positionCount: d.positionCount,
+                      memberCount: d.memberCount,
+                      isActive: d.isActive,
+                      sortOrder: d.sortOrder,
+                    })),
+                  ),
+                  membersDepartmentId,
+                ).map((n) => localizedName(language, n.nameEn, n.nameAr))}
                 members={membersQuery.data ?? []}
                 isLoading={membersQuery.isLoading}
                 canManage={canManage}
-                onBack={() => setMembersDepartmentId(null)}
+                actionError={memberActionError}
+                onBack={() => {
+                  setMembersDepartmentId(null)
+                  setMemberActionError(null)
+                }}
                 onAdd={() => {
                   setMemberSearch('')
+                  setSelectedMemberIds([])
+                  setAddMemberAsPrimary(false)
+                  setMemberActionError(null)
                   setAddMemberOpen(true)
                 }}
                 onRemove={(userId) => removeMemberMutation.mutate(userId)}
                 onSetPrimary={(userId) => setPrimaryDepartmentMutation.mutate(userId)}
+                onAssignPosition={(userId) => {
+                  setAssignMemberUserId(userId)
+                  setAssignMemberPositionId('')
+                  setAssignMemberPositionOpen(true)
+                }}
                 onOpenProfile={setProfileUserId}
               />
             ) : departmentsQuery.isLoading ? (
@@ -1080,6 +1295,9 @@ export function OrganizationHierarchyPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">{dept.code}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
+                          <Badge variant="outline" className="me-1">
+                            {t(`admin.hierarchy.unitTypes.${dept.unitType ?? 'Department'}`)}
+                          </Badge>
                           {t('admin.hierarchy.peopleCount', { count: dept.memberCount })}
                           {' · '}
                           {t('admin.hierarchy.positionsCount', { count: dept.positionCount })}
@@ -1105,7 +1323,14 @@ export function OrganizationHierarchyPage() {
                               variant="outline"
                               onClick={() => openEditDepartment(dept)}
                             >
-                              {t('admin.hierarchy.editDepartment')}
+                              {t('admin.hierarchy.editOrganizationalUnit')}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openMoveDepartment(dept)}
+                            >
+                              {t('admin.hierarchy.moveOrganizationalUnit')}
                             </Button>
                             {dept.isActive ? (
                               <Button
@@ -1116,7 +1341,16 @@ export function OrganizationHierarchyPage() {
                               >
                                 {t('admin.hierarchy.deactivate')}
                               </Button>
-                            ) : null}
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={reactivateDepartmentMutation.isPending}
+                                onClick={() => reactivateDepartmentMutation.mutate(dept.id)}
+                              >
+                                {t('admin.hierarchy.reactivate')}
+                              </Button>
+                            )}
                           </>
                         ) : null}
                       </div>
@@ -1321,14 +1555,14 @@ export function OrganizationHierarchyPage() {
           <DialogHeader>
             <DialogTitle>
               {editingDepartment
-                ? t('admin.hierarchy.editDepartment')
-                : t('admin.hierarchy.addDepartment')}
+                ? t('admin.hierarchy.editOrganizationalUnit')
+                : t('admin.hierarchy.addOrganizationalUnit')}
             </DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label>{t('admin.hierarchy.fields.nameEn')}</Label>
+                <Label>{t('admin.hierarchy.fields.nameEn')} *</Label>
                 <Input
                   value={departmentForm.nameEn}
                   onChange={(e) =>
@@ -1347,12 +1581,37 @@ export function OrganizationHierarchyPage() {
                 />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>{t('admin.hierarchy.fields.code')}</Label>
-              <Input
-                value={departmentForm.code}
-                onChange={(e) => setDepartmentForm({ ...departmentForm, code: e.target.value })}
-              />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>{t('admin.hierarchy.fields.code')} *</Label>
+                <Input
+                  value={departmentForm.code}
+                  onChange={(e) => setDepartmentForm({ ...departmentForm, code: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t('admin.hierarchy.fields.unitType')} *</Label>
+                <Select
+                  value={departmentForm.unitType}
+                  onValueChange={(value) =>
+                    setDepartmentForm({
+                      ...departmentForm,
+                      unitType: value as OrganizationUnitType,
+                    })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_TYPE_OPTIONS.map((unitType) => (
+                      <SelectItem key={unitType} value={unitType}>
+                        {t(`admin.hierarchy.unitTypes.${unitType}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="space-y-1.5">
               <Label>{t('admin.hierarchy.fields.descriptionEn')}</Label>
@@ -1444,45 +1703,184 @@ export function OrganizationHierarchyPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+      <Dialog
+        open={addMemberOpen}
+        onOpenChange={(open) => {
+          setAddMemberOpen(open)
+          if (!open) {
+            setSelectedMemberIds([])
+            setAddMemberAsPrimary(false)
+          }
+        }}
+      >
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t('admin.hierarchy.addMember')}</DialogTitle>
-            <DialogDescription>{t('admin.hierarchy.addMemberHint')}</DialogDescription>
+            <DialogTitle>{t('admin.hierarchy.addEmployees')}</DialogTitle>
+            <DialogDescription>{t('admin.hierarchy.addEmployeesHint')}</DialogDescription>
           </DialogHeader>
           <Input
             value={memberSearch}
             onChange={(e) => setMemberSearch(e.target.value)}
             placeholder={t('admin.hierarchy.searchUsers')}
           />
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox
+              checked={addMemberAsPrimary}
+              onCheckedChange={(checked) => setAddMemberAsPrimary(checked === true)}
+            />
+            {t('admin.hierarchy.setAsPrimaryUnit')}
+          </label>
+          {memberActionError ? (
+            <p className="text-sm text-destructive">{memberActionError}</p>
+          ) : null}
           <ul className="max-h-72 space-y-2 overflow-y-auto">
             {(addMemberUsersQuery.data ?? []).map((user) => {
               const already = (membersQuery.data ?? []).some((m) => m.userId === user.id)
+              const selected = selectedMemberIds.includes(user.id)
               return (
                 <li
                   key={user.id}
                   className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2"
                 >
-                  <div className="flex min-w-0 items-center gap-3">
+                  <label className="flex min-w-0 flex-1 items-center gap-3">
+                    <Checkbox
+                      checked={selected || already}
+                      disabled={already}
+                      onCheckedChange={(checked) => {
+                        if (already) return
+                        setSelectedMemberIds((prev) =>
+                          checked === true
+                            ? [...prev, user.id]
+                            : prev.filter((id) => id !== user.id),
+                        )
+                      }}
+                    />
                     <UserAvatar displayName={user.displayName} size="sm" />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{user.displayName}</p>
-                      <p className="truncate text-xs text-muted-foreground">{user.upn}</p>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    disabled={already || addMemberMutation.isPending}
-                    onClick={() => addMemberMutation.mutate(user.id)}
-                  >
-                    {already
-                      ? t('admin.hierarchy.alreadyMember')
-                      : t('admin.hierarchy.addMember')}
-                  </Button>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">{user.displayName}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {user.upn}
+                      </span>
+                    </span>
+                  </label>
+                  {already ? (
+                    <Badge variant="secondary">{t('admin.hierarchy.alreadyMember')}</Badge>
+                  ) : null}
                 </li>
               )
             })}
           </ul>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddMemberOpen(false)}>
+              {t('admin.cancel')}
+            </Button>
+            <Button
+              disabled={selectedMemberIds.length === 0 || addMemberMutation.isPending}
+              onClick={() => addMemberMutation.mutate()}
+            >
+              {t('admin.hierarchy.addSelectedEmployees', { count: selectedMemberIds.length })}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(moveDepartmentId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setMoveDepartmentId(null)
+            setMoveError(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('admin.hierarchy.moveOrganizationalUnit')}</DialogTitle>
+            <DialogDescription>{t('admin.hierarchy.moveOrganizationalUnitHint')}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>{t('admin.hierarchy.fields.parentDepartment')}</Label>
+            <Select
+              value={moveParentId || '__none__'}
+              onValueChange={(value) => setMoveParentId(value === '__none__' ? '' : value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t('admin.hierarchy.noParentDepartment')}</SelectItem>
+                {moveParentChoices.map((dept) => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    {departmentLabel(language, dept)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {moveError ? <p className="text-sm text-destructive">{moveError}</p> : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMoveDepartmentId(null)}>
+              {t('admin.cancel')}
+            </Button>
+            <Button
+              disabled={moveDepartmentMutation.isPending}
+              onClick={() => moveDepartmentMutation.mutate()}
+            >
+              {t('admin.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={assignMemberPositionOpen}
+        onOpenChange={(open) => {
+          setAssignMemberPositionOpen(open)
+          if (!open) {
+            setAssignMemberUserId(null)
+            setAssignMemberPositionId('')
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('admin.hierarchy.assignPosition')}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>{t('admin.hierarchy.position')}</Label>
+            <Select
+              value={assignMemberPositionId || '__none__'}
+              onValueChange={(value) =>
+                setAssignMemberPositionId(value === '__none__' ? '' : value)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">{t('admin.hierarchy.none')}</SelectItem>
+                {(memberPositionsQuery.data ?? []).map((position) => (
+                  <SelectItem key={position.id} value={position.id}>
+                    {localizedName(language, position.nameEn, position.nameAr)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {memberActionError ? (
+            <p className="text-sm text-destructive">{memberActionError}</p>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignMemberPositionOpen(false)}>
+              {t('admin.cancel')}
+            </Button>
+            <Button
+              disabled={!assignMemberPositionId || assignMemberPositionMutation.isPending}
+              onClick={() => assignMemberPositionMutation.mutate()}
+            >
+              {t('admin.hierarchy.assign')}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -1493,12 +1891,26 @@ function CompanyViewTab({
   language,
   isLoading,
   cards,
+  selectedId,
+  canManage,
   onSelect,
+  onEdit,
+  onMove,
+  onDeactivate,
+  onReactivate,
+  onManageEmployees,
 }: {
   language: string
   isLoading: boolean
   cards: OrganizationCompanyDepartmentCard[]
+  selectedId?: string | null
+  canManage: boolean
   onSelect: (departmentId: string) => void
+  onEdit: (departmentId: string) => void
+  onMove: (departmentId: string) => void
+  onDeactivate: (departmentId: string) => void
+  onReactivate: (departmentId: string) => void
+  onManageEmployees: (departmentId: string) => void
 }) {
   const { t } = useTranslation()
   const roots = useMemo(() => buildOrganizationDepartmentForest(cards), [cards])
@@ -1515,12 +1927,25 @@ function CompanyViewTab({
   if (cards.length === 0) {
     return (
       <p className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        {t('admin.hierarchy.noDepartments')}
+        {t('admin.hierarchy.noOrganizationalUnits')}
       </p>
     )
   }
   return (
-    <OrganizationDepartmentTree language={language} roots={roots} onSelect={onSelect} />
+    <OrganizationDepartmentTree
+      language={language}
+      roots={roots}
+      selectedId={selectedId}
+      actions={{
+        canManage,
+        onSelect,
+        onEdit,
+        onMove,
+        onDeactivate,
+        onReactivate,
+        onManageEmployees,
+      }}
+    />
   )
 }
 
@@ -1586,6 +2011,8 @@ function PeopleTab({
   onStatusChange,
   departments,
   isLoading,
+  canManage,
+  onManageOrganization,
   rows,
   onOpenProfile,
 }: {
@@ -1598,6 +2025,8 @@ function PeopleTab({
   onStatusChange: (value: PeopleStatusFilter) => void
   departments: OrganizationDepartmentSummary[]
   isLoading: boolean
+  canManage: boolean
+  onManageOrganization: () => void
   rows: Array<{
     userId: string
     displayName: string
@@ -1606,6 +2035,8 @@ function PeopleTab({
     isActive: boolean
     primaryDepartmentName: string | null
     additionalDepartmentCount: number
+    primaryPositionName?: string | null
+    additionalPositionCount?: number
     positionNames: string[]
   }>
   onOpenProfile: (userId: string) => void
@@ -1613,6 +2044,14 @@ function PeopleTab({
   const { t } = useTranslation()
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">{t('admin.hierarchy.peopleHint')}</p>
+        {canManage ? (
+          <Button variant="outline" size="sm" onClick={onManageOrganization}>
+            {t('admin.hierarchy.manageOrganization')}
+          </Button>
+        ) : null}
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="space-y-1.5">
           <Label>{t('admin.hierarchy.searchPeople')}</Label>
@@ -1623,13 +2062,13 @@ function PeopleTab({
           />
         </div>
         <div className="space-y-1.5">
-          <Label>{t('admin.hierarchy.department')}</Label>
+          <Label>{t('admin.hierarchy.organizationalUnit')}</Label>
           <Select value={departmentId} onValueChange={onDepartmentChange}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">{t('admin.hierarchy.allDepartments')}</SelectItem>
+              <SelectItem value="__all__">{t('admin.hierarchy.allOrganizationalUnits')}</SelectItem>
               {departments.map((dept) => (
                 <SelectItem key={dept.id} value={dept.id}>
                   {departmentLabel(language, dept)}
@@ -1671,9 +2110,10 @@ function PeopleTab({
             <TableHeader>
               <TableRow>
                 <TableHead>{t('admin.hierarchy.person')}</TableHead>
-                <TableHead>{t('admin.hierarchy.primaryDepartment')}</TableHead>
-                <TableHead>{t('admin.hierarchy.additionalDepartments')}</TableHead>
-                <TableHead>{t('admin.hierarchy.positions')}</TableHead>
+                <TableHead>{t('admin.hierarchy.primaryUnit')}</TableHead>
+                <TableHead>{t('admin.hierarchy.otherUnits')}</TableHead>
+                <TableHead>{t('admin.hierarchy.primaryPosition')}</TableHead>
+                <TableHead>{t('admin.hierarchy.otherPositions')}</TableHead>
                 <TableHead>{t('admin.hierarchy.status')}</TableHead>
               </TableRow>
             </TableHeader>
@@ -1707,11 +2147,17 @@ function PeopleTab({
                       : t('admin.hierarchy.none')}
                   </TableCell>
                   <TableCell>
-                    <span className="line-clamp-2 text-sm">
-                      {row.positionNames.length > 0
-                        ? row.positionNames.join(', ')
-                        : t('admin.hierarchy.none')}
-                    </span>
+                    {row.primaryPositionName
+                      ?? (row.positionNames[0] || t('admin.hierarchy.none'))}
+                  </TableCell>
+                  <TableCell>
+                    {(row.additionalPositionCount ?? Math.max(0, row.positionNames.length - 1)) > 0
+                      ? t('admin.hierarchy.additionalCount', {
+                          count:
+                            row.additionalPositionCount
+                            ?? Math.max(0, row.positionNames.length - 1),
+                        })
+                      : t('admin.hierarchy.none')}
                   </TableCell>
                   <TableCell>
                     <Badge variant={row.isActive ? 'secondary' : 'outline'}>
@@ -1831,23 +2277,29 @@ function HierarchyChart({
 
 function MembersPanel({
   departmentName,
+  breadcrumb,
   members,
   isLoading,
   canManage,
+  actionError,
   onBack,
   onAdd,
   onRemove,
   onSetPrimary,
+  onAssignPosition,
   onOpenProfile,
 }: {
   departmentName: string
+  breadcrumb: string[]
   members: OrganizationDepartmentMember[]
   isLoading: boolean
   canManage: boolean
+  actionError: string | null
   onBack: () => void
   onAdd: () => void
   onRemove: (userId: string) => void
   onSetPrimary: (userId: string) => void
+  onAssignPosition: (userId: string) => void
   onOpenProfile: (userId: string) => void
 }) {
   const { t } = useTranslation()
@@ -1856,8 +2308,11 @@ function MembersPanel({
       <div className="flex items-center justify-between gap-2">
         <div>
           <Button variant="ghost" size="sm" onClick={onBack} className="-ms-2">
-            {t('admin.hierarchy.backToDepartments')}
+            {t('admin.hierarchy.backToOrganizationalUnits')}
           </Button>
+          {breadcrumb.length > 0 ? (
+            <p className="text-xs text-muted-foreground">{breadcrumb.join(' / ')}</p>
+          ) : null}
           <h4 className="font-medium">
             {t('admin.hierarchy.membersOf', { department: departmentName })}
           </h4>
@@ -1865,10 +2320,11 @@ function MembersPanel({
         {canManage ? (
           <Button size="sm" onClick={onAdd}>
             <Plus className="me-1 h-3.5 w-3.5" />
-            {t('admin.hierarchy.addMember')}
+            {t('admin.hierarchy.addEmployees')}
           </Button>
         ) : null}
       </div>
+      {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
       {isLoading ? (
         <Skeleton className="h-20 w-full" />
       ) : members.length === 0 ? (
@@ -1894,7 +2350,7 @@ function MembersPanel({
                     {member.displayName}
                     {member.isPrimary ? (
                       <Badge className="ms-2" variant="secondary">
-                        {t('admin.hierarchy.primary')}
+                        {t('admin.hierarchy.primaryUnitBadge')}
                       </Badge>
                     ) : null}
                   </span>
@@ -1907,9 +2363,16 @@ function MembersPanel({
                 <div className="flex flex-col gap-1">
                   {!member.isPrimary ? (
                     <Button size="sm" variant="outline" onClick={() => onSetPrimary(member.userId)}>
-                      {t('admin.hierarchy.setPrimaryDepartment')}
+                      {t('admin.hierarchy.setPrimaryUnit')}
                     </Button>
                   ) : null}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onAssignPosition(member.userId)}
+                  >
+                    {t('admin.hierarchy.assignPosition')}
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => onRemove(member.userId)}>
                     {t('admin.hierarchy.removeMember')}
                   </Button>

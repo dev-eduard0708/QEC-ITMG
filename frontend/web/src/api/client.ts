@@ -5307,6 +5307,14 @@ export const remoteSupportApi = {
     }),
 }
 
+export type OrganizationUnitType =
+  | 'Company'
+  | 'Department'
+  | 'Section'
+  | 'Office'
+  | 'Team'
+  | 'Other'
+
 export type OrganizationDepartmentSummary = {
   id: string
   nameEn: string
@@ -5315,6 +5323,7 @@ export type OrganizationDepartmentSummary = {
   descriptionEn: string | null
   descriptionAr: string | null
   parentDepartmentId: string | null
+  unitType: OrganizationUnitType
   isActive: boolean
   sortOrder: number
   memberCount: number
@@ -5332,9 +5341,11 @@ export type OrganizationCompanyDepartmentCard = {
   nameAr: string | null
   code: string
   parentDepartmentId: string | null
+  unitType: OrganizationUnitType
   isActive: boolean
   peopleCount: number
   positionCount: number
+  memberCount?: number
   sortOrder: number
 }
 
@@ -5358,6 +5369,8 @@ export type OrganizationPeopleRow = {
   primaryDepartmentId: string | null
   primaryDepartmentName: string | null
   additionalDepartmentCount: number
+  primaryPositionName: string | null
+  additionalPositionCount: number
   positionNames: string[]
 }
 
@@ -5493,6 +5506,7 @@ export type CreateOrganizationDepartmentPayload = {
   descriptionAr?: string | null
   parentDepartmentId?: string | null
   sortOrder: number
+  unitType: OrganizationUnitType
 }
 
 export type UpdateOrganizationDepartmentPayload = {
@@ -5504,6 +5518,7 @@ export type UpdateOrganizationDepartmentPayload = {
   parentDepartmentId?: string | null
   sortOrder: number
   isActive: boolean
+  unitType: OrganizationUnitType
 }
 
 export const organizationHierarchyApi = {
@@ -5530,6 +5545,16 @@ export const organizationHierarchyApi = {
       `/api/v1/organization/departments/${id}/deactivate`,
       { method: 'POST' },
     ),
+  reactivateDepartment: (id: string) =>
+    apiFetch<OrganizationDepartmentSummary>(
+      `/api/v1/organization/departments/${id}/reactivate`,
+      { method: 'POST' },
+    ),
+  moveDepartment: (id: string, parentDepartmentId: string | null) =>
+    apiFetch<OrganizationDepartmentSummary>(`/api/v1/organization/departments/${id}/move`, {
+      method: 'POST',
+      body: JSON.stringify({ parentDepartmentId }),
+    }),
   listMembers: (departmentId: string) =>
     apiFetch<OrganizationDepartmentMember[]>(
       `/api/v1/organization/departments/${departmentId}/members`,
@@ -5540,6 +5565,14 @@ export const organizationHierarchyApi = {
       {
         method: 'POST',
         body: JSON.stringify({ userId, isPrimary }),
+      },
+    ),
+  addMembersBatch: (departmentId: string, userIds: string[], isPrimary?: boolean) =>
+    apiFetch<OrganizationDepartmentMember[]>(
+      `/api/v1/organization/departments/${departmentId}/members/batch`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ userIds, isPrimary }),
       },
     ),
   removeMember: (departmentId: string, userId: string) =>

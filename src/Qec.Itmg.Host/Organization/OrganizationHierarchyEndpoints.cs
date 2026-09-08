@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Qec.Itmg.Contracts.Identity;
 using Qec.Itmg.Identity.Authorization;
+using Qec.Itmg.Organization.Domain;
 using Qec.Itmg.Organization.Services;
 
 namespace Qec.Itmg.Host.Organization;
@@ -46,6 +47,7 @@ public static class OrganizationHierarchyEndpoints
                         request.DescriptionAr,
                         request.ParentDepartmentId,
                         request.SortOrder,
+                        request.UnitType ?? DepartmentUnitType.Department,
                         ct));
                 }
                 catch (InvalidOperationException ex)
@@ -73,7 +75,25 @@ public static class OrganizationHierarchyEndpoints
                         request.ParentDepartmentId,
                         request.SortOrder,
                         request.IsActive,
+                        request.UnitType ?? DepartmentUnitType.Department,
                         ct));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status400BadRequest);
+                }
+            })
+            .RequirePermission(ManagePermission);
+
+        group.MapPost("/departments/{id:guid}/move", async (
+                Guid id,
+                MoveDepartmentRequest request,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    return Results.Ok(await departments.MoveAsync(id, request.ParentDepartmentId, ct));
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -90,6 +110,22 @@ public static class OrganizationHierarchyEndpoints
                 try
                 {
                     return Results.Ok(await departments.DeactivateAsync(id, ct));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status400BadRequest);
+                }
+            })
+            .RequirePermission(ManagePermission);
+
+        group.MapPost("/departments/{id:guid}/reactivate", async (
+                Guid id,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    return Results.Ok(await departments.ReactivateAsync(id, ct));
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -123,6 +159,27 @@ public static class OrganizationHierarchyEndpoints
                 try
                 {
                     return Results.Ok(await departments.AddMemberAsync(id, request.UserId, request.IsPrimary ?? false, ct));
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return ErrorResult(ex.Message, StatusCodes.Status400BadRequest);
+                }
+            })
+            .RequirePermission(ManagePermission);
+
+        group.MapPost("/departments/{id:guid}/members/batch", async (
+                Guid id,
+                AddDepartmentMembersBatchRequest request,
+                DepartmentService departments,
+                CancellationToken ct) =>
+            {
+                try
+                {
+                    return Results.Ok(await departments.AddMembersBatchAsync(
+                        id,
+                        request.UserIds,
+                        request.IsPrimary ?? false,
+                        ct));
                 }
                 catch (InvalidOperationException ex)
                 {
@@ -414,7 +471,8 @@ public sealed record CreateDepartmentRequest(
     string? DescriptionEn,
     string? DescriptionAr,
     Guid? ParentDepartmentId,
-    int SortOrder);
+    int SortOrder,
+    DepartmentUnitType? UnitType = null);
 
 public sealed record UpdateDepartmentRequest(
     string NameEn,
@@ -424,9 +482,14 @@ public sealed record UpdateDepartmentRequest(
     string? DescriptionAr,
     Guid? ParentDepartmentId,
     int SortOrder,
-    bool IsActive);
+    bool IsActive,
+    DepartmentUnitType? UnitType = null);
+
+public sealed record MoveDepartmentRequest(Guid? ParentDepartmentId);
 
 public sealed record AddDepartmentMemberRequest(Guid UserId, bool? IsPrimary);
+
+public sealed record AddDepartmentMembersBatchRequest(IReadOnlyList<Guid> UserIds, bool? IsPrimary);
 
 public sealed record CreatePositionRequest(
     Guid DepartmentId,

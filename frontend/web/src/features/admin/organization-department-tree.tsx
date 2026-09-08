@@ -1,6 +1,9 @@
-import { Building2 } from 'lucide-react'
+import { useState } from 'react'
+import { Building2, ChevronDown, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import type { OrganizationUnitType } from '@/api/client'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export type OrganizationDepartmentTreeNode = {
@@ -9,8 +12,10 @@ export type OrganizationDepartmentTreeNode = {
   nameAr: string | null
   code: string
   parentDepartmentId: string | null
+  unitType: OrganizationUnitType
   peopleCount: number
   positionCount: number
+  memberCount?: number
   isActive: boolean
   sortOrder: number
   children: OrganizationDepartmentTreeNode[]
@@ -27,15 +32,21 @@ export function buildOrganizationDepartmentForest(
     nameAr: string | null
     code: string
     parentDepartmentId: string | null
+    unitType?: OrganizationUnitType
     peopleCount: number
     positionCount: number
+    memberCount?: number
     isActive: boolean
     sortOrder: number
   }>,
 ): OrganizationDepartmentTreeNode[] {
   const nodes = new Map<string, OrganizationDepartmentTreeNode>()
   for (const card of cards) {
-    nodes.set(card.id, { ...card, children: [] })
+    nodes.set(card.id, {
+      ...card,
+      unitType: card.unitType ?? 'Department',
+      children: [],
+    })
   }
 
   const roots: OrganizationDepartmentTreeNode[] = []
@@ -56,35 +67,72 @@ export function buildOrganizationDepartmentForest(
   return roots
 }
 
+export function buildUnitBreadcrumb(
+  nodes: OrganizationDepartmentTreeNode[],
+  departmentId: string,
+): OrganizationDepartmentTreeNode[] {
+  const byId = new Map<string, OrganizationDepartmentTreeNode>()
+  const walk = (list: OrganizationDepartmentTreeNode[]) => {
+    for (const node of list) {
+      byId.set(node.id, node)
+      walk(node.children)
+    }
+  }
+  walk(nodes)
+
+  const trail: OrganizationDepartmentTreeNode[] = []
+  let current = byId.get(departmentId)
+  const guard = new Set<string>()
+  while (current && !guard.has(current.id)) {
+    guard.add(current.id)
+    trail.unshift(current)
+    current = current.parentDepartmentId ? byId.get(current.parentDepartmentId) : undefined
+  }
+  return trail
+}
+
+export type OrganizationDepartmentTreeActions = {
+  onSelect: (departmentId: string) => void
+  onEdit?: (departmentId: string) => void
+  onMove?: (departmentId: string) => void
+  onDeactivate?: (departmentId: string) => void
+  onReactivate?: (departmentId: string) => void
+  onManageEmployees?: (departmentId: string) => void
+  canManage?: boolean
+}
+
 export function OrganizationDepartmentTree({
   language,
   roots,
-  onSelect,
+  actions,
+  selectedId,
 }: {
   language: string
   roots: OrganizationDepartmentTreeNode[]
-  onSelect: (departmentId: string) => void
+  actions: OrganizationDepartmentTreeActions
+  selectedId?: string | null
 }) {
   const { t } = useTranslation()
   if (roots.length === 0) {
     return (
       <p className="rounded-md border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-        {t('admin.hierarchy.noDepartments')}
+        {t('admin.hierarchy.noOrganizationalUnits')}
       </p>
     )
   }
 
   return (
-    <div className="space-y-8 overflow-x-auto pb-2">
-      <p className="text-center text-lg font-semibold tracking-wide text-foreground">QEC</p>
-      <div className="flex flex-col items-stretch gap-8 md:items-center">
+    <div className="space-y-4 overflow-x-auto pb-2">
+      <div className="flex flex-col gap-2">
         {roots.map((root) => (
           <OrganizationDepartmentNode
             key={root.id}
             node={root}
             language={language}
-            onSelect={onSelect}
+            actions={actions}
+            selectedId={selectedId}
             depth={0}
+            defaultExpanded
           />
         ))}
       </div>
@@ -95,76 +143,134 @@ export function OrganizationDepartmentTree({
 function OrganizationDepartmentNode({
   node,
   language,
-  onSelect,
+  actions,
+  selectedId,
   depth,
+  defaultExpanded,
 }: {
   node: OrganizationDepartmentTreeNode
   language: string
-  onSelect: (departmentId: string) => void
+  actions: OrganizationDepartmentTreeActions
+  selectedId?: string | null
   depth: number
+  defaultExpanded?: boolean
 }) {
   const { t } = useTranslation()
-  return (
-    <div className="flex w-full flex-col items-stretch md:items-center">
-      <button
-        type="button"
-        onClick={() => onSelect(node.id)}
-        className={cn(
-          'w-full max-w-sm rounded-lg border border-border bg-card p-4 text-start shadow-sm transition hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          !node.isActive && 'opacity-70',
-          depth === 0 && 'border-primary/30',
-        )}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="font-semibold text-foreground">
-              {localizedName(language, node.nameEn, node.nameAr)}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{node.code}</p>
-          </div>
-          <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-        </div>
-        <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-          <p>{t('admin.hierarchy.peopleCount', { count: node.peopleCount })}</p>
-          <p>{t('admin.hierarchy.positionsCount', { count: node.positionCount })}</p>
-          {!node.isActive ? (
-            <Badge variant="secondary">{t('admin.hierarchy.inactive')}</Badge>
-          ) : null}
-        </div>
-      </button>
+  const [expanded, setExpanded] = useState(defaultExpanded ?? depth < 2)
+  const hasChildren = node.children.length > 0
+  const memberCount = node.memberCount ?? node.peopleCount
 
-      {node.children.length > 0 ? (
-        <div className="flex w-full flex-col items-stretch md:items-center">
-          <div className="mx-auto h-6 w-px bg-border" aria-hidden />
-          <div
-            className={cn(
-              'flex w-full flex-col gap-6 md:flex-row md:flex-wrap md:justify-center md:gap-8',
-              node.children.length > 1 && 'md:relative',
-            )}
+  return (
+    <div className="min-w-[18rem]">
+      <div
+        className={cn(
+          'rounded-lg border border-border bg-card p-3 shadow-sm transition',
+          selectedId === node.id && 'border-primary/50 ring-1 ring-primary/30',
+          !node.isActive && 'opacity-70',
+        )}
+        style={{ marginInlineStart: depth * 12 }}
+      >
+        <div className="flex items-start gap-2">
+          {hasChildren ? (
+            <button
+              type="button"
+              className="mt-0.5 rounded p-0.5 text-muted-foreground hover:bg-accent"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {expanded ? (
+                <ChevronDown className="h-4 w-4" aria-hidden />
+              ) : (
+                <ChevronRight className="h-4 w-4" aria-hidden />
+              )}
+            </button>
+          ) : (
+            <span className="mt-0.5 inline-block w-5" aria-hidden />
+          )}
+          <button
+            type="button"
+            onClick={() => actions.onSelect(node.id)}
+            className="min-w-0 flex-1 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            {node.children.length > 1 ? (
-              <div
-                className="pointer-events-none absolute start-[12%] end-[12%] top-0 hidden h-px bg-border md:block"
-                aria-hidden
-              />
-            ) : null}
-            {node.children.map((child) => (
-              <div
-                key={child.id}
-                className="relative flex min-w-0 flex-col items-stretch md:min-w-[14rem] md:items-center"
-              >
-                <div className="mx-auto hidden h-6 w-px bg-border md:block" aria-hidden />
-                <div className="ms-4 border-s border-border ps-4 md:ms-0 md:border-0 md:ps-0">
-                  <OrganizationDepartmentNode
-                    node={child}
-                    language={language}
-                    onSelect={onSelect}
-                    depth={depth + 1}
-                  />
-                </div>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground">
+                  {localizedName(language, node.nameEn, node.nameAr)}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{node.code}</p>
               </div>
-            ))}
+              <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <Badge variant="outline">
+                {t(`admin.hierarchy.unitTypes.${node.unitType}`)}
+              </Badge>
+              <span>{t('admin.hierarchy.peopleCount', { count: memberCount })}</span>
+              <span>·</span>
+              <span>{t('admin.hierarchy.positionsCount', { count: node.positionCount })}</span>
+              {!node.isActive ? (
+                <Badge variant="secondary">{t('admin.hierarchy.inactive')}</Badge>
+              ) : null}
+            </div>
+          </button>
+        </div>
+
+        {actions.canManage ? (
+          <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-2">
+            {actions.onEdit ? (
+              <Button size="sm" variant="outline" onClick={() => actions.onEdit?.(node.id)}>
+                {t('admin.hierarchy.editOrganizationalUnit')}
+              </Button>
+            ) : null}
+            {actions.onMove ? (
+              <Button size="sm" variant="outline" onClick={() => actions.onMove?.(node.id)}>
+                {t('admin.hierarchy.moveOrganizationalUnit')}
+              </Button>
+            ) : null}
+            {actions.onManageEmployees ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => actions.onManageEmployees?.(node.id)}
+              >
+                {t('admin.hierarchy.manageEmployees')}
+              </Button>
+            ) : null}
+            {node.isActive && actions.onDeactivate ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => actions.onDeactivate?.(node.id)}
+              >
+                {t('admin.hierarchy.deactivate')}
+              </Button>
+            ) : null}
+            {!node.isActive && actions.onReactivate ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => actions.onReactivate?.(node.id)}
+              >
+                {t('admin.hierarchy.reactivate')}
+              </Button>
+            ) : null}
           </div>
+        ) : null}
+      </div>
+
+      {hasChildren && expanded ? (
+        <div className="mt-2 space-y-2 border-s border-border ms-4 ps-2">
+          {node.children.map((child) => (
+            <OrganizationDepartmentNode
+              key={child.id}
+              node={child}
+              language={language}
+              actions={actions}
+              selectedId={selectedId}
+              depth={depth + 1}
+              defaultExpanded={depth < 1}
+            />
+          ))}
         </div>
       ) : null}
     </div>
