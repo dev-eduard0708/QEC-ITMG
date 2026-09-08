@@ -235,67 +235,212 @@ public sealed class OrganizationPositionsSeedRunner(
             "QEC",
             DepartmentUnitType.Department,
             []),
+        new(
+            "CYBER-GOV",
+            "Cybersecurity & IT Governance Committee",
+            "لجنة الأمن السيبراني وحوكمة تقنية المعلومات",
+            "Cross-functional QEC Head Office committee for cybersecurity oversight, IT governance, security awareness, technology risk, control coordination, audit readiness, and follow-up of findings and corrective actions.",
+            "لجنة مشتركة بين الإدارات في المكتب الرئيسي لشركة جودة التعليم للإشراف على الأمن السيبراني وحوكمة تقنية المعلومات والتوعية الأمنية ومخاطر التقنية وتنسيق الضوابط والجاهزية للتدقيق ومتابعة الملاحظات والإجراءات التصحيحية.",
+            80,
+            "QEC",
+            DepartmentUnitType.Committee,
+            []),
     ];
 
     private static readonly HashSet<string> StarterCodesUnderQec =
-        new(StringComparer.OrdinalIgnoreCase) { "EXEC", "HR", "FINANCE", "IT", "PM", "LEGAL", "MARKETING" };
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "EXEC", "HR", "FINANCE", "IT", "PM", "LEGAL", "MARKETING", "CYBER-GOV",
+        };
+
+    /// <summary>
+    /// Vacant starter-only legacy keys soft-deactivated after HR-aligned positions are ensured.
+    /// Never deleted; never deactivated when PositionAssignments exist.
+    /// </summary>
+    private static readonly string[] LegacyStarterKeysToDeactivateWhenVacant =
+    [
+        "EXEC-VP",
+        "EXEC-VP-SECRETARY",
+        "EXEC-CEO-SECRETARY",
+        "IT_DIRECTOR",
+        "IT_MANAGER",
+        "IT_ADMINISTRATOR",
+        "SYSTEMS_ADMINISTRATOR",
+        "NETWORK_ADMINISTRATOR",
+        "IT_SUPPORT_SPECIALIST",
+        "IT_SECURITY_GOVERNANCE",
+        "HR_MANAGER",
+        "PM-HEAD",
+        "PM-PROJECT-MANAGER",
+        "PM-PROJECT-COORDINATOR",
+        "PM-STAFFING-COORDINATOR",
+        "PM-DEVELOPMENT-COORDINATOR",
+    ];
 
     private static readonly PositionSeed[] Positions =
     [
+        // Executive Management — HR Portal baseline
         new(
-            "EXEC", "EXEC-CEO", "Chief Executive Officer", "الرئيس التنفيذي", null, true, 10,
+            "EXEC", "EXEC-CEO", "CEO", "الرئيس التنفيذي", null, true, 10,
             "Leads QEC at the corporate level and provides overall executive direction.",
             "يقود QEC على المستوى المؤسسي ويوفر التوجيه التنفيذي العام."),
         new(
-            "EXEC", "EXEC-CEO-SECRETARY", "CEO Executive Secretary", "السكرتير التنفيذي للرئيس التنفيذي",
-            "EXEC-CEO", false, 20,
-            "Provides executive office support to the Chief Executive Officer.",
-            "يقدم الدعم للمكتب التنفيذي للرئيس التنفيذي."),
-        new(
-            "EXEC", "EXEC-VP", "Vice President", "نائب الرئيس", "EXEC-CEO", true, 30,
+            "EXEC", "EXEC-EXECUTIVE-VP", "Executive Vice President", "نائب الرئيس التنفيذي",
+            "EXEC-CEO", true, 20,
             "Supports the Chief Executive Officer and provides executive leadership.",
             "يدعم الرئيس التنفيذي ويوفر القيادة التنفيذية."),
         new(
-            "EXEC", "EXEC-VP-SECRETARY", "VP Executive Secretary", "السكرتير التنفيذي لنائب الرئيس",
-            "EXEC-VP", false, 40,
-            "Provides executive office support to the Vice President.",
-            "يقدم الدعم للمكتب التنفيذي لنائب الرئيس."),
+            "EXEC", "EXEC-EXECUTIVE-SECRETARY", "Executive Secretary", "السكرتير التنفيذي",
+            "EXEC-CEO", false, 30,
+            "Provides executive office support.",
+            "يقدم الدعم للمكتب التنفيذي."),
+        new(
+            "EXEC", "EXEC-OFFICE-MANAGER", "Office Manager", "مدير المكتب",
+            "EXEC-CEO", false, 40,
+            "Manages executive office operations.",
+            "يدير عمليات المكتب التنفيذي."),
+
+        // Finance
+        new(
+            "FINANCE", "FIN-GENERAL-MANAGER", "General Finance Manager", "المدير العام للمالية",
+            null, true, 10, null, null),
+        new(
+            "FINANCE", "FIN-ACCOUNTING-MANAGER", "Accounting Manager", "مدير المحاسبة",
+            "FIN-GENERAL-MANAGER", true, 20, null, null),
+        new(
+            "FINANCE", "FIN-ACCOUNTING-SUPERVISOR", "Accounting Supervisor", "مشرف المحاسبة",
+            "FIN-ACCOUNTING-MANAGER", true, 30, null, null),
+        new(
+            "FINANCE", "FIN-ACCOUNTANT", "Accountant", "محاسب",
+            "FIN-ACCOUNTING-SUPERVISOR", false, 40, null, null),
+
+        // Legal Affairs
+        new(
+            "LEGAL", "LEGAL-GENERAL-MANAGER", "General Legal Affairs Manager", "المدير العام للشؤون القانونية",
+            null, true, 10, null, null),
+        new(
+            "LEGAL", "LEGAL-RESEARCHER", "Legal Researcher", "باحث قانوني",
+            "LEGAL-GENERAL-MANAGER", false, 20, null, null),
+
+        // Information Technology — HR Portal baseline (new codes; vacant legacy soft-deactivated)
+        new(
+            "IT", "IT-GENERAL-MANAGER", "General IT Manager", "المدير العام لتقنية المعلومات",
+            null, true, 10, null, null),
+        new(
+            "IT", "IT-SYSTEMS-ADMIN", "Systems Admin", "مسؤول الأنظمة",
+            "IT-GENERAL-MANAGER", false, 20, null, null),
+        new(
+            "IT", "IT-NETWORK-TECHNICIAN", "Network Technician", "فني شبكات",
+            "IT-GENERAL-MANAGER", false, 30, null, null),
+        new(
+            "IT", "IT-COMPUTER-ENGINEER", "Computer Engineer", "مهندس حاسب آلي",
+            "IT-GENERAL-MANAGER", false, 40, null, null),
+        new(
+            "IT", "IT-PROGRAMMER", "Programmer", "مبرمج",
+            "IT-GENERAL-MANAGER", false, 50, null, null),
+
+        // Human Resources
+        new(
+            "HR", "HR-DEPUTY-GENERAL-MANAGER", "Deputy General HR Manager", "نائب المدير العام للموارد البشرية",
+            null, true, 10, null, null),
+        new(
+            "HR", "HR-SPECIALIST", "HR Specialist", "أخصائي موارد بشرية",
+            "HR-DEPUTY-GENERAL-MANAGER", false, 20, null, null),
+
+        // Payroll (HR-PAYROLL → HR_PAYROLL)
+        new(
+            "HR-PAYROLL", "HR-PAYROLL-OPERATIONS-MANAGER", "HR Operations Manager", "مدير عمليات الموارد البشرية",
+            null, true, 10, null, null),
+        new(
+            "HR-PAYROLL", "HR-PAYROLL-SPECIALIST", "HR Specialist", "أخصائي موارد بشرية",
+            null, false, 20, null, null),
+        new(
+            "HR-PAYROLL", "HR-PAYROLL-SENIOR-SPECIALIST", "Senior HR Specialist", "أخصائي موارد بشرية أول",
+            null, false, 30, null, null),
+
+        // Government Relations
+        new(
+            "HR-GOVREL", "HR-GOV-REL-MANAGER", "Government Relations Manager", "مدير العلاقات الحكومية",
+            null, true, 10, null, null),
+        new(
+            "HR-GOVREL", "HR-GOV-REL-SPECIALIST", "Government Relations Specialist", "أخصائي علاقات حكومية",
+            "HR-GOV-REL-MANAGER", false, 20, null, null),
+        new(
+            "HR-GOVREL", "HR-GOV-REL-SENIOR-HR-SPECIALIST", "Senior HR Specialist", "أخصائي موارد بشرية أول",
+            "HR-GOV-REL-MANAGER", false, 30, null, null),
+
+        // Personnel Administration
+        new(
+            "HR-PERSONNEL", "HR-PERSONNEL-COORDINATOR", "HR Coordinator", "منسق موارد بشرية",
+            null, false, 10, null, null),
+
+        // Admin & Support
+        new(
+            "HR-ADMIN", "HR-ADMIN-SUPPORT-CLEANER", "Cleaner", "عامل نظافة",
+            null, false, 10, null, null),
+        new(
+            "HR-ADMIN", "HR-ADMIN-SUPPORT-DRIVER", "Driver", "سائق",
+            null, false, 20, null, null),
+        new(
+            "HR-ADMIN", "HR-ADMIN-SUPPORT-LABOR", "Labor", "عامل",
+            null, false, 30, null, null),
+        new(
+            "HR-ADMIN", "HR-ADMIN-SUPPORT-LOGISTIC-SUPERVISOR", "Logistic Support Supervisor", "مشرف الدعم اللوجستي",
+            null, true, 40, null, null),
+        new(
+            "HR-ADMIN", "HR-ADMIN-SUPPORT-LOGISTIC-SPECIALIST", "Logistic Support Specialist", "أخصائي دعم لوجستي",
+            "HR-ADMIN-SUPPORT-LOGISTIC-SUPERVISOR", false, 50, null, null),
+        new(
+            "HR-ADMIN", "HR-ADMIN-SUPPORT-TEABOY", "Teaboy", "عامل ضيافة",
+            null, false, 60, null, null),
+
+        // PMO
+        new(
+            "PM", "PM-GENERAL-PROJECT-MANAGER", "General Project Manager", "المدير العام للمشاريع",
+            null, true, 10, null, null),
+        new(
+            "PM", "PM-DEPUTY-MANAGER", "PM Deputy Manager", "نائب مدير إدارة المشاريع",
+            "PM-GENERAL-PROJECT-MANAGER", true, 20, null, null),
+        new(
+            "PM", "PM-FIRST-PROGRAMS-MANAGER", "First Programs Manager", "مدير البرامج الأول",
+            "PM-DEPUTY-MANAGER", true, 30, null, null),
+        new(
+            "PM", "PM-ACADEMIC-SUPERVISOR", "Academic Supervisor", "مشرف أكاديمي",
+            "PM-DEPUTY-MANAGER", false, 40, null, null),
+        new(
+            "PM", "PM-EXECUTIVE-SECRETARY", "Executive Secretary", "سكرتير تنفيذي",
+            "PM-DEPUTY-MANAGER", false, 50, null, null),
 
         new(
-            "HR", "HR_MANAGER", "HR Manager", "مدير الموارد البشرية", null, true, 10,
-            "Leads Human Resources for QEC Head Office.",
-            "يقود الموارد البشرية لمكتب QEC الرئيسي."),
+            "PM-OFFICE", "PM-OFFICE-ADMINISTRATIVE", "Administrative", "إداري",
+            null, false, 10, null, null),
 
         new(
-            "PM", "PM-HEAD", "Head of Project Management", "مدير إدارة المشاريع", null, true, 10,
-            "Leads the Project Management department and oversees project opportunities, delivery, staffing needs and coordination with other QEC departments.",
-            "يقود إدارة المشاريع ويشرف على فرص المشاريع والتنفيذ واحتياجات القوى العاملة والتنسيق مع إدارات QEC الأخرى."),
+            "PM-STAFF", "PM-STAFF-PROJECT-COORDINATOR", "Project Coordinator", "منسق مشاريع",
+            null, false, 10, null, null),
         new(
-            "PM", "PM-PROJECT-MANAGER", "Project Manager", "مدير مشروع", "PM-HEAD", true, 20,
-            "Responsible for assigned projects, project delivery, requirements and coordination.",
-            "مسؤول عن المشاريع المكلفة وتنفيذها ومتطلباتها والتنسيق الخاص بها."),
-        new(
-            "PM", "PM-PROJECT-COORDINATOR", "Project Coordinator", "منسق مشروع", "PM-PROJECT-MANAGER", false, 30,
-            "Supports project administration, schedules, documentation and operational coordination.",
-            "يدعم إدارة المشاريع والجداول الزمنية والتوثيق والتنسيق التشغيلي."),
-        new(
-            "PM", "PM-STAFFING-COORDINATOR", "Project Staffing Coordinator", "منسق القوى العاملة للمشاريع",
-            "PM-PROJECT-MANAGER", false, 40,
-            "Coordinates project staffing requirements and candidate selection/endorsement to Human Resources. This role does not replace HR's formal employment/onboarding authority.",
-            "ينسق احتياجات القوى العاملة للمشاريع وترشيح المرشحين إلى الموارد البشرية. لا يحل هذا الدور محل صلاحية الموارد البشرية في التوظيف والانضمام الرسمي."),
-        new(
-            "PM", "PM-DEVELOPMENT-COORDINATOR", "Project Development Coordinator", "منسق تطوير المشاريع",
-            "PM-HEAD", false, 50,
-            "Supports identification, tracking and preparation of new project opportunities.",
-            "يدعم تحديد فرص المشاريع الجديدة ومتابعتها وتجهيزها."),
+            "PM-STAFF", "PM-STAFF-TALENT-ACQUISITION-SPECIALIST", "Talent Acquisition Specialist",
+            "أخصائي استقطاب المواهب", null, false, 20, null, null),
 
-        new("IT", "IT_DIRECTOR", "IT Director", "مدير تقنية المعلومات", null, true, 10, null, null),
-        new("IT", "IT_MANAGER", "IT Manager", "مدير تقنية المعلومات التشغيلي", "IT_DIRECTOR", true, 20, null, null),
-        new("IT", "IT_ADMINISTRATOR", "IT Administrator", "مسؤول تقنية المعلومات", "IT_MANAGER", false, 30, null, null),
-        new("IT", "SYSTEMS_ADMINISTRATOR", "Systems Administrator", "مسؤول الأنظمة", "IT_MANAGER", false, 40, null, null),
-        new("IT", "NETWORK_ADMINISTRATOR", "Network Administrator", "مسؤول الشبكات", "IT_MANAGER", false, 50, null, null),
-        new("IT", "IT_SUPPORT_SPECIALIST", "IT Support Specialist", "أخصائي دعم تقنية المعلومات", "IT_MANAGER", false, 60, null, null),
-        new("IT", "IT_SECURITY_GOVERNANCE", "IT Security & Governance Officer", "مسؤول أمن وحوكمة تقنية المعلومات", "IT_MANAGER", false, 70, null, null),
+        // Cybersecurity & IT Governance Committee — vacant only; never seed assignments
+        new(
+            "CYBER-GOV", "CYBER-GOV-CHAIR", "Committee Chair / Executive Sponsor",
+            "رئيس اللجنة / الراعي التنفيذي", null, true, 10, null, null),
+        new(
+            "CYBER-GOV", "CYBER-GOV-LEAD", "Cybersecurity & IT Governance Lead",
+            "مسؤول قيادة الأمن السيبراني وحوكمة تقنية المعلومات", "CYBER-GOV-CHAIR", true, 20, null, null),
+        new(
+            "CYBER-GOV", "CYBER-GOV-COORDINATOR", "Security & Governance Coordinator",
+            "منسق الأمن والحوكمة", "CYBER-GOV-LEAD", false, 30, null, null),
+        new(
+            "CYBER-GOV", "CYBER-GOV-PEOPLE", "People Security & Awareness Representative",
+            "ممثل أمن الأفراد والتوعية الأمنية", "CYBER-GOV-LEAD", false, 40, null, null),
+        new(
+            "CYBER-GOV", "CYBER-GOV-FINANCE", "Financial Systems & Controls Representative",
+            "ممثل الأنظمة والضوابط المالية", "CYBER-GOV-LEAD", false, 50, null, null),
+        new(
+            "CYBER-GOV", "CYBER-GOV-TECH-SME", "Technical Security Member / SME",
+            "عضو الأمن التقني / خبير متخصص", "CYBER-GOV-LEAD", false, 60, null, null),
     ];
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
@@ -313,23 +458,56 @@ public sealed class OrganizationPositionsSeedRunner(
 
         Dictionary<string, Guid> departmentIds = await db.Departments.AsNoTracking()
             .Where(d => d.Code != null)
-            .ToDictionaryAsync(d => d.Code, d => d.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
+            .ToDictionaryAsync(d => d.Code!, d => d.Id, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
         int created = 0;
         foreach (IGrouping<string, PositionSeed> group in Positions.GroupBy(p => p.DepartmentCode))
         {
-            if (!departmentIds.TryGetValue(group.Key, out Guid departmentId))
+            string deptCode = Department.NormalizeCode(group.Key);
+            if (!departmentIds.TryGetValue(deptCode, out Guid departmentId))
             {
-                logger.LogWarning("Skipping positions for missing department {Code}.", group.Key);
+                logger.LogWarning("Skipping positions for missing department {Code}.", deptCode);
                 continue;
             }
 
             created += await EnsurePositionsAsync(departmentId, group.ToArray(), cancellationToken);
         }
 
+        await ReconcileLegacyStarterPositionsAsync(cancellationToken);
+
         logger.LogInformation(
             "Organization hierarchy seed completed ({Created} positions created across starter departments).",
             created);
+    }
+
+    private async Task ReconcileLegacyStarterPositionsAsync(CancellationToken ct)
+    {
+        foreach (string key in LegacyStarterKeysToDeactivateWhenVacant)
+        {
+            string normalized = Position.NormalizeKey(key);
+            List<Position> matches = await db.Positions
+                .Where(p => p.Key == normalized && p.IsActive)
+                .ToListAsync(ct);
+
+            foreach (Position position in matches)
+            {
+                bool hasAssignments = await db.PositionAssignments
+                    .AnyAsync(a => a.PositionId == position.Id, ct);
+                if (hasAssignments)
+                {
+                    logger.LogInformation(
+                        "Preserving occupied legacy position {Key} (assignments present).",
+                        normalized);
+                    continue;
+                }
+
+                position.Deactivate(clock.UtcNow);
+                await db.SaveChangesAsync(ct);
+                logger.LogInformation(
+                    "Soft-deactivated vacant legacy starter position {Key}.",
+                    normalized);
+            }
+        }
     }
 
     private async Task AttachOrphanStarterDepartmentsToQecAsync(CancellationToken ct)
@@ -340,10 +518,11 @@ public sealed class OrganizationPositionsSeedRunner(
             return;
         }
 
-        string[] attachCodes = ["EXEC", "PM", "HR", "FINANCE", "IT", "LEGAL", "MARKETING"];
+        string[] attachCodes = ["EXEC", "PM", "HR", "FINANCE", "IT", "LEGAL", "MARKETING", "CYBER-GOV"];
         foreach (string code in attachCodes)
         {
-            Department? dept = await db.Departments.FirstOrDefaultAsync(x => x.Code == code, ct);
+            string normalized = Department.NormalizeCode(code);
+            Department? dept = await db.Departments.FirstOrDefaultAsync(x => x.Code == normalized, ct);
             if (dept is null || dept.ParentDepartmentId is not null)
             {
                 continue;
@@ -353,7 +532,7 @@ public sealed class OrganizationPositionsSeedRunner(
             await db.SaveChangesAsync(ct);
             logger.LogInformation(
                 "Attached orphan starter department {Code} under QEC.",
-                code);
+                normalized);
         }
     }
 
@@ -380,7 +559,8 @@ public sealed class OrganizationPositionsSeedRunner(
                 continue;
             }
 
-            Department? dept = await db.Departments.FirstOrDefaultAsync(x => x.Code == code, ct);
+            string normalized = Department.NormalizeCode(code);
+            Department? dept = await db.Departments.FirstOrDefaultAsync(x => x.Code == normalized, ct);
             if (dept is null)
             {
                 continue;

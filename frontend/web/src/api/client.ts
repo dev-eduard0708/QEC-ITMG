@@ -5313,6 +5313,7 @@ export type OrganizationUnitType =
   | 'Section'
   | 'Office'
   | 'Team'
+  | 'Committee'
   | 'Other'
 
 export type OrganizationDepartmentSummary = {

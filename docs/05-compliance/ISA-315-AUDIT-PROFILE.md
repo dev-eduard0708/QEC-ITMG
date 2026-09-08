@@ -1,6 +1,6 @@
 # ISA 315–oriented IT audit profile
 
-Related: [AUDIT-MANAGEMENT.md](../03-modules/AUDIT-MANAGEMENT.md) · [CONTROL-MODEL.md](CONTROL-MODEL.md) · [FRAMEWORK-MAPPING.md](FRAMEWORK-MAPPING.md) · [../03-modules/COMPLIANCE.md](../03-modules/COMPLIANCE.md)
+Related: [AUDIT-MANAGEMENT.md](../03-modules/AUDIT-MANAGEMENT.md) · [CONTROL-MODEL.md](CONTROL-MODEL.md) · [FRAMEWORK-MAPPING.md](FRAMEWORK-MAPPING.md) · [../03-modules/COMPLIANCE.md](../03-modules/COMPLIANCE.md) · [../03-modules/ORGANIZATION.md](../03-modules/ORGANIZATION.md) (Cybersecurity & IT Governance Committee — not an ISA 315 department)
 
 ## Purpose
 

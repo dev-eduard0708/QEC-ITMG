@@ -55,7 +55,7 @@ BusinessAudit field names include V1 actions such as `AwarenessCampaignLaunched`
 
 Awareness campaign and completion records support **IT audit readiness and evidence**. Authoritative completion rows are the evidence — do not create an Evidence Library row per employee completion. Campaign/completion CSV exports may be referenced from Evidence where the existing library cleanly supports it.
 
-Do **not** label the product or reports as “ISA 315 compliant”, “security certified”, or “audit passed”. ISA 315 language in docs means readiness support only; it does not claim statutory compliance or replace auditor judgement.
+Do **not** label the product or reports as “ISA 315 compliant”, “security certified”, or “audit passed”. ISA 315 language in docs means readiness support only; it does not claim statutory compliance or replace auditor judgement. The Head Office **Cybersecurity & IT Governance Committee** organizational unit (see [ORGANIZATION.md](ORGANIZATION.md)) may help coordinate readiness follow-up; it is not an ISA 315 department and does not grant RBAC.
 
 ## Permissions
 

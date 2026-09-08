@@ -12,5 +12,6 @@ public enum DepartmentUnitType
     Section = 2,
     Office = 3,
     Team = 4,
-    Other = 5,
+    Committee = 5,
+    Other = 6,
 }

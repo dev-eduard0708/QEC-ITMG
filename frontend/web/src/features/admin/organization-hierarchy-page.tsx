@@ -179,6 +179,7 @@ const UNIT_TYPE_OPTIONS: OrganizationUnitType[] = [
   'Section',
   'Office',
   'Team',
+  'Committee',
   'Other',
 ]
 
@@ -714,6 +715,25 @@ export function OrganizationHierarchyPage() {
     selectedPosition?.departmentId,
   ])
 
+  const assignDepartmentUnitType = useMemo(() => {
+    const deptId = selectedPosition?.departmentId ?? resolvedDepartmentId
+    return (departmentsQuery.data ?? []).find((d) => d.id === deptId)?.unitType
+  }, [departmentsQuery.data, resolvedDepartmentId, selectedPosition?.departmentId])
+
+  const isAssignTargetCommittee = assignDepartmentUnitType === 'Committee'
+
+  const openAssignForPosition = (positionId: string) => {
+    const node = findNode(roots, positionId)
+    const deptId = node?.departmentId ?? resolvedDepartmentId
+    const dept = (departmentsQuery.data ?? []).find((d) => d.id === deptId)
+    setSelectedPositionId(positionId)
+    setFormError(null)
+    setAssignSearch('')
+    setPendingAssignUser(null)
+    setSearchAllUsers(dept?.unitType === 'Committee')
+    setAssignOpen(true)
+  }
+
   const tryAssignUser = (user: OrganizationActiveUser) => {
     if (!searchAllUsers || assignMemberIds.has(user.id)) {
       assignMutation.mutate({ userId: user.id })
@@ -937,7 +957,9 @@ export function OrganizationHierarchyPage() {
             isLoading={hierarchyQuery.isLoading}
             roots={roots}
             language={language}
+            canManage={canManage}
             onSelectPosition={setSelectedPositionId}
+            onAssignEmployee={openAssignForPosition}
             onSelectUser={(occupant) => setProfileUserId(occupant.userId)}
           />
         </div>
@@ -1015,7 +1037,9 @@ export function OrganizationHierarchyPage() {
               isLoading={hierarchyQuery.isLoading}
               roots={roots}
               language={language}
+              canManage={canManage}
               onSelectPosition={setSelectedPositionId}
+              onAssignEmployee={openAssignForPosition}
               onSelectUser={(occupant) => setProfileUserId(occupant.userId)}
             />
           ) : positionsListQuery.isLoading ? (
@@ -1102,15 +1126,10 @@ export function OrganizationHierarchyPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => {
-                        setFormError(null)
-                        setAssignSearch('')
-                        setSearchAllUsers(false)
-                        setAssignOpen(true)
-                      }}
+                      onClick={() => openAssignForPosition(selectedPosition.id)}
                     >
                       <Plus className="me-1 h-3.5 w-3.5" />
-                      {t('admin.hierarchy.assignUser')}
+                      {t('admin.hierarchy.assignEmployee')}
                     </Button>
                   ) : null}
                 </div>
@@ -1516,12 +1535,21 @@ export function OrganizationHierarchyPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t('admin.hierarchy.addToDepartmentConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isAssignTargetCommittee
+                ? t('admin.hierarchy.addToCommitteeConfirmTitle')
+                : t('admin.hierarchy.addToDepartmentConfirmTitle')}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {t('admin.hierarchy.addToDepartmentConfirm', {
-                user: pendingAssignUser?.displayName ?? '',
-                department: assignDepartmentName,
-              })}
+              {isAssignTargetCommittee
+                ? t('admin.hierarchy.addToCommitteeConfirm', {
+                    user: pendingAssignUser?.displayName ?? '',
+                    department: assignDepartmentName,
+                  })
+                : t('admin.hierarchy.addToDepartmentConfirm', {
+                    user: pendingAssignUser?.displayName ?? '',
+                    department: assignDepartmentName,
+                  })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1535,7 +1563,9 @@ export function OrganizationHierarchyPage() {
                 })
               }}
             >
-              {t('admin.hierarchy.addToDepartmentAndAssign')}
+              {isAssignTargetCommittee
+                ? t('admin.hierarchy.addToCommitteeAndAssign')
+                : t('admin.hierarchy.addToDepartmentAndAssign')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -2233,13 +2263,17 @@ function HierarchyChart({
   isLoading,
   roots,
   language,
+  canManage,
   onSelectPosition,
+  onAssignEmployee,
   onSelectUser,
 }: {
   isLoading: boolean
   roots: OrganizationPositionNode[]
   language: string
+  canManage: boolean
   onSelectPosition: (id: string) => void
+  onAssignEmployee: (id: string) => void
   onSelectUser: (occupant: OrganizationPositionOccupant) => void
 }) {
   const { t } = useTranslation()
@@ -2266,7 +2300,9 @@ function HierarchyChart({
             key={root.id}
             node={root}
             language={language}
+            canManage={canManage}
             onSelectPosition={onSelectPosition}
+            onAssignEmployee={onAssignEmployee}
             onSelectUser={onSelectUser}
           />
         ))}
@@ -2498,12 +2534,16 @@ function ProfileSummarySheet({
 function PositionTree({
   node,
   language,
+  canManage,
   onSelectPosition,
+  onAssignEmployee,
   onSelectUser,
 }: {
   node: OrganizationPositionNode
   language: string
+  canManage: boolean
   onSelectPosition: (id: string) => void
+  onAssignEmployee: (id: string) => void
   onSelectUser: (occupant: OrganizationPositionOccupant) => void
 }) {
   return (
@@ -2511,7 +2551,9 @@ function PositionTree({
       <PositionCard
         node={node}
         language={language}
+        canManage={canManage}
         onSelectPosition={onSelectPosition}
+        onAssignEmployee={onAssignEmployee}
         onSelectUser={onSelectUser}
       />
       {node.children.length > 0 ? (
@@ -2539,7 +2581,9 @@ function PositionTree({
                   <PositionTree
                     node={child}
                     language={language}
+                    canManage={canManage}
                     onSelectPosition={onSelectPosition}
+                    onAssignEmployee={onAssignEmployee}
                     onSelectUser={onSelectUser}
                   />
                 </div>
@@ -2555,88 +2599,112 @@ function PositionTree({
 function PositionCard({
   node,
   language,
+  canManage,
   onSelectPosition,
+  onAssignEmployee,
   onSelectUser,
 }: {
   node: OrganizationPositionNode
   language: string
+  canManage: boolean
   onSelectPosition: (id: string) => void
+  onAssignEmployee: (id: string) => void
   onSelectUser: (occupant: OrganizationPositionOccupant) => void
 }) {
   const { t } = useTranslation()
   const visible = node.occupants.slice(0, 3)
   const extra = Math.max(0, node.occupants.length - visible.length)
+  const isVacant = node.occupants.length === 0
 
   return (
-    <button
-      type="button"
-      onClick={() => onSelectPosition(node.id)}
+    <div
       className={cn(
         'w-full max-w-sm rounded-lg border border-border bg-card p-4 text-start shadow-sm transition hover:border-primary/40 hover:shadow-md',
         !node.isActive && 'opacity-70',
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold text-foreground">
-            {localizedName(language, node.nameEn, node.nameAr)}
-          </p>
-          {node.isManagerial ? (
-            <Badge variant="secondary" className="mt-1">
-              {t('admin.hierarchy.managerial')}
-            </Badge>
-          ) : null}
+      <button
+        type="button"
+        onClick={() => onSelectPosition(node.id)}
+        className="w-full text-start"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="font-semibold text-foreground">
+              {localizedName(language, node.nameEn, node.nameAr)}
+            </p>
+            {node.isManagerial ? (
+              <Badge variant="secondary" className="mt-1">
+                {t('admin.hierarchy.managerial')}
+              </Badge>
+            ) : null}
+          </div>
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <Users className="h-3.5 w-3.5" />
+            {node.occupants.length}
+          </span>
         </div>
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Users className="h-3.5 w-3.5" />
-          {node.occupants.length}
-        </span>
-      </div>
 
-      <div className="mt-3 space-y-2">
-        {node.occupants.length === 0 ? (
-          <p className="text-sm italic text-muted-foreground">{t('admin.hierarchy.vacant')}</p>
-        ) : (
-          visible.map((occupant) => (
-            <div
-              key={occupant.assignmentId}
-              className="flex items-center gap-2"
-              onClick={(e) => {
-                e.stopPropagation()
-                onSelectUser(occupant)
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+        <div className="mt-3 space-y-2">
+          {isVacant ? (
+            <p className="text-sm italic text-muted-foreground">{t('admin.hierarchy.vacant')}</p>
+          ) : (
+            visible.map((occupant) => (
+              <div
+                key={occupant.assignmentId}
+                className="flex items-center gap-2"
+                onClick={(e) => {
                   e.stopPropagation()
                   onSelectUser(occupant)
-                }
-              }}
-              role="link"
-              tabIndex={0}
-            >
-              <UserAvatar
-                displayName={occupant.displayName}
-                profileImageUrl={occupant.avatarUrl}
-                size="sm"
-              />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">{occupant.displayName}</span>
-                <span className="block truncate text-xs text-muted-foreground">{occupant.upn}</span>
-              </span>
-            </div>
-          ))
-        )}
-        {extra > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {t('admin.hierarchy.moreOccupants', { count: extra })}
-          </p>
-        ) : null}
-      </div>
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation()
+                    onSelectUser(occupant)
+                  }
+                }}
+                role="link"
+                tabIndex={0}
+              >
+                <UserAvatar
+                  displayName={occupant.displayName}
+                  profileImageUrl={occupant.avatarUrl}
+                  size="sm"
+                />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">{occupant.displayName}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{occupant.upn}</span>
+                </span>
+              </div>
+            ))
+          )}
+          {extra > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {t('admin.hierarchy.moreOccupants', { count: extra })}
+            </p>
+          ) : null}
+        </div>
 
-      <p className="mt-3 text-xs text-muted-foreground">
-        {t('admin.hierarchy.occupantCount', { count: node.occupants.length })}
-      </p>
-    </button>
+        <p className="mt-3 text-xs text-muted-foreground">
+          {t('admin.hierarchy.occupantCount', { count: node.occupants.length })}
+        </p>
+      </button>
+
+      {canManage && node.isActive && isVacant ? (
+        <Button
+          size="sm"
+          variant="outline"
+          className="mt-3 w-full"
+          onClick={(e) => {
+            e.stopPropagation()
+            onAssignEmployee(node.id)
+          }}
+        >
+          <Plus className="me-1 h-3.5 w-3.5" />
+          {t('admin.hierarchy.assignEmployee')}
+        </Button>
+      ) : null}
+    </div>
   )
 }
 
